@@ -316,3 +316,4 @@ If you find this repository helpful for your research, please consider giving us
 1. Yishan Li, Wentong Chen, Yukun Yan, Mingwei Li, Sen Mei, Xiaorong Wang, Kunpeng Liu, Xin Cong, Shuo Wang, Zhong Zhang, Yaxi Lu, Zhenghao Liu, Yankai Lin, Zhiyuan Liu, Maosong Sun. (2026) AgentCPM-Report: Interleaving Drafting and Deepening for Open-Ended Deep Research. [arXiv:2602.06540](https://arxiv.org/abs/2602.06540).
 
 2. OpenBMB. MiniCPM-Embedding-Light. [Hugging Face Model Card](https://huggingface.co/openbmb/MiniCPM-Embedding-Light).
+# UltraRAG-AWP
