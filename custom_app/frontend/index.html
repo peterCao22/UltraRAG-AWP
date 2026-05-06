@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AGV 知识库助手 · 对话</title>
+    <link rel="icon" href="/frontend/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/frontend/style.css">
+  </head>
+  <body>
+    <div id="app" class="app-shell chat-shell" data-page="chat">
+      <aside class="chat-sidebar" aria-label="对话侧栏">
+        <section>
+          <h1 class="brand-title">AGV 知识库助手</h1>
+          <p class="brand-subtitle">面向内网 SOP 的私有问答系统</p>
+        </section>
+
+        <button class="primary-action" type="button" data-role="new-chat">+ 新建对话</button>
+
+        <section class="sidebar-section">
+          <label class="sidebar-caption" for="kb-select">知识库</label>
+          <select id="kb-select" class="field" data-role="kb-select">
+            <option value="" disabled selected>请选择知识库</option>
+          </select>
+        </section>
+
+        <section class="sidebar-section" data-role="session-section">
+          <span class="sidebar-caption">会话列表</span>
+          <div class="session-list-host" data-role="session-list" aria-label="历史会话"></div>
+        </section>
+
+        <a class="sidebar-link" href="/admin">管理后台</a>
+      </aside>
+
+      <main class="chat-workspace">
+        <header class="mobile-topbar">
+          <button class="icon-button" type="button" aria-label="打开侧栏" data-role="sidebar-toggle">☰</button>
+          <strong>AGV 知识库助手</strong>
+        </header>
+
+        <section class="message-list" aria-label="消息列表" data-role="message-list">
+          <article class="message ai">
+            <strong>助手</strong>
+            <p>您好，请先选择知识库，然后输入 AGV 操作问题。</p>
+            <div class="source-placeholder">引用来源将在回答完成后展示。</div>
+          </article>
+        </section>
+
+        <footer class="composer">
+          <div class="composer-toolbar">
+            <select class="agent-select" aria-label="智能体模式" data-role="agent-select">
+              <option value="quick">智能体：快速问答</option>
+              <option value="agent">智能体：智能推理</option>
+            </select>
+            <span class="muted" data-role="char-count">0/500</span>
+          </div>
+          <div class="composer-row">
+            <label class="visually-hidden" for="composer-input">输入问题</label>
+            <textarea id="composer-input" class="composer-input" data-role="composer-input" placeholder="输入您的问题，Enter 发送，Shift+Enter 换行"></textarea>
+            <button class="send-button" type="button" data-role="send-button">发送</button>
+          </div>
+        </footer>
+      </main>
+
+      <div
+        class="chat-sidebar-backdrop"
+        data-role="sidebar-backdrop"
+        aria-hidden="true"
+      ></div>
+    </div>
+
+    <script src="/frontend/vendor/marked.min.js"></script>
+    <script src="/frontend/vendor/DOMPurify.min.js"></script>
+    <script type="module" src="/frontend/main.js"></script>
+  </body>
+</html>

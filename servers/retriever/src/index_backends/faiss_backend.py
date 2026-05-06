@@ -160,6 +160,7 @@ class FaissIndexBackend(BaseIndexBackend):
             total=total,
             desc="[faiss] Indexing: ",
             unit="vec",
+            disable=True,
         ) as pbar:
             for start in range(0, total, index_chunk_size):
                 end = min(start + index_chunk_size, total)

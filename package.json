@@ -1,0 +1,15 @@
+{
+  "name": "ultrarag-phase3-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.5",
+    "happy-dom": "^20.9.0",
+    "vitest": "^4.1.5"
+  }
+}

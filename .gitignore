@@ -33,3 +33,7 @@ servers/*/server.yaml
 
 # Python package metadata
 src/*.egg-info/
+
+# Node frontend test tooling
+node_modules/
+coverage/

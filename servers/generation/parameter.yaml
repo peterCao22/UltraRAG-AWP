@@ -1,34 +1,46 @@
 # servers/generation/parameter.yaml
+# Phase 1: 默认内网 OpenAI 兼容端点（vLLM 等）。运行时可用 .env 覆盖，无需改本文件：
+#   ULTRARAG_OPENAI_BASE_URL  ULTRARAG_OPENAI_MODEL  ULTRARAG_OPENAI_API_KEY（可选）
+#   ULTRARAG_OPENAI_REQUEST_TIMEOUT_SEC（可选）
+# 将来可由后端「模型管理」写入配置或环境变量（参见 custom_app RagRunner）。
+# 可选：chat_backend: gemini  # 与 ULTRARAG_CHAT_BACKEND=gemini 等价，走 Google AI generateContent
 
-backend: vllm # options: vllm, openai
+backend: openai
 backend_configs:
+  openai:
+    model_name: Qwen/Qwen3.6-27B-FP8
+    base_url: http://192.168.8.44:8800/v1
+    # 单次 chat/completions 读超时（秒）。RAG 长提示 + max_tokens 较大时生成常 >120s，易误报「服务不在线」
+    request_timeout_sec: 300
+    api_key: "dummy"        # vLLM 不做鉴权，填任意字符串
+    concurrency: 4
+    retries: 3
+    base_delay: 1.0
   vllm:
-    model_name_or_path: openbmb/MiniCPM4-8B
-    gpu_ids: "2,3"
+    model_name_or_path: Qwen/Qwen3.6-27B-FP8
+    gpu_ids: "0"
     gpu_memory_utilization: 0.9
     dtype: auto
     trust_remote_code: true
-  openai:
-    model_name: MiniCPM4-8B
-    base_url: http://localhost:8000/v1
-    api_key: "abc"
-    concurrency: 8
-    retries: 3
-    base_delay: 1.0
   hf:
-    model_name_or_path: openbmb/MiniCPM4-8B
-    gpu_ids: '2,3'
+    model_name_or_path: gpt-oss-120b
+    gpu_ids: '0'
     trust_remote_code: true
     batch_size: 8
 
 sampling_params:
-  temperature: 0.7
-  top_p: 0.8
-  max_tokens: 2048
+  temperature: 0.2          # SOP 文档推荐低温度，减少幻觉
+  top_p: 0.9
+  max_tokens: 4096          # 完整 SOP 多段摘录 + 中文翻译需要更长输出
 
-extra_params:
-  chat_template_kwargs:
-    enable_thinking: false
+extra_params: {}
 
-system_prompt: ""
+system_prompt: |
+  You are a professional AGV (Automated Guided Vehicle) operations assistant for SOP-based Q&A.
+  Follow the user message instructions exactly: use only the provided excerpts.
+  Whenever the user's question contains any Chinese characters, you MUST answer with Simplified Chinese for all
+  narrative and procedural text (translate English SOP excerpts faithfully). Do not reply in English to Chinese questions.
+  Never omit procedural steps or safety items from those excerpts (faithful translation / rephrasing only).
+  If information is missing from the excerpts, state clearly that the documentation is insufficient — do not fabricate.
+
 image_tag: null

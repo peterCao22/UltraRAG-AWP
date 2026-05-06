@@ -1,0 +1,14 @@
+
+1、phase1 执行docx解析入库流程：  
+conda activate ultrarag
+cd D:\Peter2025\myCursor\UltraRAG
+
+python -m custom_app.services.docx_parser --input data/kb/agv_demo/raw --kb-root data/kb/agv_demo
+
+python -c "from custom_app.services.google_embedder import build_embedding_npy; build_embedding_npy('data/kb/agv_demo/corpora/chunks.jsonl','data/kb/agv_demo/embedding/embedding.npy')"
+
+ultrarag run examples/agv_index_only.yaml
+
+2. phase2 多知识库管理
+
+

@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(claude --version)",
+      "Bash(npx claude:*)",
+      "Bash(npm list:*)",
+      "Read(//c/Users/Peter/.claude/**)",
+      "Read(//c/Users/Peter/**)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.keys\\(\\)\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d['mcpServers'].keys\\(\\)\\)\\)\")",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('/c/Users/Peter/.claude/.mcp.json'\\)\\); print\\(list\\(d['mcpServers'].keys\\(\\)\\)\\)\")",
+      "Bash(python -c \"import requests; print\\('requests ok'\\)\")",
+      "Bash(python -c \"import pytest; print\\('pytest ok'\\)\")",
+      "Bash(pip install:*)",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -m pip install --force-reinstall torch --index-url https://download.pytorch.org/whl/cu124)",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -c ':*)",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -m custom_app.app)",
+      "Bash(curl -s http://127.0.0.1:8080/)",
+      "Read(//tmp/**)",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -m pytest tests/test_t3_rerank.py::TestT3RerankerEnabled -v -s --tb=short)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -m pytest tests/test_t3_rerank.py::TestT3RerankerEnabled::test_rerank_applied_true tests/test_t3_rerank.py::TestT3RerankerEnabled::test_rerank_device_reported tests/test_t3_rerank.py::TestT3RerankerEnabled::test_rerank_ms_reasonable tests/test_t3_rerank.py::TestT3RerankerEnabled::test_meta_summary -v -s --tb=short)",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -m pytest tests/test_t4_t5_integration.py -v --tb=short)",
+      "Bash(C:/Users/Peter/miniconda3/envs/ultrarag/python.exe -m pytest tests/test_t4_t5_integration.py -v -s --tb=short)",
+      "Bash(python -m pytest tests/test_phase2_kb_api.py -v --tb=no -q)",
+      "Bash(python -m pytest tests/test_phase2_kb_api.py -v --tb=short -q)",
+      "Bash(py -3 --version)",
+      "Bash(/c/Users/Peter/miniconda3/envs/ultrarag/python -m pytest tests/test_phase2_kb_api.py -v --tb=short -q)",
+      "Bash(/c/Users/Peter/miniconda3/envs/ultrarag/python -m pytest tests/test_phase2_kb_api.py -v --tb=short)",
+      "Bash(/c/Users/Peter/miniconda3/envs/ultrarag/python -m pytest tests/ -v --tb=short --ignore=tests/test_t1_t2_integration.py --ignore=tests/test_t3_rerank.py --ignore=tests/test_t4_t5_integration.py)",
+      "Bash(/c/Users/Peter/miniconda3/envs/ultrarag/python -c ':*)",
+      "Bash(/c/Users/Peter/miniconda3/envs/ultrarag/python -m pytest tests/test_phase2_kb_api.py::TestChunksPreview tests/test_phase2_kb_api.py::TestJobProgress -v)",
+      "Bash(curl -s -X POST http://127.0.0.1:8080/api/chat -H 'Content-Type: application/json' -d '{\"kb_id\":\"agv_demo\",\"question\":\"换电步骤是什么？\"}' --max-time 60)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Peter2025\\\\myCursor\\\\WeKnora\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(find \"D:\\\\Peter2025\\\\myCursor\\\\WeKnora\" -type f \\\\\\( -name \"*.py\" -o -name \"*.ts\" -o -name \"*.js\" \\\\\\) | head -50)",
+      "Read(//d/Peter2025/myCursor/WeKnora/**)",
+      "Bash(xargs grep -l \"AgentQA\\\\|KnowledgeQA\")",
+      "Bash(Get-ChildItem -Path \"D:\\\\Peter2025\\\\myCursor\\\\UltraRAG\\\\custom_app\" -Recurse -Name)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\Peter2025\\\\myCursor\\\\UltraRAG\\\\custom_app\" -Recurse | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\('D:\\\\Peter2025\\\\myCursor\\\\UltraRAG\\\\custom_app\\\\', ''\\) })",
+      "PowerShell(Get-Command uv -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command conda -ErrorAction SilentlyContinue)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Peter\\.claude"
+    ]
+  }
+}

@@ -1,6 +1,9 @@
 import asyncio
+import contextlib
 import gc
+import io
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -17,6 +20,23 @@ from index_backends import BaseIndexBackend, create_index_backend
 from websearch_backends import create_websearch_backend
 
 app = UltraRAG_MCP_Server("retriever")
+
+# Suppress FAISS/SWIG deprecation warnings that may print to stdio and break MCP protocol.
+warnings.filterwarnings(
+    "ignore",
+    message="builtin type SwigPyPacked has no __module__ attribute",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="builtin type SwigPyObject has no __module__ attribute",
+    category=DeprecationWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    message="builtin type swigvarlink has no __module__ attribute",
+    category=DeprecationWarning,
+)
 
 
 class Retriever:
@@ -166,7 +186,7 @@ class Retriever:
             async with pbar_lock:
                 pbar.update(len(batch))
 
-        with tqdm(total=len(texts), desc=desc, unit=unit) as pbar:
+        with tqdm(total=len(texts), desc=desc, unit=unit, disable=True) as pbar:
             tasks = [
                 asyncio.create_task(_process_batch(start, batch))
                 for start, batch in batches
@@ -280,6 +300,7 @@ class Retriever:
             self.model = AsyncEngineArray.from_args([infinity_engine_args])[0]
 
         elif self.backend == "sentence_transformers":
+            app.logger.info("[retriever] Importing sentence_transformers package...")
             try:
                 from sentence_transformers import SentenceTransformer
             except ImportError:
@@ -289,6 +310,7 @@ class Retriever:
                 )
                 app.logger.error(err_msg)
                 raise ImportError(err_msg)
+            app.logger.info("[retriever] sentence_transformers package imported.")
             self.st_encode_params = (
                 self.cfg.get("sentence_transformers_encode", {}) or {}
             )
@@ -296,11 +318,20 @@ class Retriever:
                 self.cfg, banned=["sentence_transformers_encode"]
             )
 
-            self.model = SentenceTransformer(
-                model_name_or_path=model_name_or_path,
-                device=self.device,
-                **st_params,
+            app.logger.info(
+                "[retriever] Initializing SentenceTransformer: %s",
+                model_name_or_path,
             )
+            # Keep MCP stdio channel clean: some ST/transformers internals print to stdout/stderr.
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(
+                io.StringIO()
+            ):
+                self.model = SentenceTransformer(
+                    model_name_or_path=model_name_or_path,
+                    device=self.device,
+                    **st_params,
+                )
+            app.logger.info("[retriever] SentenceTransformer initialized.")
 
         elif self.backend == "openai":
             try:
@@ -404,6 +435,7 @@ class Retriever:
                     unit="B",
                     unit_scale=True,
                     ncols=100,
+                    disable=True,
                 ) as pbar:
                     bytes_read = 0
                     for i, line in enumerate(f):
@@ -432,6 +464,10 @@ class Retriever:
                     if bytes_read < file_size:
                         pbar.update(file_size - bytes_read)
                     pbar.refresh()
+            app.logger.info(
+                "[retriever] Corpus loaded into memory, total items: %d",
+                len(self.contents),
+            )
         else:
             if self.is_demo:
                 app.logger.info(
@@ -444,6 +480,9 @@ class Retriever:
         if self.backend in ["infinity", "sentence_transformers", "openai"]:
             index_backend_cfg = self.index_backend_configs.get(
                 self.index_backend_name, {}
+            )
+            app.logger.info(
+                "[retriever] Creating index backend: %s", self.index_backend_name
             )
 
             if self.index_backend_name == "milvus":
@@ -460,7 +499,9 @@ class Retriever:
                 "[index] Initialized backend '%s'.", self.index_backend_name
             )
             try:
+                app.logger.info("[index] Loading existing index if present...")
                 self.index_backend.load_index()
+                app.logger.info("[index] Existing index load step finished.")
             except Exception as exc:
                 warn_msg = (
                     f"[index] Failed to load existing index using backend "
@@ -561,7 +602,7 @@ class Retriever:
 
                 eff_bs = self.batch_size * self.device_num
                 n = len(data)
-                pbar = tqdm(total=n, desc="[infinity] Embedding:")
+                pbar = tqdm(total=n, desc="[infinity] Embedding:", disable=True)
                 embeddings = []
                 for i in range(0, n, eff_bs):
                     chunk = data[i : i + eff_bs]

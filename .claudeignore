@@ -1,0 +1,19 @@
+#please add some patterns to ignore
+*.log
+node_modules/
+build/
+.next/
+__pycache__/
+
+*.lock
+package-lock.json
+.git
+.idea
+.vscode
+
+*.png
+*.jpg
+*.svg
+*.ico
+.cache/
+coverage/

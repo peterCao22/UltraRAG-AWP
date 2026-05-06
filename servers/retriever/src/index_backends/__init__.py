@@ -1,14 +1,27 @@
 from __future__ import annotations
 from typing import Any, Dict, Optional, Sequence, Type
-import importlib
 
-from .base import BaseIndexBackend  
+from .base import BaseIndexBackend
 
-
-_INDEX_BACKENDS: Dict[str, str] = {
-    "faiss": ".faiss_backend.FaissIndexBackend",
-    "milvus": ".milvus_backend.MilvusIndexBackend",
+_INDEX_BACKENDS: Dict[str, Optional[Type[BaseIndexBackend]]] = {
+    "faiss": None,
+    "milvus": None,
 }
+_INDEX_IMPORT_ERRORS: Dict[str, Exception] = {}
+
+try:
+    from .faiss_backend import FaissIndexBackend
+
+    _INDEX_BACKENDS["faiss"] = FaissIndexBackend
+except Exception as exc:
+    _INDEX_IMPORT_ERRORS["faiss"] = exc
+
+try:
+    from .milvus_backend import MilvusIndexBackend
+
+    _INDEX_BACKENDS["milvus"] = MilvusIndexBackend
+except Exception as exc:
+    _INDEX_IMPORT_ERRORS["milvus"] = exc
 
 
 def create_index_backend(
@@ -24,19 +37,13 @@ def create_index_backend(
             f"Unsupported index backend '{name}'. "
             f"Available options: {', '.join(sorted(_INDEX_BACKENDS))}."
         )
-
-    module_path, class_name = _INDEX_BACKENDS[backend_key].rsplit(".", 1)
-    try:
-        module = importlib.import_module(module_path, package=__package__)
-        backend_cls: Type[BaseIndexBackend] = getattr(module, class_name)
-    except ImportError as e:
+    backend_cls = _INDEX_BACKENDS.get(backend_key)
+    if backend_cls is None:
+        exc = _INDEX_IMPORT_ERRORS.get(backend_key)
         raise ImportError(
             f"Backend '{backend_key}' requires optional dependency not installed.\n"
-            f"Original error: {e}"
+            f"Original error: {exc}"
         )
-    except AttributeError:
-        raise ImportError(f"Class '{class_name}' not found in module '{module_path}'")
-
     return backend_cls(contents=contents, config=config or {}, logger=logger, **kwargs)
 
 

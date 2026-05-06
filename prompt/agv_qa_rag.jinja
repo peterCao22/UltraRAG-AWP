@@ -1,0 +1,24 @@
+The following excerpts are from SOP/knowledge-base documents. Each has a unique identifier (source_id).
+
+{% for psg in passages %}
+[Excerpt {{ loop.index }}] [source_id: {{ psg.source_id }}] {{ psg.title }}
+{{ psg.contents }}
+
+{% endfor %}
+---
+User question (may be in English or Chinese):
+
+{{ question }}
+
+Instructions:
+- Use only the provided excerpts above. Do not use external knowledge.
+- **Answer only what the user asked.** Do not volunteer information from passages unrelated to the question.
+- **Mandatory output format:** Output exactly **{{ passages|length }}** sections, one per excerpt. Section k (for k = 1 through {{ passages|length }}) MUST start with its own line:
+  `<<<EXCERPT k>>>` (replace k with the actual number)
+- **For each section k:**
+  - If [Excerpt k] contains information **relevant** to the user's question: write a concise **Simplified Chinese** answer using only that excerpt's content. Translate English to Chinese. Markdown (numbered steps, bold keywords) is encouraged for readability.
+  - If [Excerpt k] is **NOT relevant** to the user's question: output only the single word `[跳过]` on its own line. Do not add any other text for that section.
+- Do **not** add citation markers such as 【来源: ...】 anywhere in the output.
+- Do **not** say "see figure" or "refer to image" — images are attached automatically.
+- Do **not** merge or reorder sections. Section k must correspond exactly to [Excerpt k].
+- If **no excerpt** is relevant: write 「根据现有文档，未找到与该问题相关的信息，无法回答。」 in section 1, and write `[跳过]` for all other sections.

@@ -1,0 +1,11 @@
+# AGV Phase 1 — 仅 FAISS 建索引（需先有 chunks.jsonl + embedding.npy）
+# 1) python -m custom_app.services.docx_parser --kb-root data/kb/agv_demo
+# 2) python -c "from custom_app.services.google_embedder import build_embedding_npy; build_embedding_npy('data/kb/agv_demo/corpora/chunks.jsonl','data/kb/agv_demo/embedding/embedding.npy')"
+# 3) ultrarag run examples/agv_index_only.yaml
+
+servers:
+  retriever: servers/retriever
+
+pipeline:
+- retriever.retriever_init
+- retriever.retriever_index

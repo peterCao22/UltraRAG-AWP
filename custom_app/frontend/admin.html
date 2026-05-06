@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AGV 知识库助手 · 管理</title>
+    <link rel="icon" href="/frontend/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/frontend/style.css">
+  </head>
+  <body>
+    <div id="admin-app" class="admin-shell" data-page="admin">
+      <header class="admin-header">
+        <div class="admin-header-left">
+          <button
+            type="button"
+            class="icon-button admin-sidebar-toggle"
+            data-role="admin-sidebar-toggle"
+            aria-label="打开导航菜单"
+          >☰</button>
+          <strong data-role="admin-title">管理后台</strong>
+        </div>
+        <a class="admin-primary-link" href="/">返回对话页</a>
+      </header>
+
+      <div class="admin-body">
+        <nav class="admin-sidebar" aria-label="管理后台导航" data-role="admin-sidebar">
+          <a href="#/" data-nav="kb">知识库管理</a>
+          <a href="#/status" class="muted" data-nav="status">系统状态</a>
+        </nav>
+
+        <main class="admin-content" data-role="admin-outlet">
+          <p class="muted">加载中…</p>
+        </main>
+
+        <div
+          class="admin-sidebar-backdrop"
+          data-role="admin-sidebar-backdrop"
+          aria-hidden="true"
+        ></div>
+      </div>
+    </div>
+
+    <script src="/frontend/vendor/DOMPurify.min.js"></script>
+    <script type="module" src="/frontend/admin.js"></script>
+  </body>
+</html>

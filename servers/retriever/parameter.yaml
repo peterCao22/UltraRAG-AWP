@@ -1,43 +1,33 @@
 # servers/retriever/parameter.yaml
+# Phase 1: corpus embeddings via custom_app/services/google_embedder.py;
+#          FAISS index / search via UltraRAG retriever.
 
-model_name_or_path: openbmb/MiniCPM-Embedding-Light
-corpus_path: data/corpus_example.jsonl
-embedding_path: embedding/embedding.npy
-collection_name: wiki
-
-backend: sentence_transformers # options: infinity, sentence_transformers, openai, bm25
+# model_name_or_path: used when backend runs embed/search (see examples/parameter overrides).
+model_name_or_path: gemini-embedding-001
+backend: openai
 backend_configs:
-  infinity:
-    bettertransformer: false
-    pooling_method: auto
-    model_warmup: false
-    trust_remote_code: true
   sentence_transformers:
     trust_remote_code: true
     sentence_transformers_encode:
-      normalize_embeddings: false
+      normalize_embeddings: true
       encode_chunk_size: 256
-      q_prompt_name: query
-      psg_prompt_name: document
-      psg_task: null
-      q_task: null
   openai:
-    model_name: text-embedding-3-small
-    base_url: "https://api.openai.com/v1"
-    api_key: "abc"
-    concurrency: 8
+    model_name: gemini-embedding-001
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    api_key: "from_env"
+    concurrency: 4
   bm25:
     lang: en
     save_path: index/bm25
 
-index_backend: faiss # options: faiss, milvus
+index_backend: faiss
 index_backend_configs:
   faiss:
-    index_use_gpu: True
+    index_use_gpu: false
     index_chunk_size: 10000
-    index_path: index/index.index
+    index_path: data/kb/agv_demo/index/index.index
   milvus:
-    uri: index/milvus_demo.db # Milvus Lite local file (or http://localhost:19530 for server)
+    uri: index/milvus_demo.db
     token: null
     id_field_name: id
     vector_field_name: vector
@@ -53,35 +43,29 @@ index_backend_configs:
       params: {}
     index_chunk_size: 1000
 
-websearch_backend: tavily # options: tavily, exa, zhipuai
+corpus_path: data/kb/agv_demo/corpora/chunks.jsonl
+embedding_path: data/kb/agv_demo/embedding/embedding.npy
+collection_name: agv_demo
+
+websearch_backend: tavily
 websearch_backend_configs:
-  exa:
-    api_key: ""
-    retries: 3
-    base_delay: 1.0
-    search_kwargs: {}
   tavily:
     api_key: ""
     retries: 3
     base_delay: 1.0
     search_kwargs: {}
-  zhipuai:
-    api_key: ""
-    base_url: "https://open.bigmodel.cn/api/paas/v4/web_search"
-    search_engine: "search_std"
-    search_intent: false
-    search_recency_filter: "noLimit"
-    content_size: "medium"
-    retries: 3
-    base_delay: 1.0
-    search_kwargs: {}
 
 batch_size: 16
-top_k: 5
-gpu_ids: "1"
-query_instruction: ""
-is_multimodal: false
-overwrite: false
-retrieve_thread_num: 1
-retriever_url: "http://127.0.0.1:64501"
-is_demo: false
+top_k: 8
+# RAG 问答：先多召回，final_top_k=0 表示不把命中截断（全部送入生成，适合完整 SOP）
+recall_top_k: 20
+final_top_k: 0
+
+# custom_app RagRunner 可选 CrossEncoder 重排（Phase 1.5 / T3）
+# 依赖: pip install sentence-transformers torch （有 GPU 时建议装 CUDA 版 torch）
+# 首次加载 bge-reranker-base 可能较慢；排障或纯测延迟可设 ULTRARAG_DISABLE_RERANK=1。
+rag_rerank:
+  enabled: true
+  model_name_or_path: BAAI/bge-reranker-base  # MiniCPM-Reranker-Light 需要 transformers<5.0，换用兼容模型
+  device: auto
+  batch_size: 8
