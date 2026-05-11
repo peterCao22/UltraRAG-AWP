@@ -1,0 +1,10 @@
+# Phase 5.1.4 一致性验证用 query（针对 agv_demo）
+# 一行一个 query；# 开头被忽略
+
+更换 AGV 电池的步骤
+电池告警如何处理
+E-Stop Button Active 怎么恢复
+AGV 进入系统报错
+升降平台位置错误
+UDC presence 故障
+告警块电池电压低

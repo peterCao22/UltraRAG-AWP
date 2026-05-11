@@ -78,12 +78,21 @@ parsing = [
     "docling",
 ]
 
+# Phase 5.1: 存储栈迁移（Qdrant 向量库 + PostgreSQL 元数据库）
+# 安装：uv sync --extras storage
+# 部署：Qdrant + Postgres 都是局域网 Docker 服务，连接信息见 .env
+storage = [
+    "qdrant-client>=1.10",      # 官方 Python 客户端（也支持纯 HTTP）
+    "psycopg[binary,pool]>=3.2", # PostgreSQL driver + 连接池
+]
+
 all = [
     "ultrarag[retriever]",
     "ultrarag[generation]",
     "ultrarag[corpus]",
     "ultrarag[evaluation]",
     "ultrarag[parsing]",
+    "ultrarag[storage]",
 ]
 
 [tool.setuptools.packages.find]
@@ -112,4 +121,6 @@ package = true
 markers = [
     "requires_mineru: integration test that needs real MinerU CLI + models",
     "requires_docling: integration test that needs real Docling installation",
+    "requires_qdrant: integration test that needs real Qdrant service",
+    "requires_postgres: integration test that needs real PostgreSQL service",
 ]

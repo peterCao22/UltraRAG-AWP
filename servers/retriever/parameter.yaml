@@ -20,6 +20,12 @@ backend_configs:
     lang: en
     save_path: index/bm25
 
+# Phase 5.1.2: custom_app RagRunner 向量后端切换
+# faiss = 本地 FAISS 索引文件（Phase 3 / 4 默认）
+# qdrant = 局域网 Qdrant 服务（连接信息见 .env 中 ULTRARAG_QDRANT_*）
+# 若此字段为空，自动 fallback 到 ULTRARAG_VECTOR_BACKEND 环境变量；仍为空则默认 faiss
+vector_backend: faiss
+
 index_backend: faiss
 index_backend_configs:
   faiss:

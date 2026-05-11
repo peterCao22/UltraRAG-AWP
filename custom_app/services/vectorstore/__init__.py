@@ -11,6 +11,20 @@ Phase 5 计划新增：
 需要使用时显式 `from custom_app.services.vectorstore.faiss_store import FaissVectorStore`。
 """
 
-from custom_app.services.vectorstore.base import Hit, VectorStore
+from custom_app.services.vectorstore.base import (
+    VALID_VECTOR_BACKENDS,
+    Hit,
+    VectorStore,
+    build_vector_store,
+    load_faiss_store,
+    resolve_vector_backend,
+)
 
-__all__ = ["Hit", "VectorStore"]
+__all__ = [
+    "Hit",
+    "VectorStore",
+    "VALID_VECTOR_BACKENDS",
+    "build_vector_store",
+    "load_faiss_store",
+    "resolve_vector_backend",
+]

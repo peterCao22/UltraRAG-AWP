@@ -95,9 +95,84 @@ def load_faiss_store(
 ) -> "VectorStore":
     """便利函数：加载 FAISS 索引并返回 VectorStore 实例。
 
-    放在 base.py 是为了 rag_runner 不必直接 import 具体实现类型；
-    切换 Qdrant 时改这一个函数即可。
+    放在 base.py 是为了 rag_runner 不必直接 import 具体实现类型。
     """
     from custom_app.services.vectorstore.faiss_store import FaissVectorStore
 
     return FaissVectorStore.load(index_path, chunk_ids)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.1.2：backend 工厂
+# ---------------------------------------------------------------------------
+
+
+VALID_VECTOR_BACKENDS = frozenset({"faiss", "qdrant"})
+
+
+def resolve_vector_backend(yaml_value: Optional[str] = None) -> str:
+    """解析向量后端配置，优先级：YAML > 环境变量 > 默认 faiss。
+
+    Args:
+        yaml_value: servers/retriever/parameter.yaml 中 vector_backend 字段
+                    （None 表示未配置）
+
+    Returns:
+        "faiss" 或 "qdrant"
+
+    Raises:
+        ValueError: 解析到的 backend 不在 VALID_VECTOR_BACKENDS 内
+    """
+    import os
+
+    backend = (
+        (yaml_value or "").strip()
+        or os.environ.get("ULTRARAG_VECTOR_BACKEND", "").strip()
+        or "faiss"
+    ).lower()
+    if backend not in VALID_VECTOR_BACKENDS:
+        raise ValueError(
+            f"invalid vector_backend {backend!r}, "
+            f"expected one of {sorted(VALID_VECTOR_BACKENDS)}"
+        )
+    return backend
+
+
+def build_vector_store(
+    *,
+    backend: str,
+    kb_id: str,
+    index_path: Optional[Path] = None,
+    chunk_ids: Optional[list[str]] = None,
+    embed_dim: int = 768,
+) -> "VectorStore":
+    """按 backend 创建 VectorStore 实例。
+
+    Args:
+        backend:    "faiss" 或 "qdrant"
+        kb_id:      KB 标识；Qdrant 用作 collection 后缀，FAISS 不用
+        index_path: FAISS 模式必填（.index 文件路径）
+        chunk_ids:  FAISS 模式必填（行号 → chunk_id 映射）
+        embed_dim:  Qdrant collection 维度（首次建库时用）
+
+    Returns:
+        VectorStore 实例
+
+    Raises:
+        ValueError: backend 不在 VALID_VECTOR_BACKENDS
+        各 backend 的 load/connect 错误（FileNotFoundError、网络错误等）
+    """
+    if backend not in VALID_VECTOR_BACKENDS:
+        raise ValueError(f"invalid backend {backend!r}")
+
+    if backend == "faiss":
+        if index_path is None or chunk_ids is None:
+            raise ValueError("faiss backend requires index_path and chunk_ids")
+        return load_faiss_store(index_path, chunk_ids)
+
+    if backend == "qdrant":
+        from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
+
+        return QdrantVectorStore(kb_id=kb_id, embed_dim=embed_dim)
+
+    raise ValueError(f"unhandled backend {backend!r}")  # unreachable

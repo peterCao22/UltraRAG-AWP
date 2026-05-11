@@ -1188,8 +1188,6 @@ class RagRunner:
 
         if not corpus_path.exists():
             raise FileNotFoundError(f"chunks file not found: {corpus_path}")
-        if not index_path.exists():
-            raise FileNotFoundError(f"faiss index not found: {index_path}")
 
         # 加载语料文件：按行解析 JSONL，每行是 chunk（JSON 对象），_rows 包含 id/title/contents/doc/images 等字段。
         self._rows = [
@@ -1197,13 +1195,36 @@ class RagRunner:
             for line in corpus_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-        # 加载 FAISS 索引：通过 VectorStore Protocol 包装，为 Phase 5 Qdrant 切换预留接口。
-        # chunk_ids 顺序与 _rows 一致（FAISS 行号 i ↔ _rows[i] ↔ chunk_ids[i]）。
+        # Phase 5.1.3：通过 VectorStore 工厂按 backend 选择存储后端
+        # YAML vector_backend > env ULTRARAG_VECTOR_BACKEND > 默认 faiss
+        from custom_app.services.vectorstore import (
+            build_vector_store,
+            resolve_vector_backend,
+        )
+        backend = resolve_vector_backend(retr_cfg.get("vector_backend"))
+        logger.info("rag_runner using vector_backend=%s", backend)
+
         chunk_ids = [str(row.get("id", "")) for row in self._rows]
-        from custom_app.services.vectorstore.faiss_store import FaissVectorStore
-        self._vector_store = FaissVectorStore.load(index_path, chunk_ids)
-        # 兼容性别名：保留 self._index 引用，避免 Phase 4 内部其他地方意外触发 None 检查
-        self._index = self._vector_store._index
+        if backend == "faiss":
+            if not index_path.exists():
+                raise FileNotFoundError(f"faiss index not found: {index_path}")
+            self._vector_store = build_vector_store(
+                backend="faiss",
+                kb_id=self.kb_id,
+                index_path=index_path,
+                chunk_ids=chunk_ids,
+            )
+            # 兼容性别名：保留 self._index 引用，避免 Phase 4 内部其他地方意外触发 None 检查
+            self._index = self._vector_store._index
+        elif backend == "qdrant":
+            self._vector_store = build_vector_store(
+                backend="qdrant",
+                kb_id=self.kb_id,
+            )
+            # Qdrant 模式下没有本地索引文件；_index 设为 sentinel 防 None 检查
+            self._index = object()
+        else:
+            raise ValueError(f"unsupported vector_backend: {backend!r}")
 
         openai_cfg = (gen_cfg.get("backend_configs") or {}).get("openai") or {}
         sampling = gen_cfg.get("sampling_params") or {}

@@ -166,3 +166,76 @@ def test_chunk_ids_view_is_a_copy(mock_faiss, fake_index, tmp_path):
     ids = store.chunk_ids
     ids.append("HACKED")
     assert store.chunk_ids == ["a", "b", "c"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.1.2 工厂函数测试
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_vector_backend_yaml_priority(monkeypatch):
+    from custom_app.services.vectorstore.base import resolve_vector_backend
+
+    monkeypatch.setenv("ULTRARAG_VECTOR_BACKEND", "qdrant")
+    assert resolve_vector_backend("faiss") == "faiss"  # YAML 优先
+
+
+def test_resolve_vector_backend_env_fallback(monkeypatch):
+    from custom_app.services.vectorstore.base import resolve_vector_backend
+
+    monkeypatch.setenv("ULTRARAG_VECTOR_BACKEND", "qdrant")
+    assert resolve_vector_backend(None) == "qdrant"
+    assert resolve_vector_backend("") == "qdrant"
+
+
+def test_resolve_vector_backend_default_faiss(monkeypatch):
+    from custom_app.services.vectorstore.base import resolve_vector_backend
+
+    monkeypatch.delenv("ULTRARAG_VECTOR_BACKEND", raising=False)
+    assert resolve_vector_backend(None) == "faiss"
+
+
+def test_resolve_vector_backend_invalid(monkeypatch):
+    from custom_app.services.vectorstore.base import resolve_vector_backend
+
+    monkeypatch.delenv("ULTRARAG_VECTOR_BACKEND", raising=False)
+    with pytest.raises(ValueError, match="invalid vector_backend"):
+        resolve_vector_backend("milvus")
+
+
+def test_resolve_vector_backend_case_insensitive(monkeypatch):
+    from custom_app.services.vectorstore.base import resolve_vector_backend
+
+    monkeypatch.delenv("ULTRARAG_VECTOR_BACKEND", raising=False)
+    assert resolve_vector_backend("FAISS") == "faiss"
+    assert resolve_vector_backend("Qdrant") == "qdrant"
+
+
+def test_build_vector_store_faiss(mock_faiss, fake_index, tmp_path):
+    from custom_app.services.vectorstore.base import build_vector_store
+    from custom_app.services.vectorstore.faiss_store import FaissVectorStore
+
+    index_path = tmp_path / "x.index"
+    index_path.write_bytes(b"fake")
+    mock_faiss.read_index.return_value = fake_index
+    store = build_vector_store(
+        backend="faiss",
+        kb_id="demo",
+        index_path=index_path,
+        chunk_ids=["a", "b", "c"],
+    )
+    assert isinstance(store, FaissVectorStore)
+
+
+def test_build_vector_store_faiss_missing_args():
+    from custom_app.services.vectorstore.base import build_vector_store
+
+    with pytest.raises(ValueError, match="requires index_path and chunk_ids"):
+        build_vector_store(backend="faiss", kb_id="demo")
+
+
+def test_build_vector_store_invalid_backend():
+    from custom_app.services.vectorstore.base import build_vector_store
+
+    with pytest.raises(ValueError, match="invalid backend"):
+        build_vector_store(backend="elasticsearch", kb_id="demo")
