@@ -1,0 +1,16 @@
+# Phase 4.3 heading_path A/B 验证 — 示例 query 文件
+# 用法：复制到 custom_app/scripts/eval_queries.txt 后改成你关心的真实问题
+# 一行一个 query；# 开头的行被忽略
+
+# 故障/告警类（典型 SOP 命中场景）
+AGV 电池告警如何处理
+E-Stop Button Active 怎么恢复
+更换 AGV 电池的完整步骤
+
+# 操作流程类
+如何在 IFS 系统中创建客户订单
+库存盘点的标准流程
+
+# 跨章节/含父级标题语义的查询（heading_path 增强应该在此类查询上提升最明显）
+故障处理中关于电池模块的所有说明
+IFS 库存管理基础数据的录入规则

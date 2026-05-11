@@ -12,11 +12,18 @@ from custom_app.services.docx_parser import parse_directory, write_chunks_jsonl
 from custom_app.services.filename_safe import unicode_safe_filename
 from custom_app.services.google_embedder import build_embedding_npy
 from custom_app.services.job_executor import JobExecutor
+from custom_app.services.parsers import (
+    KB_TYPE_GENERAL,
+    KB_TYPE_SOP_DOCX,
+    VALID_KB_TYPES,
+    get_supported_extensions,
+)
 
 kb_bp = Blueprint("kb_api", __name__)
 _JOB_EXECUTOR = JobExecutor(max_workers=1)
 
-_ALLOWED_EXTENSIONS = {".docx", ".pdf"}
+# Phase 4.2: 白名单按 kb.type 动态计算；保留常量做兜底（用于无 type 的老 KB）
+_LEGACY_ALLOWED_EXTENSIONS = {".docx", ".pdf"}
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -154,24 +161,51 @@ def _update_job_stage(job_id: str, stage: str, extra: dict | None = None) -> Non
         )
 
 
+def _kb_type(kb: dict) -> str:
+    """读取 kb 的 type 字段；老库无此字段时退化到 sop_docx。"""
+    return str(kb.get("type") or KB_TYPE_SOP_DOCX)
+
+
+def _scan_raw_files(kb: dict, raw_dir: Path) -> list[Path]:
+    """扫描 raw_dir 中所有 kb.type 支持的文件，按文件名排序。
+
+    Phase 4.2：替换原"硬编码 *.docx 通配"，改成按 KB 类型支持的扩展名集合。
+    """
+    if not raw_dir.exists():
+        return []
+    exts = get_supported_extensions(_kb_type(kb))
+    files: list[Path] = []
+    for fp in raw_dir.iterdir():
+        if not fp.is_file():
+            continue
+        if fp.suffix.lower() in exts:
+            files.append(fp)
+    return sorted(files, key=lambda p: p.name)
+
+
 def _register_documents(kb: dict, kb_id: str, raw_dir: Path, chunks_path: Path) -> None:
-    """扫描 raw_dir 下的文件并在 kb_documents 中登记（或更新状态为 pending）。"""
-    docx_files = sorted(raw_dir.glob("*.docx"))
+    """扫描 raw_dir 下的文件并在 kb_documents 中登记（或更新状态为 pending）。
+
+    Phase 4.2：按 kb.type 支持的所有扩展名扫描；file_type 字段记录实际扩展名
+    （如 'docx' / 'pdf' / 'png'），便于排障与未来 doc-level 路由。
+    """
+    raw_files = _scan_raw_files(kb, raw_dir)
     with get_conn() as conn:
-        if docx_files:
-            for fp in docx_files:
+        if raw_files:
+            for fp in raw_files:
                 now = now_iso()
                 doc_id = f"{kb_id}:{fp.name}"
+                file_type = fp.suffix.lower().lstrip(".") or "unknown"
                 conn.execute(
                     """INSERT INTO kb_documents
                        (kb_id, tenant_id, doc_id, file_name, file_type, file_path,
                         channel, status, error_message, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, 'docx', ?, 'api', 'pending', '', ?, ?)
+                       VALUES (?, ?, ?, ?, ?, ?, 'api', 'pending', '', ?, ?)
                        ON CONFLICT(kb_id, doc_id) DO UPDATE SET
-                         file_name=excluded.file_name, file_type='docx',
+                         file_name=excluded.file_name, file_type=excluded.file_type,
                          file_path=excluded.file_path, channel='api',
                          status='pending', error_message='', updated_at=excluded.updated_at""",
-                    (kb_id, kb["tenant_id"], doc_id, fp.name, str(fp), now, now),
+                    (kb_id, kb["tenant_id"], doc_id, fp.name, file_type, str(fp), now, now),
                 )
         elif chunks_path.exists():
             now = now_iso()
@@ -187,17 +221,40 @@ def _register_documents(kb: dict, kb_id: str, raw_dir: Path, chunks_path: Path) 
                 (kb_id, kb["tenant_id"], f"{kb_id}:chunks", "chunks.jsonl", str(chunks_path), now, now),
             )
         else:
+            kb_type = _kb_type(kb)
+            exts = sorted(get_supported_extensions(kb_type))
             raise RuntimeError(
-                f"no .docx files found under {raw_dir}, and chunks missing: {chunks_path}"
+                f"no supported files found under {raw_dir} for kb_type={kb_type!r} "
+                f"(expected one of {exts}); and chunks missing: {chunks_path}"
             )
 
 
-def _parse_stage(raw_dir: Path, kb_root: Path, chunks_path: Path) -> None:
-    """阶段1：解析 DOCX → chunks.jsonl。"""
-    docx_files = sorted(raw_dir.glob("*.docx"))
-    if docx_files:
+def _parse_stage(kb: dict, raw_dir: Path, kb_root: Path, chunks_path: Path) -> None:
+    """阶段1：解析所有支持的文件 → chunks.jsonl。
+
+    Phase 4.2：
+      - sop_docx KB 仍走 docx_parser.parse_directory（保留 SOP 业务定制分块）
+      - general KB 走 Parser 工厂（per-file 分发到 MineruParser/DoclingParser/MarkdownParser）
+    """
+    raw_files = _scan_raw_files(kb, raw_dir)
+    if not raw_files:
+        return  # 调用方在 _register_documents 阶段已校验
+
+    kb_type = _kb_type(kb)
+
+    if kb_type == KB_TYPE_SOP_DOCX:
+        # SOP 路径不变：parse_directory 保留 STEP/Heading 业务定制分块
         chunks = parse_directory(raw_dir, kb_root)
         write_chunks_jsonl(chunks, chunks_path)
+        return
+
+    # general 路径：用 Parser 工厂逐文件解析
+    from custom_app.services.parsers import parse_files
+
+    chunks = parse_files(kb_type, raw_files, kb_root, kb_id=kb.get("kb_id", ""))
+    # parse_files 返回 list[Chunk]；write_chunks_jsonl 期望 list[dict]
+    chunk_dicts = [c.to_jsonl_dict() for c in chunks]
+    write_chunks_jsonl(chunk_dicts, chunks_path)
 
 
 def _embed_stage(chunks_path: Path, embedding_path: Path) -> None:
@@ -282,8 +339,9 @@ def _run_ingest_job(kb: dict, kb_id: str, job_id: str, force_reindex: bool) -> d
             d.mkdir(parents=True, exist_ok=True)
 
         _register_documents(kb, kb_id, raw_dir, chunks_path)
-        file_count = len(sorted(raw_dir.glob("*.docx")))
-        _parse_stage(raw_dir, kb_root, chunks_path)
+        # Phase 4.2: file_count 不再硬编码 *.docx；按 kb.type 支持的扩展名汇总
+        file_count = len(_scan_raw_files(kb, raw_dir))
+        _parse_stage(kb, raw_dir, kb_root, chunks_path)
         _update_job_stage(job_id, "parse", {"file_count": file_count})
         _embed_stage(chunks_path, embedding_path)
         _update_job_stage(job_id, "embed")
@@ -306,11 +364,19 @@ def create_kb():
     name = str(body.get("name", "")).strip()
     description = str(body.get("description", "")).strip()
     tenant_id = str(body.get("tenant_id", "default")).strip() or "default"
+    # Phase 4.2: kb 类型，决定解析器路由 (sop_docx / general)；老库不传时默认 sop_docx
+    kb_type = str(body.get("type", KB_TYPE_SOP_DOCX)).strip() or KB_TYPE_SOP_DOCX
 
     if not kb_id:
         return _err("kb_id is required", "KB_ID_REQUIRED", 400)
     if not name:
         return _err("name is required", "KB_NAME_REQUIRED", 400)
+    if kb_type not in VALID_KB_TYPES:
+        return _err(
+            f"invalid type {kb_type!r}, expected one of {sorted(VALID_KB_TYPES)}",
+            "KB_TYPE_INVALID",
+            400,
+        )
 
     data_path, index_path, embedding_path = _kb_paths(kb_id)
     created_at = now_iso()
@@ -320,16 +386,19 @@ def create_kb():
             return _err(f"kb_id already exists: {kb_id}", "KB_ALREADY_EXISTS", 409)
         conn.execute(
             """INSERT INTO knowledge_bases
-               (kb_id, name, description, tenant_id, status, data_path,
+               (kb_id, name, description, tenant_id, status, type, data_path,
                 index_path, embedding_path, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)""",
-            (kb_id, name, description, tenant_id, data_path, index_path, embedding_path, created_at, created_at),
+               VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)""",
+            (
+                kb_id, name, description, tenant_id, kb_type,
+                data_path, index_path, embedding_path, created_at, created_at,
+            ),
         )
 
     for rel in ["raw", "corpora", "embedding", "index", "images"]:
         (Path(data_path) / rel).mkdir(parents=True, exist_ok=True)
 
-    return _ok({"kb_id": kb_id, "status": "active"})
+    return _ok({"kb_id": kb_id, "type": kb_type, "status": "active"})
 
 
 @kb_bp.route("/api/kb", methods=["GET"])
@@ -346,7 +415,7 @@ def list_kb():
     )
     if role_id:
         sql = f"""SELECT kb.kb_id, kb.name, kb.description, kb.tenant_id, kb.status,
-                         kb.data_path, kb.index_path, kb.embedding_path,
+                         kb.type, kb.data_path, kb.index_path, kb.embedding_path,
                          kb.last_indexed_at, kb.created_at, kb.updated_at,
                          {doc_count_sql}
                   FROM knowledge_bases kb
@@ -357,7 +426,7 @@ def list_kb():
         params = [role_id, limit, offset]
     else:
         sql = f"""SELECT kb.kb_id, kb.name, kb.description, kb.tenant_id, kb.status,
-                         kb.data_path, kb.index_path, kb.embedding_path,
+                         kb.type, kb.data_path, kb.index_path, kb.embedding_path,
                          kb.last_indexed_at, kb.created_at, kb.updated_at,
                          {doc_count_sql}
                   FROM knowledge_bases kb
@@ -439,11 +508,19 @@ def delete_kb(kb_id: str):
 @kb_bp.route("/api/kb/<string:kb_id>/documents/upload", methods=["POST"])
 def upload_documents(kb_id: str):
     with get_conn() as conn:
-        kb = conn.execute(
-            "SELECT kb_id, tenant_id, data_path FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
+        kb_row = conn.execute(
+            "SELECT kb_id, tenant_id, data_path, type FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
         ).fetchone()
-    if kb is None:
+    if kb_row is None:
         return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    kb = row_to_dict(kb_row) or {}
+
+    # Phase 4.2: 白名单按 kb.type 动态计算
+    try:
+        allowed_exts = get_supported_extensions(_kb_type(kb))
+    except ValueError:
+        # 不应发生（DB 里 type 列已校验），但兜底防御
+        allowed_exts = _LEGACY_ALLOWED_EXTENSIONS
 
     files = request.files.getlist("files") or request.files.getlist("file")
     if not files or all(f.filename == "" for f in files):
@@ -460,7 +537,7 @@ def upload_documents(kb_id: str):
                 continue
             safe_name = unicode_safe_filename(f.filename)
             ext = Path(safe_name).suffix.lower()
-            if ext not in _ALLOWED_EXTENSIONS:
+            if ext not in allowed_exts:
                 continue
             # 同名冲突时追加序号，保证多个 Unicode 名各自落盘
             dest = raw_dir / safe_name
@@ -490,7 +567,12 @@ def upload_documents(kb_id: str):
             uploaded.append(safe_name)
 
     if not uploaded:
-        return _err("no valid files found (.docx/.pdf only)", "NO_VALID_FILE", 400)
+        allowed_display = ", ".join(sorted(allowed_exts))
+        return _err(
+            f"no valid files found (allowed: {allowed_display})",
+            "NO_VALID_FILE",
+            400,
+        )
     return _ok({"uploaded": len(uploaded), "files": uploaded})
 
 

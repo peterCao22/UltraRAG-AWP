@@ -115,10 +115,43 @@ def strip_images_footer(contents: str) -> str:
     return (contents or "").strip()
 
 
+def compose_doc_embedding_text(row: dict) -> str:
+    """构造一条 chunk 的嵌入输入文本。
+
+    Phase 4.3：heading_path 增强
+        当 chunk 含 structure.heading_path 时（Phase 4+ schema），将标题层级链
+        以 "A > B > C" 形式作为前缀拼接，强化父级标题语义。无 heading_path 时
+        退化到 Phase 3 行为（仅 title + contents），保证老库零回归。
+
+    格式：
+        有 heading_path:  "A > B\n<title>\n<contents>"
+        无 heading_path:  "<title>\n<contents>"
+    """
+    structure = row.get("structure") or {}
+    heading_path = structure.get("heading_path") or []
+    title = row.get("title", "") or ""
+    body = strip_images_footer(row.get("contents", ""))
+
+    parts: list[str] = []
+    if heading_path:
+        # heading_path 可能是 list 或 tuple；过滤空串
+        cleaned = [str(h).strip() for h in heading_path if str(h).strip()]
+        if cleaned:
+            parts.append(" > ".join(cleaned))
+    if title:
+        parts.append(title)
+    if body:
+        parts.append(body)
+    return "\n".join(parts).strip()
+
+
 def build_embedding_npy(chunks_jsonl: str, output_npy: str) -> None:
     """
-    读取 chunks.jsonl，对 title + contents 批量 embedding，保存为 .npy。
+    读取 chunks.jsonl，对 chunk 批量 embedding，保存为 .npy。
     供建索引流程替换 UltraRAG 的 retriever_embed 步骤。
+
+    Phase 4.3：嵌入输入由 compose_doc_embedding_text() 统一构造，
+    含 structure.heading_path 的 chunk 会获得标题层级链前缀增强。
 
     Args:
         chunks_jsonl: chunks.jsonl 文件路径
@@ -129,11 +162,8 @@ def build_embedding_npy(chunks_jsonl: str, output_npy: str) -> None:
         for line in Path(chunks_jsonl).read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    # 不向量化图片路径行，仅对正文 + 标题做 embedding
-    texts = [
-        (r.get("title", "") + "\n" + strip_images_footer(r.get("contents", ""))).strip()
-        for r in rows
-    ]
+    # 不向量化图片路径行，仅对正文 + 标题（+ heading_path 前缀）做 embedding
+    texts = [compose_doc_embedding_text(r) for r in rows]
 
     print(f"开始 embedding {len(texts)} 条 chunks ...")
     embeddings = embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")

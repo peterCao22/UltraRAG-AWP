@@ -69,11 +69,21 @@ corpus = [
     "mineru[core]",
 ]
 
+# Phase 4.1: custom_app 通用文档解析（PDF / 图片 / 通用 DOCX / MD）
+# 安装：uv sync --extras parsing
+# 注意：MinerU 首次运行会自动下载 GB 级模型；Docling 也较大
+# Office 文档（.docx/.pptx 等走 MinerU 路径时）需要系统装 LibreOffice CLI
+parsing = [
+    "mineru[core]",
+    "docling",
+]
+
 all = [
     "ultrarag[retriever]",
     "ultrarag[generation]",
     "ultrarag[corpus]",
     "ultrarag[evaluation]",
+    "ultrarag[parsing]",
 ]
 
 [tool.setuptools.packages.find]
@@ -92,3 +102,14 @@ dev = [
 
 [tool.uv]
 package = true
+
+# Phase 4.1: 注册自定义 marker
+# 集成测试需要重型外部依赖时用以下 marker 标记，CI 默认 skip：
+#   @pytest.mark.requires_mineru   —— 需要 mineru CLI + 模型（GB 级）
+#   @pytest.mark.requires_docling  —— 需要 docling 包 + 模型
+# 本地手动跑：pytest -m requires_mineru
+[tool.pytest.ini_options]
+markers = [
+    "requires_mineru: integration test that needs real MinerU CLI + models",
+    "requires_docling: integration test that needs real Docling installation",
+]
