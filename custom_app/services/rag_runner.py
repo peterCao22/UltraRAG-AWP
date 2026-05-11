@@ -38,6 +38,10 @@ _EXCERPT_DELIM_RE = re.compile(
 )
 # LLM 用于标记与问题无关章节的占位符（与 agv_qa_rag.jinja 约定一致）
 _SKIP_MARKER_RE = re.compile(r"^\s*\[跳过\]\s*$")
+_ASCII_PHRASE_RE = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9\s_/\-:()]{2,}[A-Za-z0-9]"
+)
+_ID_CODE_RE = re.compile(r"\bID\s*0*\d+\b", re.IGNORECASE)
 
 
 def answer_blocks_to_display_markdown(
@@ -141,7 +145,8 @@ class RagRunner:
         self.retriever_param_path = Path(retriever_param_path)
         self.generation_param_path = Path(generation_param_path)
 
-        self._index = None
+        self._index = None  # 兼容字段：暂保留以减小 0.5 阶段改动范围
+        self._vector_store = None  # Phase 4.0: VectorStore Protocol 实例
         self._rows: List[Dict[str, Any]] = []
         self._top_k = 8
         self._recall_top_k = 12
@@ -276,6 +281,65 @@ class RagRunner:
     @staticmethod
     def _procedure_intent(question: str) -> bool:
         return bool(_PROCEDURE_INTENT_RE.search(question or ""))
+
+    @staticmethod
+    def _compact_lookup_text(text: str) -> str:
+        """用于告警名/ID 精确召回的归一化文本，忽略空格、连字符、冒号等符号。"""
+        return re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "", (text or "").lower())
+
+    def _keyword_match_hit_ids(self, question: str, *, limit: int = 5) -> List[int]:
+        """
+        对技术告警名做轻量精确召回，弥补向量检索在中英混合短查询上的漏召回。
+
+        典型问题如「E-Stop Button Active 的故障如何恢复」里，英文告警名本身已经是
+        高置信度检索键；若只依赖 embedding，可能被中文「故障/恢复」稀释而漏掉。
+        """
+        q = (question or "").strip()
+        if not q:
+            return []
+
+        phrases: List[str] = []
+        for m in _ASCII_PHRASE_RE.finditer(q):
+            phrase = re.sub(r"\s+", " ", m.group(0)).strip(" :-_/()")
+            if len(self._compact_lookup_text(phrase)) >= 4:
+                phrases.append(phrase)
+        for m in _ID_CODE_RE.finditer(q):
+            phrases.append(m.group(0))
+
+        seen_phrase: Set[str] = set()
+        compact_phrases: List[str] = []
+        for phrase in phrases:
+            c = self._compact_lookup_text(phrase)
+            if c and c not in seen_phrase:
+                seen_phrase.add(c)
+                compact_phrases.append(c)
+        if not compact_phrases:
+            return []
+
+        scored: List[Tuple[int, int]] = []
+        for idx, row in enumerate(self._rows):
+            hay = f"{row.get('title', '')}\n{row.get('contents', '')}"
+            compact_hay = self._compact_lookup_text(hay)
+            score = 0
+            for c in compact_phrases:
+                if c in compact_hay:
+                    score += 100 + len(c)
+            if score:
+                scored.append((idx, score))
+
+        scored.sort(key=lambda item: (-item[1], item[0]))
+        return [idx for idx, _ in scored[: max(1, limit)]]
+
+    @staticmethod
+    def _merge_preferred_hit_ids(preferred: List[int], fallback: List[int]) -> List[int]:
+        merged: List[int] = []
+        seen: Set[int] = set()
+        for idx in [*preferred, *fallback]:
+            if idx in seen:
+                continue
+            seen.add(idx)
+            merged.append(idx)
+        return merged
 
     def _docs_for_agent_deep_read(self, hit_ids: List[int]) -> Set[str]:
         """
@@ -979,47 +1043,42 @@ class RagRunner:
 
     def _ensure_rerank_model(self) -> Any:
         """
-        懒加载 CrossEncoder；失败时记录 _rerank_load_error，不抛异常。
+        Phase 4.0: 通过 Reranker Protocol 加载 LocalReranker（替换原 sentence_transformers.CrossEncoder）。
 
-        返回:
-            CrossEncoder 实例，或 None（未启用 / 依赖缺失 / 加载失败）。
+        从 self._rerank_cfg 读取配置（来自 servers/retriever/parameter.yaml rag_rerank 段）：
+            model_name_or_path: 模型路径（YAML 化，便于服务器迁移）
+            batch_size:         批量大小
+            device:             auto / cuda / cpu
+
+        失败时记录 _rerank_load_error 并返回 None，不抛异常（保持原契约）。
         """
         if self._rerank_model is not None:
             return self._rerank_model
         if not (self._rerank_cfg or {}).get("enabled"):
             return None
-        try:
-            from sentence_transformers import CrossEncoder
-        except ImportError as e:
-            self._rerank_load_error = f"sentence_transformers: {e}"
-            return None
         model_path = (self._rerank_cfg or {}).get("model_name_or_path") or ""
         if not model_path:
             self._rerank_load_error = "model_name_or_path empty"
             return None
-        device = self._resolve_rerank_device(str(self._rerank_cfg.get("device", "auto")))
-        trust = bool(self._rerank_cfg.get("trust_remote_code", True))
+        device_pref = str(self._rerank_cfg.get("device", "auto"))
+        batch_size = int(self._rerank_cfg.get("batch_size", 8))
         try:
-            self._rerank_model = CrossEncoder(
-                model_path, device=device, trust_remote_code=trust
+            from custom_app.utils.local_reranker import get_default_reranker
+        except ImportError as e:
+            self._rerank_load_error = f"local_reranker import: {e}"
+            return None
+        try:
+            self._rerank_model = get_default_reranker(
+                model_path=model_path,
+                batch_size=batch_size,
+                device=device_pref,
             )
-            self._rerank_resolved_device = device
+            self._rerank_resolved_device = self._rerank_model.device
             self._rerank_load_error = None
         except Exception as e:
-            if device == "cuda":
-                try:
-                    self._rerank_model = CrossEncoder(
-                        model_path, device="cpu", trust_remote_code=trust
-                    )
-                    self._rerank_resolved_device = "cpu"
-                    self._rerank_load_error = None
-                    logger.warning("rag_rerank: CUDA load failed (%s), fallback to CPU", e)
-                except Exception as e2:
-                    self._rerank_load_error = f"cuda:{e}; cpu:{e2}"
-                    self._rerank_model = None
-            else:
-                self._rerank_load_error = str(e)
-                self._rerank_model = None
+            self._rerank_load_error = str(e)
+            self._rerank_model = None
+            logger.warning("rag_rerank: LocalReranker load failed: %s", e)
         return self._rerank_model
 
     def _rerank_hit_ids(
@@ -1053,7 +1112,8 @@ class RagRunner:
             info["rerank_skip_reason"] = self._rerank_load_error or "model_unavailable"
             info["rerank_ms"] = int((time.perf_counter() - t0) * 1000)
             return hit_ids, info
-        pairs: List[List[str]] = []
+        # Phase 4.0: 改用 LocalReranker.rerank_items 接口；行号通过 row_idx 字段回写。
+        items: List[Dict[str, Any]] = []
         for i in hit_ids:
             if i < 0 or i >= len(self._rows):
                 info["rerank_skip_reason"] = "invalid_hit_index"
@@ -1062,20 +1122,19 @@ class RagRunner:
             row = self._rows[i]
             plain, _ = self._split_contents_and_images(row.get("contents", ""))
             blob = f"{row.get('title', '')}\n{plain}".strip()[:2000]
-            pairs.append([query, blob])
-        batch_size = int(self._rerank_cfg.get("batch_size", 8))
+            items.append({"row_idx": i, "content": blob})
         try:
-            scores = model.predict(
-                pairs, batch_size=max(1, batch_size), show_progress_bar=False
+            ranked = model.rerank_items(
+                query=query,
+                items=items,
+                content_key="content",
+                top_k=len(items),  # 不截断，让上层 SOP 扩展/截断逻辑接管
             )
         except Exception as e:
             info["rerank_skip_reason"] = f"predict_failed:{e}"
             info["rerank_ms"] = int((time.perf_counter() - t0) * 1000)
             return hit_ids, info
-        order = sorted(
-            range(len(hit_ids)), key=lambda j: float(scores[j]), reverse=True
-        )
-        reranked = [hit_ids[j] for j in order]
+        reranked = [int(item["row_idx"]) for item in ranked]
         info["rerank_applied"] = True
         info["rerank_ms"] = int((time.perf_counter() - t0) * 1000)
         info["rerank_device"] = self._rerank_resolved_device
@@ -1138,8 +1197,13 @@ class RagRunner:
             for line in corpus_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-        # 加载 FAISS 索引：读取二进制文件，得到向量索引本体。
-        self._index = faiss.read_index(str(index_path))
+        # 加载 FAISS 索引：通过 VectorStore Protocol 包装，为 Phase 5 Qdrant 切换预留接口。
+        # chunk_ids 顺序与 _rows 一致（FAISS 行号 i ↔ _rows[i] ↔ chunk_ids[i]）。
+        chunk_ids = [str(row.get("id", "")) for row in self._rows]
+        from custom_app.services.vectorstore.faiss_store import FaissVectorStore
+        self._vector_store = FaissVectorStore.load(index_path, chunk_ids)
+        # 兼容性别名：保留 self._index 引用，避免 Phase 4 内部其他地方意外触发 None 检查
+        self._index = self._vector_store._index
 
         openai_cfg = (gen_cfg.get("backend_configs") or {}).get("openai") or {}
         sampling = gen_cfg.get("sampling_params") or {}
@@ -1151,7 +1215,11 @@ class RagRunner:
             _to = 300
         _to = max(30, min(_to, 7200))
 
-        _yaml_backend = (gen_cfg.get("chat_backend") or "openai").strip().lower()
+        _yaml_backend = (
+            gen_cfg.get("chat_backend")
+            or gen_cfg.get("backend")
+            or "openai"
+        ).strip().lower()
         if _yaml_backend not in ("openai", "gemini"):
             _yaml_backend = "openai"
 
@@ -1275,8 +1343,14 @@ class RagRunner:
         if top_k is None and self._top_k:
             recall_k = max(recall_k, int(self._top_k))
         recall_k = max(1, min(recall_k, len(self._rows)))
-        _, indices = self._index.search(q_vec, recall_k)
-        hit_ids = [int(x) for x in indices[0].tolist() if int(x) >= 0]
+        # Phase 4.0: 走 VectorStore.search()；hits 是 Hit(chunk_id, score) 列表
+        # 暂时回写为行号 hit_ids 以保留下游（rerank/SOP 扩展/prompt 构建）的现有签名；
+        # Phase 5 切 Qdrant 时下游统一改用 chunk_id 检索
+        hits = self._vector_store.search(q_vec, recall_k)
+        id_to_row = {str(self._rows[i].get("id", "")): i for i in range(len(self._rows))}
+        hit_ids = [id_to_row[h.chunk_id] for h in hits if h.chunk_id in id_to_row]
+        keyword_hit_ids = self._keyword_match_hit_ids(q)
+        hit_ids = self._merge_preferred_hit_ids(keyword_hit_ids, hit_ids)
         hit_ids, rerank_meta = self._rerank_hit_ids(rewritten_q, hit_ids)
         final_k_cfg = int(self._final_top_k)
         if final_k_cfg > 0:
@@ -1536,15 +1610,26 @@ class RagRunner:
         pieces: List[str] = []
         first_chunk = True
         t_first_chunk: Optional[float] = None
-        for piece in self._generate_stream(prep["prompt_text"]):
-            if first_chunk:
-                t_first_chunk = time.perf_counter()
-                first_chunk = False
-            pieces.append(piece)
-            yield {"type": "chunk", "content": piece}
+
+        if normalized_mode == "quick":
+            # vLLM/OpenAI-compatible streaming can hang on some local gateways after
+            # the request is accepted. Quick mode favors reliability over token-level
+            # streaming, so use the non-streaming endpoint and emit one UI chunk.
+            answer_raw = self._generate(prep["prompt_text"]).strip()
+            t_first_chunk = time.perf_counter()
+        else:
+            for piece in self._generate_stream(prep["prompt_text"]):
+                if first_chunk:
+                    t_first_chunk = time.perf_counter()
+                    first_chunk = False
+                pieces.append(piece)
+                yield {"type": "chunk", "content": piece}
+            answer_raw = "".join(pieces).strip()
         t_gen_end = time.perf_counter()
-        answer_raw = "".join(pieces).strip()
         result = self._build_result_from_raw(prep, answer_raw)
+        display_answer = str(result.get("answer") or "")
+        if normalized_mode == "quick" and display_answer:
+            yield {"type": "chunk", "content": display_answer}
         sources = result.get("sources") or []
         if sources:
             yield {"type": "sources", "sources": sources}

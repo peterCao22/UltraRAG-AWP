@@ -61,11 +61,12 @@ top_k: 8
 recall_top_k: 20
 final_top_k: 0
 
-# custom_app RagRunner 可选 CrossEncoder 重排（Phase 1.5 / T3）
-# 依赖: pip install sentence-transformers torch （有 GPU 时建议装 CUDA 版 torch）
-# 首次加载 bge-reranker-base 可能较慢；排障或纯测延迟可设 ULTRARAG_DISABLE_RERANK=1。
+# custom_app RagRunner 本地 Reranker（Phase 4.0 起统一到 LocalReranker）
+# 模型加载：custom_app/utils/local_reranker.py（依赖 torch + transformers，已在 .venv 中）
+# 模型路径：默认指向本地下载的 bge-reranker-v2-m3；模型迁移到其他服务器只需改这一行。
+# 排障/纯测延迟可设 ULTRARAG_DISABLE_RERANK=1。
 rag_rerank:
   enabled: true
-  model_name_or_path: BAAI/bge-reranker-base  # MiniCPM-Reranker-Light 需要 transformers<5.0，换用兼容模型
-  device: auto
-  batch_size: 8
+  model_name_or_path: C:\reranker\bge-reranker-v2-m3
+  device: auto    # auto / cuda / cpu；CUDA 加载失败自动 fallback CPU
+  batch_size: 4   # bge-reranker-v2-m3 在 RTX 2080 8GB 上建议 2~4

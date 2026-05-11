@@ -32,6 +32,30 @@ _TOOL_HINT_MAP: Dict[str, str] = {
     "final_answer": "提交最终答案",
 }
 
+# tool_result.details 在 SSE 流出之前的最大字符数；前端折叠展开可读，落库前
+# chat.py 还会再做一次保护性截断到 2000 字符
+_TOOL_DETAILS_MAX_CHARS = 1500
+
+
+def _format_tool_details(result: Any) -> str:
+    """把工具原始返回值序列化成可在前端展开查看的字符串。
+
+    截断策略：超过 _TOOL_DETAILS_MAX_CHARS 时硬截断并追加省略提示，避免单个
+    SSE 帧过大或前端 details 折叠后渲染卡顿。
+    """
+    if isinstance(result, dict) and "error" in result:
+        text = f"错误：{result['error']}"
+    elif isinstance(result, str):
+        text = result
+    else:
+        try:
+            text = json.dumps(result, ensure_ascii=False, indent=2)
+        except (TypeError, ValueError):
+            text = str(result)
+    if len(text) > _TOOL_DETAILS_MAX_CHARS:
+        text = text[:_TOOL_DETAILS_MAX_CHARS] + "\n…（已截断）"
+    return text
+
 
 class AgentRunner:
     """ReAct 推理引擎，驱动 Gemini function calling 循环。
@@ -45,7 +69,7 @@ class AgentRunner:
     def __init__(
         self,
         kb_id: str,
-        max_iterations: int = 6,
+        max_iterations: int = 12,
         enabled_tools: Optional[List[str]] = None,
     ) -> None:
         self.kb_id = kb_id
@@ -82,6 +106,7 @@ class AgentRunner:
         from custom_app.services.tools.keyword_search import KeywordSearchTool
         from custom_app.services.tools.list_chunks import ListChunksTool
         from custom_app.services.tools.final_answer import FinalAnswerTool
+        from custom_app.services.tools.query_knowledge_graph import QueryKnowledgeGraphTool
 
         self._rows = rows
         self._index = index
@@ -92,6 +117,7 @@ class AgentRunner:
         self._registry.register(KeywordSearchTool(rows=rows))
         self._registry.register(ListChunksTool(rows=rows))
         self._registry.register(FinalAnswerTool())
+        self._registry.register(QueryKnowledgeGraphTool(kb_id=self.kb_id))
 
         api_key = (
             os.environ.get("GOOGLE_API_KEY")
@@ -163,6 +189,9 @@ class AgentRunner:
             return f"阅读文档：《{doc}》" if doc else "阅读文档完整内容"
         if tool_name == "final_answer":
             return "提交最终答案"
+        if tool_name == "query_knowledge_graph":
+            ents = ", ".join(str(e) for e in args.get("entities", [])[:3])
+            return f"知识图谱查询：[{ents}]" if ents else "知识图谱查询"
         return f"执行操作：{tool_name}"
 
     # ─── LLM 调用 ──────────────────────────────────────────
@@ -234,6 +263,97 @@ class AgentRunner:
             trimmed.append(msg)
         return trimmed
 
+    # ─── 耗尽轮次时强制合成答案 ────────────────────────────
+
+    _SYNTHESIS_PROMPT = (
+        "Based on the above tool call results, generate a complete answer for the user's question.\n"
+        "User question: {question}\n"
+        "Requirements:\n"
+        "1. Answer based on the actually retrieved content\n"
+        "2. Clearly cite information sources\n"
+        "3. Organize the answer in a structured format\n"
+        "4. If information is insufficient, honestly state so\n"
+        "5. Respond in the same language as the user's question"
+    )
+
+    def _synthesize_final_answer(
+        self,
+        question: str,
+        messages: List[Dict[str, Any]],
+        system_prompt: str,
+    ) -> str:
+        """耗尽轮次时，重新调用 LLM 综合所有工具结果生成答案。
+
+        参考 WeKnora 的 streamFinalAnswerToEventBus 实现：
+        重建 messages = system_prompt + 原始问题 + 所有工具结果。
+        """
+        # 提取所有工具结果
+        tool_results = []
+        for msg in messages:
+            content = msg.get("content", "")
+            if isinstance(content, str) and content.startswith("[工具结果 "):
+                tool_results.append(content)
+
+        if not tool_results:
+            return ""
+
+        # 构建合成请求
+        synthesis_messages = [
+            {"role": "user", "content": question},
+        ]
+        for tr in tool_results:
+            # 截断过长结果
+            tr_short = tr[:2000] if len(tr) > 2000 else tr
+            synthesis_messages.append({"role": "user", "content": tr_short})
+
+        synthesis_messages.append({
+            "role": "user",
+            "content": self._SYNTHESIS_PROMPT.format(question=question),
+        })
+
+        try:
+            result = self._llm_call(
+                messages=synthesis_messages,
+                system_prompt=system_prompt,
+                tools=None,  # 不带工具，纯文本输出
+            )
+            return result.get("text", "").strip()
+        except Exception as e:
+            logger.error("Synthesis failed: %s", e)
+            return ""
+
+    # ─── 空响应重试 ────────────────────────────────────────
+
+    _EMPTY_RETRY_NUDGE = (
+        "Please provide your answer by calling the final_answer tool. "
+        "You must call final_answer to submit your complete answer."
+    )
+
+    def _retry_empty_response(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: str,
+        tools: Optional[List[Dict[str, Any]]],
+        max_retries: int = 2,
+    ) -> Optional[Dict[str, Any]]:
+        """LLM 返回空内容且有工具结果时，重试并追加提示。
+
+        参考 WeKnora 的 maxEmptyResponseRetries。
+        """
+        for attempt in range(max_retries):
+            messages.append({"role": "user", "content": self._EMPTY_RETRY_NUDGE})
+            result = self._llm_call(
+                messages=messages,
+                system_prompt=system_prompt,
+                tools=tools,
+            )
+            text = result.get("text", "").strip()
+            tcs = result.get("tool_calls") or []
+            if text or any(tc.get("name") == "final_answer" for tc in tcs):
+                return result
+            logger.warning("Empty retry attempt %d failed", attempt + 1)
+        return None
+
     # ─── ReAct 主循环 ──────────────────────────────────────
 
     def chat_stream(
@@ -293,8 +413,26 @@ class AgentRunner:
 
                 # 无工具调用 → LLM 直接给出文本答案（fallback）
                 if not tool_calls:
-                    final_answer_text = thought_text
-                    break
+                    if thought_text:
+                        final_answer_text = thought_text
+                        break
+                    # 空响应重试（参考 WeKnora maxEmptyResponseRetries）
+                    empty_result = self._retry_empty_response(
+                        messages, system_prompt, tools,
+                    )
+                    if empty_result:
+                        thought_text = empty_result.get("text", "").strip()
+                        tool_calls = empty_result.get("tool_calls") or []
+                        if thought_text:
+                            yield {"type": "thought", "content": thought_text}
+                        if not tool_calls:
+                            final_answer_text = thought_text
+                            break
+                        # 有 tool_calls 继续执行
+                    else:
+                        # 重试也失败，继续下一轮
+                        logger.warning("Empty response retry exhausted, continuing loop")
+                        continue
 
                 # ── ACT ────────────────────────────────────
                 stop_loop = False
@@ -361,6 +499,7 @@ class AgentRunner:
                         "tool_name": tool_name,
                         "summary": summary,
                         "duration_ms": duration_ms,
+                        "details": _format_tool_details(result),
                     }
 
                     # ── OBSERVE：将结果追加到 messages ──────
@@ -379,9 +518,20 @@ class AgentRunner:
                     break
 
             else:
-                # 超出 max_iterations，用最后一次 LLM 文本作答案
+                # 超出 max_iterations，强制 LLM 合成答案（参考 WeKnora）
                 if not final_answer_text:
-                    final_answer_text = "（已达到最大推理轮次，以上为当前检索到的内容。）"
+                    logger.info(
+                        "AgentRunner: max_iterations=%d reached, synthesizing answer",
+                        self.max_iterations,
+                    )
+                    yield {"type": "thought", "content": "已达到最大推理轮次，正在综合已检索内容生成答案..."}
+                    synthesized = self._synthesize_final_answer(
+                        question, messages, system_prompt,
+                    )
+                    if synthesized:
+                        final_answer_text = synthesized
+                    else:
+                        final_answer_text = "（已达到最大推理轮次，以上为当前检索到的内容。）"
 
         except Exception as exc:
             logger.exception("AgentRunner error: %s", exc)

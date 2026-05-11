@@ -34,6 +34,7 @@ def init_db() -> None:
               description TEXT DEFAULT '',
               tenant_id TEXT NOT NULL DEFAULT 'default',
               status TEXT NOT NULL DEFAULT 'active',
+              type TEXT NOT NULL DEFAULT 'sop_docx',
               data_path TEXT NOT NULL,
               index_path TEXT DEFAULT '',
               embedding_path TEXT DEFAULT '',
@@ -136,6 +137,34 @@ def init_db() -> None:
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS kg_entities (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              kb_id TEXT NOT NULL,
+              entity_name TEXT NOT NULL,
+              entity_type TEXT NOT NULL,
+              description TEXT DEFAULT '',
+              chunk_ids TEXT NOT NULL DEFAULT '[]',
+              created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_kg_entity_kb ON kg_entities(kb_id);
+            CREATE INDEX IF NOT EXISTS idx_kg_entity_name ON kg_entities(entity_name);
+
+            CREATE TABLE IF NOT EXISTS kg_relations (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              kb_id TEXT NOT NULL,
+              source_id INTEGER NOT NULL,
+              target_id INTEGER NOT NULL,
+              relation_type TEXT NOT NULL,
+              description TEXT DEFAULT '',
+              strength INTEGER DEFAULT 5,
+              created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_kg_rel_kb ON kg_relations(kb_id);
+            CREATE INDEX IF NOT EXISTS idx_kg_rel_source ON kg_relations(source_id);
+            CREATE INDEX IF NOT EXISTS idx_kg_rel_target ON kg_relations(target_id);
             """
         )
 
@@ -146,6 +175,16 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE kb_session_messages "
                 "ADD COLUMN reasoning_json TEXT NOT NULL DEFAULT '{}'"
+            )
+
+        # Phase 4 迁移：knowledge_bases 加 type 列（区分 sop_docx / general）
+        # 老库无感升级：默认 'sop_docx'，行为完全不变
+        cur = conn.execute("PRAGMA table_info(knowledge_bases)")
+        kb_cols = {row["name"] for row in cur.fetchall()}
+        if "type" not in kb_cols:
+            conn.execute(
+                "ALTER TABLE knowledge_bases "
+                "ADD COLUMN type TEXT NOT NULL DEFAULT 'sop_docx'"
             )
 
 

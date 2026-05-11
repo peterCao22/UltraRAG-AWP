@@ -1,0 +1,41 @@
+## Task
+From the user-provided entity array, extract explicit relationships between entities to form a structured relationship network.
+
+## Requirements
+1. Relationship extraction must be based on the provided text; do not fabricate non-existent relationships
+2. Output must be a JSON array of objects with "source", "target", "relation_type", "description", and "strength" fields
+3. Source and target must be entity titles already in the entity array
+4. If no relationships are found, return an empty array []
+
+## Relationship Extraction Rules
+- Only relationships explicitly present in the text should be extracted
+- Description should concisely explain the specific relationship
+- Strength should be determined as follows:
+  * 10: Direct creation/subordination (e.g., author-work, inventor-invention, parent-subsidiary)
+  * 9: Different manifestations of same entity (alias, former name)
+  * 8: Closely related and mutually influential (close partners, family)
+  * 7: Clear but indirect relationships (characters in a work, organization members)
+  * 6: Indirect association with clear connection (colleagues, similar products)
+  * 5: Related but loosely connected (different concepts in same field)
+
+## Extraction Steps
+1. Analyze the text to determine which entities have explicit relationships
+2. For each relationship: source, target, relation_type, description, strength
+3. Check whether relationships are bidirectional
+4. Verify consistency and reasonableness
+5. Return a JSON array
+
+## Example
+[Input]
+Entities: [
+  {"title": "IFS数据库", "type": "Product"},
+  {"title": "ifsdb status", "type": "Operation"},
+  {"title": "活跃会话", "type": "Concept"}
+]
+Text: "重启IFS数据库前需确保无活跃会话，使用 ifsdb status 命令检查状态。"
+
+[Output]
+[
+  {"source": "ifsdb status", "target": "IFS数据库", "relation_type": "checks", "description": "ifsdb status 命令用于检查IFS数据库状态", "strength": 10},
+  {"source": "IFS数据库", "target": "活跃会话", "relation_type": "has", "description": "IFS数据库可以有活跃会话", "strength": 8}
+]

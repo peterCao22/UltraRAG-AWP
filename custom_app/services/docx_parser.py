@@ -226,20 +226,47 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
     counter_holder = [0]
 
     def pack_chunk(cid: str, title: str, lines: List[str], imgs: List[str]) -> None:
-        text_body = "\n".join(x for x in lines if x).strip()
+        # lines 是有序的字符串混合：普通文本行 / "[IMG: <相对路径>]" 内联占位
+        # imgs 是去重后的图片路径数组（用于 chunk["images"] 兼容字段）
+        body = "\n".join(x for x in lines if x).strip()
         uimgs = list(dict.fromkeys(imgs))
-        if not text_body and not uimgs:
+        if not body and not uimgs:
             return
-        contents = text_body
-        if uimgs:
-            contents = (contents + IMAGES_MARK + "\n".join(uimgs)).strip()
+        # 兜底：如果 lines 里没有 [IMG: ...] 占位（旧代码路径或表格内图片），
+        # 把缺失的图片路径追加到末尾，保证 LLM 仍能看到（向后兼容）
+        present = set(re.findall(r"\[IMG:\s*([^\]]+)\]", body))
+        missing = [p for p in uimgs if p not in present]
+        if missing:
+            tail = "\n".join(f"[IMG: {p}]" for p in missing)
+            body = (body + "\n" + tail).strip()
+
+        # Phase 4 新 schema 字段（向后兼容版本）：
+        # - images 仍输出字符串数组：现有下游 (api/chat.py, services/tools/list_chunks.py)
+        #   假定字符串路径，保留兼容；新 parser (mineru/docling) 可直接输出对象数组，
+        #   Chunk.from_jsonl_dict 已能兼容两种格式
+        # - heading_path：当前 docx_parser 只维护单层运行标题 h_run
+        # - step_number：仅 STEP chunk 有值（intro/section chunk 为 None）
+        is_step_chunk = cur_step is not None and cid == f"{doc_stem}_step_{cur_step}"
+        step_number = cur_step if is_step_chunk else None
+        heading_path = [h_run] if h_run else []
+
         chunks_out.append(
             {
                 "id": cid,
                 "title": title,
-                "contents": contents,
+                "contents": body,
                 "doc": doc_stem,
                 "images": uimgs,
+                "source_type": "sop_docx",
+                "parser": "docx_parser",
+                "structure": {
+                    "heading_path": heading_path,
+                    "heading_level": 1 if heading_path else 0,
+                    "step_number": step_number,
+                    "page_idx": None,
+                },
+                "tables": [],
+                "vector_id": None,
             }
         )
 
@@ -297,15 +324,22 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
             img_counter = counter_holder[0]
 
             for phase_text, phase_imgs in phases:
+                # 把图片同时加到 lines 数组（作为 [IMG: path] 占位行，保留位置）
+                # 和 imgs 数组（用于 chunk["images"] 兼容字段）
+                def _append_imgs(target_lines: List[str], target_imgs: List[str], paths: List[str]) -> None:
+                    for p in paths:
+                        target_lines.append(f"[IMG: {p}]")
+                        target_imgs.append(p)
+
                 pieces = _split_paragraph_by_steps(
                     _ensure_step_newlines(phase_text.strip())
                 )
                 if not pieces:
                     if phase_imgs:
                         if cur_step is None:
-                            intro_imgs.extend(phase_imgs)
+                            _append_imgs(intro_lines, intro_imgs, phase_imgs)
                         else:
-                            cur_imgs.extend(phase_imgs)
+                            _append_imgs(cur_lines, cur_imgs, phase_imgs)
                     continue
                 n_pieces = len(pieces)
                 for idx, (piece_step, segment) in enumerate(pieces):
@@ -313,27 +347,27 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
                     if piece_step is None:
                         if cur_step is None:
                             intro_lines.append(segment)
-                            intro_imgs.extend(piece_imgs)
+                            _append_imgs(intro_lines, intro_imgs, piece_imgs)
                         else:
                             cur_lines.append(segment)
-                            cur_imgs.extend(piece_imgs)
+                            _append_imgs(cur_lines, cur_imgs, piece_imgs)
                         continue
                     if cur_step != piece_step:
                         if cur_step is None and not intro_lines and not intro_imgs:
                             cur_step = piece_step
                             cur_lines.append(segment)
-                            cur_imgs.extend(piece_imgs)
+                            _append_imgs(cur_lines, cur_imgs, piece_imgs)
                         elif cur_step is None:
                             flush_for_new_step(piece_step)
                             cur_lines.append(segment)
-                            cur_imgs.extend(piece_imgs)
+                            _append_imgs(cur_lines, cur_imgs, piece_imgs)
                         else:
                             flush_for_new_step(piece_step)
                             cur_lines.append(segment)
-                            cur_imgs.extend(piece_imgs)
+                            _append_imgs(cur_lines, cur_imgs, piece_imgs)
                     else:
                         cur_lines.append(segment)
-                        cur_imgs.extend(piece_imgs)
+                        _append_imgs(cur_lines, cur_imgs, piece_imgs)
         elif child.tag == qn("w:tbl"):
             tt = _table_to_text(Table(child, doc))
             if not tt:

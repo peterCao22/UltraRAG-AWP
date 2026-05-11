@@ -65,6 +65,11 @@ def _compact_reasoning_event(event: dict) -> dict:
         out["summary"] = str(event.get("summary") or "")[:200]
         if isinstance(event.get("duration_ms"), int):
             out["duration_ms"] = event["duration_ms"]
+        # 落库前对 details 再做保护性截断（最长 2000 字符），防止 SSE 上游
+        # 截断阈值变大时拖累 SQLite 存储和后续 list_messages 反序列化。
+        details = event.get("details")
+        if isinstance(details, str) and details:
+            out["details"] = details[:2000]
     return out
 
 

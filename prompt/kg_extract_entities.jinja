@@ -1,0 +1,40 @@
+## Task
+Extract all entities from the user-provided text that match the following entity types:
+EntityTypes: [Person, Organization, Location, Product, Event, Date, Work, Concept, Resource, Category, Operation]
+
+## Requirements
+1. Output must be a JSON array of objects with "title", "type", and "description" fields
+2. The "type" value must be strictly selected from EntityTypes; do not create new types
+3. If the entity type cannot be determined, skip that entity
+4. All field values must be in {{ language }}
+5. If no entities are found, return an empty array []
+
+## Entity Extraction Rules
+- Person: Real or fictional characters, historical figures, etc.
+- Organization: Companies, government agencies, teams, schools
+- Location: Geographic locations, landmarks, countries, cities
+- Product: Goods, services, brands, software products
+- Event: Events, conferences, festivals, historical events
+- Date: Dates, time periods, eras
+- Work: Books, movies, music, articles, creative works
+- Concept: Abstract concepts, ideas, theories
+- Resource: Natural resources, information resources, tools, files, commands
+- Category: Classifications, categories, fields
+- Operation: Operations, actions, methods, processes, commands
+
+## Extraction Steps
+1. Read the text and identify potential entities
+2. For each entity, determine the most appropriate type from EntityTypes
+3. Create a JSON object: {"title": "standard name", "type": "EntityType", "description": "brief description"}
+4. Return a JSON array of all entities
+
+## Example
+[Input]
+Text: "重启IFS数据库前需确保无活跃会话，使用 ifsdb status 命令检查状态。"
+
+[Output]
+[
+  {"title": "IFS数据库", "type": "Product", "description": "IFS系统的数据库组件"},
+  {"title": "ifsdb status", "type": "Operation", "description": "检查IFS数据库状态的命令"},
+  {"title": "活跃会话", "type": "Concept", "description": "数据库当前的活跃连接"}
+]

@@ -18,6 +18,7 @@ ALL_TOOLS: List[str] = [
     "knowledge_search",
     "keyword_search",
     "list_knowledge_chunks",
+    "query_knowledge_graph",
     "final_answer",
 ]
 

@@ -7,10 +7,9 @@ from pathlib import Path
 import numpy as np
 import faiss
 from flask import Blueprint, jsonify, request
-from werkzeug.utils import secure_filename
-
 from custom_app.db import get_conn, new_id, now_iso, row_to_dict
 from custom_app.services.docx_parser import parse_directory, write_chunks_jsonl
+from custom_app.services.filename_safe import unicode_safe_filename
 from custom_app.services.google_embedder import build_embedding_npy
 from custom_app.services.job_executor import JobExecutor
 
@@ -459,11 +458,22 @@ def upload_documents(kb_id: str):
         for f in files:
             if not f.filename:
                 continue
-            safe_name = secure_filename(f.filename)
+            safe_name = unicode_safe_filename(f.filename)
             ext = Path(safe_name).suffix.lower()
             if ext not in _ALLOWED_EXTENSIONS:
                 continue
+            # 同名冲突时追加序号，保证多个 Unicode 名各自落盘
             dest = raw_dir / safe_name
+            if dest.exists():
+                stem = Path(safe_name).stem
+                idx = 1
+                while True:
+                    candidate = raw_dir / f"{stem}_{idx}{ext}"
+                    if not candidate.exists():
+                        dest = candidate
+                        safe_name = candidate.name
+                        break
+                    idx += 1
             f.save(str(dest))
             doc_id = f"{kb_id}:{safe_name}"
             conn.execute(
@@ -798,6 +808,7 @@ _TOOL_LABELS = {
     "knowledge_search": "搜索知识库（语义向量）",
     "keyword_search": "文本关键词搜索",
     "list_knowledge_chunks": "阅读文档完整内容（Deep Read）",
+    "query_knowledge_graph": "知识图谱查询（实体关系）",
     "final_answer": "提交最终答案",
 }
 
