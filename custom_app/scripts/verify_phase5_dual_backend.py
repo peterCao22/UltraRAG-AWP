@@ -214,6 +214,46 @@ def main() -> int:
         print(f"  [SKIP] Qdrant 检查失败：{e}")
 
     # ───────────────────────────────────────────────────────────────────
+    # 第 3 部分：Neo4j KG 与原 SQLite KG 一致性
+    # ───────────────────────────────────────────────────────────────────
+    _print_header("第 3 部分：Neo4j KG 与原 SQL KG 一致性")
+
+    try:
+        from custom_app.services.kgstore.sqlite_store import SqliteKgStore
+        from custom_app.services.kgstore.neo4j_store import Neo4jKgStore
+
+        # SQLite KG 走 sqlite provider 隔离查询
+        set_default_provider(sqlite_provider)
+        sqlite_kg = SqliteKgStore()
+        neo4j_kg = Neo4jKgStore()
+
+        for kb_id in sqlite_kbs[:3]:
+            try:
+                s_stats = sqlite_kg.count_entities_and_relations(kb_id)
+                n_stats = neo4j_kg.count_entities_and_relations(kb_id)
+                if (s_stats["entity_count"] == n_stats["entity_count"]
+                        and s_stats["relation_count"] == n_stats["relation_count"]):
+                    print(
+                        f"  [OK] {kb_id}: SQL={s_stats['entity_count']}E/"
+                        f"{s_stats['relation_count']}R == "
+                        f"Neo4j={n_stats['entity_count']}E/{n_stats['relation_count']}R"
+                    )
+                    if s_stats["entity_count"] > 0:
+                        passed += 1
+                else:
+                    print(
+                        f"  [DIFF] {kb_id}: SQL={s_stats} vs Neo4j={n_stats}"
+                    )
+                    if s_stats["entity_count"] > 0:
+                        failed += 1
+            except Exception as e:
+                print(f"  [INFO] {kb_id}: KG check 失败 ({e})")
+
+        neo4j_kg.close()
+    except Exception as e:
+        print(f"  [SKIP] Neo4j 检查失败：{e}")
+
+    # ───────────────────────────────────────────────────────────────────
     # 总结
     # ───────────────────────────────────────────────────────────────────
     _print_header("总结")

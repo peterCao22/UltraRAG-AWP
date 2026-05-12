@@ -123,4 +123,5 @@ markers = [
     "requires_docling: integration test that needs real Docling installation",
     "requires_qdrant: integration test that needs real Qdrant service",
     "requires_postgres: integration test that needs real PostgreSQL service",
+    "requires_neo4j: integration test that needs real Neo4j service",
 ]

@@ -106,6 +106,56 @@ def probe_postgres() -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
+# Neo4j (Phase 5.2)
+# ---------------------------------------------------------------------------
+
+
+def probe_neo4j() -> Optional[str]:
+    """探测 Neo4j 服务；返回错误消息（None = 成功）。"""
+    uri = os.environ.get("ULTRARAG_NEO4J_URI", "")
+    if not uri:
+        return "ULTRARAG_NEO4J_URI not set"
+
+    user = os.environ.get("ULTRARAG_NEO4J_USER", "neo4j")
+    password = os.environ.get("ULTRARAG_NEO4J_PASSWORD", "")
+    database = os.environ.get("ULTRARAG_NEO4J_DATABASE", "neo4j")
+
+    try:
+        from neo4j import GraphDatabase  # type: ignore
+    except ImportError:
+        return "neo4j driver not installed (pip install neo4j)"
+
+    try:
+        with GraphDatabase.driver(uri, auth=(user, password)) as driver:
+            driver.verify_connectivity()
+            with driver.session(database=database) as session:
+                # 取版本信息
+                rec = session.run(
+                    "CALL dbms.components() YIELD name, versions, edition "
+                    "RETURN name, versions[0] AS version, edition"
+                ).single()
+                if rec:
+                    print(
+                        f"  [OK] {rec['name']} version={rec['version']} "
+                        f"edition={rec['edition']}"
+                    )
+                # 数据库与节点统计
+                node_count = session.run(
+                    "MATCH (n) RETURN count(n) AS cnt"
+                ).single()["cnt"]
+                rel_count = session.run(
+                    "MATCH ()-[r]->() RETURN count(r) AS cnt"
+                ).single()["cnt"]
+                print(
+                    f"  database '{database}': {node_count} nodes, "
+                    f"{rel_count} relationships"
+                )
+        return None
+    except Exception as e:
+        return f"neo4j connection failed: {e}"
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -131,6 +181,13 @@ def main() -> int:
     pg_err = probe_postgres()
     print()
 
+    print("[Neo4j]")
+    neo_uri = os.environ.get("ULTRARAG_NEO4J_URI", "(unset)")
+    neo_db = os.environ.get("ULTRARAG_NEO4J_DATABASE", "neo4j")
+    print(f"  URI: {neo_uri}  database={neo_db}")
+    neo_err = probe_neo4j()
+    print()
+
     print("=== 结果 ===")
     failed = []
     if qdrant_err:
@@ -143,6 +200,11 @@ def main() -> int:
         failed.append("postgres")
     else:
         print("[OK]   Postgres")
+    if neo_err:
+        print(f"[FAIL] Neo4j: {neo_err}")
+        failed.append("neo4j")
+    else:
+        print("[OK]   Neo4j")
 
     if failed:
         print(f"\n失败服务: {failed}")

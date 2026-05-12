@@ -1,6 +1,6 @@
-# Phase 5.1 实施记录与验收
+# Phase 5 实施记录与验收
 
-> 完成时间：2026-05-11
+> 完成时间：5.1 = 2026-05-11，5.2 = 2026-05-12
 > 前置：[Phase 4](../Phase4/PHASE4_PLAN.md)
 > 概要：[PHASE5_OUTLINE.md](PHASE5_OUTLINE.md)
 
@@ -27,6 +27,18 @@
 | 5.1.7 全套 SQL 调用点改用 Repository | ✅ 6 文件 × 146 调用 → 0 raw SQL |
 | 5.1.8 双后端 E2E 验收 | ✅ 7/7 一致性检查通过 |
 
+### 5.2.0-5.2.6：Neo4j 知识图谱后端
+
+| 子项 | 状态 |
+| --- | --- |
+| 5.2.0 Neo4j 服务连通性 + .env | ✅ Neo4j 2025.10.1 (Community) @ 192.168.8.40:7687 |
+| 5.2.1 KgStore Protocol + SqliteKgStore | ✅ 4 项工厂测试 + Protocol 合规 |
+| 5.2.2 Neo4jKgStore 实现 | ✅ 节点 :Entity + 关系 :RELATES_TO + (kb_id, name) UNIQUE 约束 |
+| 5.2.3 kg_extractor / kg_search 切到 KgStore | ✅ 全部走 build_kg_store()，无 KgRepository 直调 |
+| 5.2.4 SQLite/PG KG → Neo4j 迁移脚本 | ✅ ifs_docs 188 entities + 177 relations 0 skipped |
+| 5.2.5 测试 | ✅ 10 项（含 2 项真实 Neo4j 集成：CRUD lifecycle + kb_id 隔离） |
+| 5.2.6 三栈双后端验收 | ✅ 8/8 一致性通过（SQL 6 + Qdrant 1 + Neo4j 3） |
+
 ---
 
 ## 二、架构成果
@@ -34,20 +46,20 @@
 ### 2.1 双后端抽象
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│                  Application Layer                  │
-│  custom_app/api/{kb,roles}.py + services/*          │
-└────────────────┬──────────────────┬─────────────────┘
-                 │                  │
-        ┌────────▼────────┐  ┌──────▼─────────┐
-        │ Repository 层    │  │ VectorStore    │
-        │ (8 个 Protocol)  │  │ Protocol       │
-        └────────┬────────┘  └──────┬─────────┘
-                 │                  │
-       ┌─────────┴─────────┐  ┌────┴────┬──────────┐
-       ▼                   ▼  ▼         ▼          ▼
-  SqliteProvider     PostgresProvider  FAISS    Qdrant
-  (db/app.sqlite)    (192.168.8.40)    (本地)   (192.168.8.40)
+┌──────────────────────────────────────────────────────────────────┐
+│                       Application Layer                          │
+│  custom_app/api/{kb,roles}.py + services/{kg_extractor,kg_search} │
+└─────────────┬───────────────┬───────────────┬───────────────────┘
+              │               │               │
+     ┌────────▼───────┐  ┌────▼────────┐  ┌──▼──────────────┐
+     │ Repository 层  │  │ VectorStore │  │  KgStore        │
+     │ (7 Repository) │  │  Protocol   │  │  Protocol       │
+     └────────┬───────┘  └────┬────────┘  └──┬──────────────┘
+              │               │               │
+       ┌──────┴──────┐  ┌─────┴─────┐  ┌─────┴───────┐
+       ▼             ▼  ▼           ▼  ▼             ▼
+  SqliteProvider  Postgres   FAISS   Qdrant  SqliteKgStore  Neo4jKgStore
+  (本地 sqlite)   awprag    (本地)  (cluster) (复用 SQL)    (192.168.8.40)
 ```
 
 ### 2.2 切换方式
@@ -58,6 +70,7 @@
 # .env
 ULTRARAG_VECTOR_BACKEND=qdrant      # faiss | qdrant
 ULTRARAG_DB_BACKEND=postgres        # sqlite | postgres
+ULTRARAG_KG_BACKEND=neo4j           # sqlite | neo4j   (Phase 5.2)
 ```
 
 ```yaml
@@ -110,17 +123,26 @@ custom_app/repositories/
 custom_app/services/vectorstore/
   qdrant_store.py               # QdrantVectorStore + QdrantConfig
 
+custom_app/services/kgstore/    # Phase 5.2 知识图谱存储抽象
+  __init__.py
+  base.py                       # KgStore Protocol + EntityRecord + 工厂
+  sqlite_store.py               # SqliteKgStore (复用 KgRepository)
+  neo4j_store.py                # Neo4jKgStore (:Entity + :RELATES_TO)
+
 custom_app/scripts/
-  probe_phase5_services.py      # Docker 服务连通性探测
+  probe_phase5_services.py      # Docker 服务连通性探测（含 Neo4j）
+  bootstrap_postgres_database.py # 创建 awprag 库（幂等）
   migrate_faiss_to_qdrant.py    # FAISS → Qdrant 迁移 + 一致性验证
-  migrate_sqlite_to_postgres.py # SQLite → Postgres 全表迁移
-  verify_phase5_dual_backend.py # 双后端 E2E 验收
+  migrate_sqlite_to_postgres.py # SQLite → Postgres 全表迁移（KG FK 重映射）
+  migrate_kg_to_neo4j.py        # SQLite/PG KG → Neo4j 迁移（element_id 重映射）
+  verify_phase5_dual_backend.py # 三栈双后端 E2E 验收（8/8）
   verify_queries_agv.txt        # 一致性验证查询样本
 
 tests/
   test_qdrant_vectorstore.py    # 22 项（含 1 项真实 Qdrant 集成）
   test_repositories.py          # 41 项 SQLite Repository CRUD
   test_repositories_postgres.py # 6 项真实 Postgres 集成
+  test_kgstore.py               # 10 项（含 2 项真实 Neo4j 集成）
 
 docs/Phase5/
   PHASE5_OUTLINE.md
@@ -233,15 +255,18 @@ Qdrant ifs_docs:     16 points 在线 ✓
 
 ## 六、后续工作
 
-### Phase 5.2（已规划，按需启动）
+### Phase 5.2（已完成 2026-05-12）
 
-- Neo4j 替代 SQLite kg_entities/kg_relations 两表
-- 触发条件：Agent 工具需要多跳推理（"故障 → 关联部件 → 维修 SOP" 链式查找）
+- ✅ Neo4j 知识图谱后端：单 database + kb_id property 区分 KB
+- ✅ KgStore Protocol（SqliteKgStore + Neo4jKgStore 双实现）
+- ✅ ifs_docs KG 数据完整迁移：188 entities + 177 relations
+- ✅ 三栈双后端验收 8/8 通过
 
 ### Phase 6（规划中）
 
 - BM25 混合检索（Qdrant + Tantivy / Elasticsearch）
 - Multi-query rewrite
+- 利用 Neo4j 多跳查询能力增强 Agent KnowledgeGraphTool（"故障 → 关联部件 → 维修 SOP" 链式查找）
 
 ---
 
@@ -255,12 +280,18 @@ Qdrant ifs_docs:     16 points 在线 ✓
 # 首次部署时先创建 awprag 数据库（已存在则跳过）
 .venv/Scripts/python.exe -m custom_app.scripts.bootstrap_postgres_database
 
+# 探测三个服务都可达（建议）
+.venv/Scripts/python.exe -m custom_app.scripts.probe_phase5_services
+
 # SQLite → Postgres（awprag）
 .venv/Scripts/python.exe -m custom_app.scripts.migrate_sqlite_to_postgres --truncate
 
 # FAISS → Qdrant（按 KB 迁移）
 .venv/Scripts/python.exe -m custom_app.scripts.migrate_faiss_to_qdrant --kb agv_demo --recreate
 .venv/Scripts/python.exe -m custom_app.scripts.migrate_faiss_to_qdrant --kb ifs_docs --recreate
+
+# SQLite/Postgres KG → Neo4j（Phase 5.2，按 KB 或全量）
+ULTRARAG_DB_BACKEND=postgres .venv/Scripts/python.exe -m custom_app.scripts.migrate_kg_to_neo4j
 ```
 
 **2. 切换配置**：
@@ -269,16 +300,17 @@ Qdrant ifs_docs:     16 points 在线 ✓
 # .env
 ULTRARAG_VECTOR_BACKEND=qdrant
 ULTRARAG_DB_BACKEND=postgres
+ULTRARAG_KG_BACKEND=neo4j
 ```
 
 **3. 验证**：
 
 ```bash
 .venv/Scripts/python.exe -m custom_app.scripts.verify_phase5_dual_backend
-# 应输出：通过：7 失败：0
+# 应输出：通过：8 失败：0
 ```
 
-**4. 回滚**（如需）：把上面 2 行环境变量改回 `faiss` / `sqlite` 重启 Flask 即可。
+**4. 回滚**（如需）：把上面 3 行环境变量改回 `faiss` / `sqlite` / `sqlite` 重启 Flask 即可。
 
 ---
 

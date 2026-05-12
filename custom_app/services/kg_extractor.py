@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from custom_app.db import now_iso
-from custom_app.repositories import KgRepository
 from custom_app.services.google_embedder import strip_images_footer
+from custom_app.services.kgstore import KgStore, build_kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -170,24 +170,25 @@ def extract_relations_from_text(entities: List[dict], text: str) -> List[dict]:
         return []
 
 
-def _upsert_entity(kb_id: str, entity: dict, chunk_id: str) -> int:
-    """插入或更新实体，返回实体 id。"""
-    kg_repo = KgRepository()
-    existing = kg_repo.find_entity_by_name(kb_id, entity["title"])
+def _upsert_entity(store: KgStore, kb_id: str, entity: dict, chunk_id: str) -> str:
+    """插入或更新实体，返回实体 id (str)。
+
+    Phase 5.2：entity_id 改用 str（SQLite 后端把 int 自动转 str，Neo4j 用 element_id）
+    """
+    existing = store.find_entity_by_name(kb_id, entity["title"])
     if existing:
-        entity_id = int(existing["id"])
-        chunk_ids = json.loads(existing.get("chunk_ids") or "[]")
+        chunk_ids = json.loads(existing.chunk_ids or "[]")
         if chunk_id not in chunk_ids:
             chunk_ids.append(chunk_id)
-        kg_repo.update_entity_full(
-            entity_id,
+        store.update_entity_full(
+            existing.id,
             entity_type=entity["type"],
             description=entity["description"],
             chunk_ids_json=json.dumps(chunk_ids, ensure_ascii=False),
         )
-        return entity_id
+        return existing.id
 
-    return kg_repo.insert_entity(
+    return store.insert_entity(
         kb_id=kb_id,
         entity_name=entity["title"],
         entity_type=entity["type"],
@@ -197,15 +198,16 @@ def _upsert_entity(kb_id: str, entity: dict, chunk_id: str) -> int:
     )
 
 
-def _add_relation_if_not_exists(kb_id: str, source_id: int, target_id: int, relation: dict) -> bool:
+def _add_relation_if_not_exists(
+    store: KgStore, kb_id: str, source_id: str, target_id: str, relation: dict
+) -> bool:
     """添加关系，若已存在则跳过。返回是否新增。"""
-    kg_repo = KgRepository()
-    if kg_repo.find_relation(
+    if store.find_relation(
         kb_id=kb_id, source_id=source_id, target_id=target_id,
         relation_type=relation["relation_type"],
     ):
         return False
-    kg_repo.insert_relation(
+    store.insert_relation(
         kb_id=kb_id,
         source_id=source_id, target_id=target_id,
         relation_type=relation["relation_type"],
@@ -216,9 +218,12 @@ def _add_relation_if_not_exists(kb_id: str, source_id: int, target_id: int, rela
     return True
 
 
-def extract_and_store_chunk(kb_id: str, chunk: dict) -> Tuple[int, int]:
-    """对单个 chunk 进行实体和关系抽取，并存入 SQLite。
+def extract_and_store_chunk(
+    kb_id: str, chunk: dict, *, store: Optional[KgStore] = None
+) -> Tuple[int, int]:
+    """对单个 chunk 进行实体和关系抽取，并存入 KgStore。
 
+    Phase 5.2：store 默认按 ULTRARAG_KG_BACKEND 决定（sqlite / neo4j）。
     返回: (entity_count, relation_count)
     """
     chunk_id = chunk.get("id", "")
@@ -234,10 +239,12 @@ def extract_and_store_chunk(kb_id: str, chunk: dict) -> Tuple[int, int]:
     if not entities:
         return 0, 0
 
+    kg_store = store or build_kg_store()
+
     # 存储实体
-    entity_id_map: Dict[str, int] = {}
+    entity_id_map: Dict[str, str] = {}
     for e in entities:
-        eid = _upsert_entity(kb_id, e, chunk_id)
+        eid = _upsert_entity(kg_store, kb_id, e, chunk_id)
         entity_id_map[e["title"]] = eid
 
     # 抽取并存储关系
@@ -247,7 +254,7 @@ def extract_and_store_chunk(kb_id: str, chunk: dict) -> Tuple[int, int]:
         source_id = entity_id_map.get(r["source"])
         target_id = entity_id_map.get(r["target"])
         if source_id and target_id and source_id != target_id:
-            if _add_relation_if_not_exists(kb_id, source_id, target_id, r):
+            if _add_relation_if_not_exists(kg_store, kb_id, source_id, target_id, r):
                 rel_count += 1
 
     return len(entities), rel_count
@@ -272,8 +279,11 @@ def extract_kb(kb_id: str, chunks_path: str, batch_size: int = 20) -> dict:
     chunk_count = 0
     errors = 0
 
+    # Phase 5.2：单 store 实例复用整批，避免每 chunk 重新建 Neo4j driver
+    store = build_kg_store()
+
     # 清除旧图谱数据
-    KgRepository().delete_all_for_kb(kb_id)
+    store.delete_all_for_kb(kb_id)
 
     logger.info("Starting KG extraction for kb_id=%s from %s", kb_id, chunks_path)
 
@@ -283,7 +293,7 @@ def extract_kb(kb_id: str, chunks_path: str, batch_size: int = 20) -> dict:
                 continue
             try:
                 chunk = json.loads(line)
-                e_count, r_count = extract_and_store_chunk(kb_id, chunk)
+                e_count, r_count = extract_and_store_chunk(kb_id, chunk, store=store)
                 total_entities += e_count
                 total_relations += r_count
                 chunk_count += 1

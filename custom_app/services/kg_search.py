@@ -10,7 +10,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from custom_app.repositories import KgRepository
+from custom_app.services.kgstore import build_kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def search_graph(kb_id: str, entity_names: List[str],
     if not entity_names:
         return {"entities": [], "relations": [], "neighbor_entities": [], "all_chunk_ids": []}
 
-    rows = KgRepository().find_relations_for_entities(kb_id, entity_names)
+    rows = build_kg_store().find_relations_for_entities(kb_id, entity_names)
 
     # 去重处理
     seen_entities: Dict[str, dict] = {}
@@ -130,7 +130,7 @@ def get_graph_stats(kb_id: Optional[str] = None) -> dict:
     返回:
         {"kb_id": str, "entity_count": int, "relation_count": int}
     """
-    return KgRepository().count_entities_and_relations(kb_id)
+    return build_kg_store().count_entities_and_relations(kb_id)
 
 
 def clear_graph(kb_id: str) -> int:
@@ -138,5 +138,5 @@ def clear_graph(kb_id: str) -> int:
 
     返回删除的关系记录数。
     """
-    rel_count, _ = KgRepository().delete_all_for_kb(kb_id)
+    rel_count, _ = build_kg_store().delete_all_for_kb(kb_id)
     return rel_count
