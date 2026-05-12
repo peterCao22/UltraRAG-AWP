@@ -79,6 +79,22 @@ class KgRepository:
         with self._provider.connect() as conn:
             conn.execute(adapt_sql(sql, self._provider), (chunk_ids_json, entity_id))
 
+    def update_entity_full(
+        self,
+        entity_id: int,
+        *,
+        entity_type: str,
+        description: str,
+        chunk_ids_json: str,
+    ) -> None:
+        """更新实体的 type / description / chunk_ids（kg_extractor 合并实体时用）。"""
+        sql = "UPDATE kg_entities SET description=?, chunk_ids=?, entity_type=? WHERE id=?"
+        with self._provider.connect() as conn:
+            conn.execute(
+                adapt_sql(sql, self._provider),
+                (description, chunk_ids_json, entity_type, entity_id),
+            )
+
     # ------------------------------------------------------------------
     # kg_relations
     # ------------------------------------------------------------------
@@ -194,9 +210,12 @@ class KgRepository:
     ) -> list[dict[str, Any]]:
         """查找种子实体集的 outgoing + incoming 关系，含邻居实体信息。
 
-        返回行包含统一字段：entity_id / entity_name / entity_type / description /
-        chunk_ids / direction / relation_type / description_rel / strength /
-        neighbor_chunks / source_name / target_name
+        返回行字段（kg_search.search_graph 用）：
+            entity_id / entity_name / entity_type / description / chunk_ids
+            direction (self / source / target)
+            rel_id / relation_type / rel_description / strength
+            neighbor_id / neighbor_name / neighbor_type / neighbor_desc / neighbor_chunks
+            source_name / target_name
         """
         if not entity_names:
             return []
@@ -205,7 +224,10 @@ class KgRepository:
             -- seed 段：种子实体自身（无关系，作为兜底）
             SELECT e.id as entity_id, e.entity_name, e.entity_type, e.description,
                    e.chunk_ids, 'self' as direction,
-                   NULL as relation_type, NULL as description_rel, NULL as strength,
+                   NULL as rel_id, NULL as relation_type,
+                   NULL as rel_description, NULL as strength,
+                   NULL as neighbor_id, NULL as neighbor_name,
+                   NULL as neighbor_type, NULL as neighbor_desc,
                    NULL as neighbor_chunks,
                    NULL as source_name, NULL as target_name
             FROM kg_entities e
@@ -216,7 +238,10 @@ class KgRepository:
             -- outgoing：种子在 e（source），邻居在 t（target）
             SELECT t.id as entity_id, t.entity_name, t.entity_type, t.description,
                    t.chunk_ids, 'source' as direction,
-                   r.relation_type, r.description as description_rel, r.strength,
+                   r.id as rel_id, r.relation_type,
+                   r.description as rel_description, r.strength,
+                   e.id as neighbor_id, e.entity_name as neighbor_name,
+                   e.entity_type as neighbor_type, e.description as neighbor_desc,
                    e.chunk_ids as neighbor_chunks,
                    e.entity_name as source_name, t.entity_name as target_name
             FROM kg_entities e
@@ -229,7 +254,10 @@ class KgRepository:
             -- incoming：种子在 t（target），邻居在 e（source）
             SELECT e.id as entity_id, e.entity_name, e.entity_type, e.description,
                    e.chunk_ids, 'target' as direction,
-                   r.relation_type, r.description as description_rel, r.strength,
+                   r.id as rel_id, r.relation_type,
+                   r.description as rel_description, r.strength,
+                   t.id as neighbor_id, t.entity_name as neighbor_name,
+                   t.entity_type as neighbor_type, t.description as neighbor_desc,
                    t.chunk_ids as neighbor_chunks,
                    e.entity_name as source_name, t.entity_name as target_name
             FROM kg_entities t

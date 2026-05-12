@@ -7,7 +7,12 @@ from pathlib import Path
 import numpy as np
 import faiss
 from flask import Blueprint, jsonify, request
-from custom_app.db import get_conn, new_id, now_iso, row_to_dict
+from custom_app.db import new_id, now_iso
+from custom_app.repositories import (
+    DocumentRepository,
+    JobRepository,
+    KbRepository,
+)
 from custom_app.services.docx_parser import parse_directory, write_chunks_jsonl
 from custom_app.services.filename_safe import unicode_safe_filename
 from custom_app.services.google_embedder import build_embedding_npy
@@ -100,65 +105,48 @@ def _decorate_job_row(item: dict | None) -> dict | None:
 def _has_running_job(kb_id: str) -> bool:
     """检查 kb 是否有运行中的任务（自动恢复超时僵尸任务）。"""
     stale_timeout_seconds = 120
-    with get_conn() as conn:
-        running_rows = conn.execute(
-            "SELECT job_id, started_at FROM kb_jobs WHERE kb_id=? AND status='running'",
-            (kb_id,),
-        ).fetchall()
-        now = datetime.now(timezone.utc)
-        for row in running_rows:
-            started_at = row["started_at"]
-            if not started_at:
-                continue
-            try:
-                st = datetime.fromisoformat(str(started_at))
-                if st.tzinfo is None:
-                    st = st.replace(tzinfo=timezone.utc)
-                if (now - st).total_seconds() > stale_timeout_seconds:
-                    conn.execute(
-                        """UPDATE kb_jobs SET status='failed', finished_at=?,
-                           last_error=?, updated_at=? WHERE job_id=? AND status='running'""",
-                        (now_iso(), "stale running job recovered by watchdog", now_iso(), row["job_id"]),
-                    )
-            except Exception:
-                continue
+    job_repo = JobRepository()
+    running_rows = job_repo.find_running(kb_id)
+    now = datetime.now(timezone.utc)
+    for row in running_rows:
+        started_at = row["started_at"]
+        if not started_at:
+            continue
+        try:
+            st = datetime.fromisoformat(str(started_at))
+            if st.tzinfo is None:
+                st = st.replace(tzinfo=timezone.utc)
+            if (now - st).total_seconds() > stale_timeout_seconds:
+                job_repo.mark_stale_recovered(row["job_id"], finished_at=now_iso())
+        except Exception:
+            continue
 
-        row = conn.execute(
-            "SELECT job_id FROM kb_jobs WHERE kb_id=? AND status='running' LIMIT 1", (kb_id,)
-        ).fetchone()
-    return row is not None
+    return job_repo.has_running(kb_id)
 
 
 # ── ingest job helpers (refactored) ──────────────────────────────────────────
 
 def _mark_job_running(job_id: str) -> None:
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE kb_jobs SET status='running', started_at=?, updated_at=? WHERE job_id=?",
-            (now_iso(), now_iso(), job_id),
-        )
+    JobRepository().mark_running(job_id, started_at=now_iso())
 
 
 def _update_job_stage(job_id: str, stage: str, extra: dict | None = None) -> None:
     """在 ingest 各阶段完成后更新 result_json，供进度接口实时查询。"""
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT result_json FROM kb_jobs WHERE job_id=?", (job_id,)
-        ).fetchone()
-        existing = {}
-        if row:
-            try:
-                existing = json.loads(row["result_json"] or "{}")
-            except Exception:
-                existing = {}
-        stages_done: list = existing.get("stages_done", [])
-        if stage not in stages_done:
-            stages_done.append(stage)
-        existing.update({"stages_done": stages_done, **(extra or {})})
-        conn.execute(
-            "UPDATE kb_jobs SET result_json=?, updated_at=? WHERE job_id=?",
-            (json.dumps(existing), now_iso(), job_id),
-        )
+    job_repo = JobRepository()
+    result_json = job_repo.get_result_json(job_id)
+    existing: dict = {}
+    if result_json:
+        try:
+            existing = json.loads(result_json or "{}")
+        except Exception:
+            existing = {}
+    stages_done: list = existing.get("stages_done", [])
+    if stage not in stages_done:
+        stages_done.append(stage)
+    existing.update({"stages_done": stages_done, **(extra or {})})
+    job_repo.update_result_json(
+        job_id, result_json=json.dumps(existing), updated_at=now_iso()
+    )
 
 
 def _kb_type(kb: dict) -> str:
@@ -190,43 +178,30 @@ def _register_documents(kb: dict, kb_id: str, raw_dir: Path, chunks_path: Path) 
     （如 'docx' / 'pdf' / 'png'），便于排障与未来 doc-level 路由。
     """
     raw_files = _scan_raw_files(kb, raw_dir)
-    with get_conn() as conn:
-        if raw_files:
-            for fp in raw_files:
-                now = now_iso()
-                doc_id = f"{kb_id}:{fp.name}"
-                file_type = fp.suffix.lower().lstrip(".") or "unknown"
-                conn.execute(
-                    """INSERT INTO kb_documents
-                       (kb_id, tenant_id, doc_id, file_name, file_type, file_path,
-                        channel, status, error_message, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, 'api', 'pending', '', ?, ?)
-                       ON CONFLICT(kb_id, doc_id) DO UPDATE SET
-                         file_name=excluded.file_name, file_type=excluded.file_type,
-                         file_path=excluded.file_path, channel='api',
-                         status='pending', error_message='', updated_at=excluded.updated_at""",
-                    (kb_id, kb["tenant_id"], doc_id, fp.name, file_type, str(fp), now, now),
-                )
-        elif chunks_path.exists():
-            now = now_iso()
-            conn.execute(
-                """INSERT INTO kb_documents
-                   (kb_id, tenant_id, doc_id, file_name, file_type, file_path,
-                    channel, status, error_message, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, 'jsonl', ?, 'api', 'pending', '', ?, ?)
-                   ON CONFLICT(kb_id, doc_id) DO UPDATE SET
-                     file_name=excluded.file_name, file_type='jsonl',
-                     file_path=excluded.file_path, channel='api',
-                     status='pending', error_message='', updated_at=excluded.updated_at""",
-                (kb_id, kb["tenant_id"], f"{kb_id}:chunks", "chunks.jsonl", str(chunks_path), now, now),
+    doc_repo = DocumentRepository()
+    if raw_files:
+        for fp in raw_files:
+            file_type = fp.suffix.lower().lstrip(".") or "unknown"
+            doc_repo.upsert(
+                kb_id=kb_id, tenant_id=kb["tenant_id"],
+                doc_id=f"{kb_id}:{fp.name}", file_name=fp.name,
+                file_type=file_type, file_path=str(fp),
+                channel="api", status="pending", updated_at=now_iso(),
             )
-        else:
-            kb_type = _kb_type(kb)
-            exts = sorted(get_supported_extensions(kb_type))
-            raise RuntimeError(
-                f"no supported files found under {raw_dir} for kb_type={kb_type!r} "
-                f"(expected one of {exts}); and chunks missing: {chunks_path}"
-            )
+    elif chunks_path.exists():
+        doc_repo.upsert(
+            kb_id=kb_id, tenant_id=kb["tenant_id"],
+            doc_id=f"{kb_id}:chunks", file_name="chunks.jsonl",
+            file_type="jsonl", file_path=str(chunks_path),
+            channel="api", status="pending", updated_at=now_iso(),
+        )
+    else:
+        kb_type = _kb_type(kb)
+        exts = sorted(get_supported_extensions(kb_type))
+        raise RuntimeError(
+            f"no supported files found under {raw_dir} for kb_type={kb_type!r} "
+            f"(expected one of {exts}); and chunks missing: {chunks_path}"
+        )
 
 
 def _parse_stage(kb: dict, raw_dir: Path, kb_root: Path, chunks_path: Path) -> None:
@@ -286,41 +261,30 @@ def _index_stage(chunks_path: Path, embedding_path: Path, index_path: Path) -> i
 def _mark_job_success(job_id: str, kb_id: str, chunk_count: int,
                       chunks_path: Path, embedding_path: Path, index_path: Path,
                       force_reindex: bool) -> None:
-    with get_conn() as conn:
-        now = now_iso()
-        conn.execute(
-            """UPDATE kb_jobs SET status='success', finished_at=?, result_json=?, updated_at=?
-               WHERE job_id=?""",
-            (now, json.dumps({
-                "force_reindex": force_reindex,
-                "chunks_path": str(chunks_path),
-                "embedding_path": str(embedding_path),
-                "index_path": str(index_path),
-                "chunk_count": chunk_count,
-                "summary": f"indexed {chunk_count} chunks",
-            }), now, job_id),
-        )
-        conn.execute(
-            "UPDATE knowledge_bases SET last_indexed_at=?, updated_at=? WHERE kb_id=?",
-            (now, now, kb_id),
-        )
-        conn.execute(
-            "UPDATE kb_documents SET status='indexed', error_message='', updated_at=? WHERE kb_id=?",
-            (now, kb_id),
-        )
+    """成功收尾：更新 job + KB + documents 三表。
+
+    注：3 步分别 commit；非原子事务，但单条 UPDATE 都是幂等。
+    极端情况若中途崩溃，watchdog + 重 ingest 会修复。
+    """
+    now = now_iso()
+    JobRepository().mark_success(
+        job_id, finished_at=now, result={
+            "force_reindex": force_reindex,
+            "chunks_path": str(chunks_path),
+            "embedding_path": str(embedding_path),
+            "index_path": str(index_path),
+            "chunk_count": chunk_count,
+            "summary": f"indexed {chunk_count} chunks",
+        },
+    )
+    KbRepository().mark_indexed(kb_id, updated_at=now)
+    DocumentRepository().mark_all_indexed(kb_id, updated_at=now)
 
 
 def _mark_job_failed(job_id: str, kb_id: str, exc: Exception) -> None:
-    with get_conn() as conn:
-        now = now_iso()
-        conn.execute(
-            "UPDATE kb_jobs SET status='failed', finished_at=?, last_error=?, updated_at=? WHERE job_id=?",
-            (now, str(exc), now, job_id),
-        )
-        conn.execute(
-            "UPDATE kb_documents SET status='failed', error_message=?, updated_at=? WHERE kb_id=? AND status='pending'",
-            (str(exc), now, kb_id),
-        )
+    now = now_iso()
+    JobRepository().mark_failed(job_id, finished_at=now, error=str(exc))
+    DocumentRepository().mark_pending_failed(kb_id, error=str(exc), updated_at=now)
 
 
 def _run_ingest_job(kb: dict, kb_id: str, job_id: str, force_reindex: bool) -> dict:
@@ -381,19 +345,15 @@ def create_kb():
     data_path, index_path, embedding_path = _kb_paths(kb_id)
     created_at = now_iso()
 
-    with get_conn() as conn:
-        if conn.execute("SELECT kb_id FROM knowledge_bases WHERE kb_id = ?", (kb_id,)).fetchone():
-            return _err(f"kb_id already exists: {kb_id}", "KB_ALREADY_EXISTS", 409)
-        conn.execute(
-            """INSERT INTO knowledge_bases
-               (kb_id, name, description, tenant_id, status, type, data_path,
-                index_path, embedding_path, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)""",
-            (
-                kb_id, name, description, tenant_id, kb_type,
-                data_path, index_path, embedding_path, created_at, created_at,
-            ),
-        )
+    kb_repo = KbRepository()
+    if kb_repo.exists(kb_id):
+        return _err(f"kb_id already exists: {kb_id}", "KB_ALREADY_EXISTS", 409)
+    kb_repo.create(
+        kb_id=kb_id, name=name, description=description,
+        tenant_id=tenant_id, kb_type=kb_type,
+        data_path=data_path, index_path=index_path, embedding_path=embedding_path,
+        created_at=created_at,
+    )
 
     for rel in ["raw", "corpora", "embedding", "index", "images"]:
         (Path(data_path) / rel).mkdir(parents=True, exist_ok=True)
@@ -406,52 +366,19 @@ def list_kb():
     role_id = request.args.get("role_id", "").strip() or None
     include_archived = str(request.args.get("include_archived", "false")).lower() == "true"
     limit, offset = _parse_pagination(request.args)
-
-    status_sql = "" if include_archived else " AND kb.status != 'archived'"
-    params: list = []
-
-    doc_count_sql = (
-        "(SELECT COUNT(*) FROM kb_documents d WHERE d.kb_id = kb.kb_id) AS document_count"
+    rows = KbRepository().list_paginated(
+        role_id=role_id,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
     )
-    if role_id:
-        sql = f"""SELECT kb.kb_id, kb.name, kb.description, kb.tenant_id, kb.status,
-                         kb.type, kb.data_path, kb.index_path, kb.embedding_path,
-                         kb.last_indexed_at, kb.created_at, kb.updated_at,
-                         {doc_count_sql}
-                  FROM knowledge_bases kb
-                  INNER JOIN role_kb_permissions p ON p.kb_id = kb.kb_id
-                  WHERE p.role_id = ? {status_sql}
-                  ORDER BY kb.created_at DESC
-                  LIMIT ? OFFSET ?"""
-        params = [role_id, limit, offset]
-    else:
-        sql = f"""SELECT kb.kb_id, kb.name, kb.description, kb.tenant_id, kb.status,
-                         kb.type, kb.data_path, kb.index_path, kb.embedding_path,
-                         kb.last_indexed_at, kb.created_at, kb.updated_at,
-                         {doc_count_sql}
-                  FROM knowledge_bases kb
-                  WHERE 1=1 {status_sql}
-                  ORDER BY kb.created_at DESC
-                  LIMIT ? OFFSET ?"""
-        params = [limit, offset]
-
-    with get_conn() as conn:
-        rows = conn.execute(sql, tuple(params)).fetchall()
-    return _ok([row_to_dict(r) for r in rows])
+    return _ok(rows)
 
 
 @kb_bp.route("/api/kb/<string:kb_id>", methods=["GET"])
 def get_kb(kb_id: str):
     include_archived = str(request.args.get("include_archived", "false")).lower() == "true"
-    status_sql = "" if include_archived else " AND status != 'archived'"
-    with get_conn() as conn:
-        row = conn.execute(
-            f"""SELECT kb.*,
-                       (SELECT COUNT(*) FROM kb_documents d WHERE d.kb_id = kb.kb_id) AS document_count
-                FROM knowledge_bases kb WHERE kb.kb_id = ? {status_sql}""",
-            (kb_id,),
-        ).fetchone()
-    item = row_to_dict(row)
+    item = KbRepository().get(kb_id, include_archived=include_archived)
     if item is None:
         return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
     return _ok(item)
@@ -459,47 +386,36 @@ def get_kb(kb_id: str):
 
 @kb_bp.route("/api/kb/<string:kb_id>", methods=["PUT"])
 def update_kb(kb_id: str):
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT * FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
-        ).fetchone()
-        if row is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    kb_repo = KbRepository()
+    current = kb_repo.get_basic(kb_id)
+    if current is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
 
-        current = row_to_dict(row)
-        body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True) or {}
+    new_name = str(body.get("name", current["name"])).strip()
+    new_desc = str(body.get("description", current["description"])).strip()
 
-        new_name = str(body.get("name", current["name"])).strip()
-        new_desc = str(body.get("description", current["description"])).strip()
+    if not new_name:
+        return _err("name cannot be empty", "KB_NAME_EMPTY", 400)
 
-        if not new_name:
-            return _err("name cannot be empty", "KB_NAME_EMPTY", 400)
-
-        conn.execute(
-            "UPDATE knowledge_bases SET name=?, description=?, updated_at=? WHERE kb_id=?",
-            (new_name, new_desc, now_iso(), kb_id),
-        )
+    kb_repo.update_basic(kb_id, name=new_name, description=new_desc, updated_at=now_iso())
     return _ok({"kb_id": kb_id, "name": new_name, "description": new_desc})
 
 
 @kb_bp.route("/api/kb/<string:kb_id>", methods=["DELETE"])
 def delete_kb(kb_id: str):
     hard = str(request.args.get("hard", "false")).lower() == "true"
-    with get_conn() as conn:
-        row = conn.execute("SELECT * FROM knowledge_bases WHERE kb_id = ?", (kb_id,)).fetchone()
-        if row is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        if hard:
-            conn.execute("DELETE FROM knowledge_bases WHERE kb_id = ?", (kb_id,))
-        else:
-            conn.execute(
-                "UPDATE knowledge_bases SET status = 'archived', updated_at = ? WHERE kb_id = ?",
-                (now_iso(), kb_id),
-            )
+    kb_repo = KbRepository()
+    current = kb_repo.get_basic(kb_id)
+    if current is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
     if hard:
-        kb_dir = Path(row["data_path"])
+        kb_repo.hard_delete(kb_id)
+        kb_dir = Path(current["data_path"])
         if kb_dir.exists():
             shutil.rmtree(kb_dir, ignore_errors=True)
+    else:
+        kb_repo.archive(kb_id, updated_at=now_iso())
     return _ok({"kb_id": kb_id, "deleted": True, "hard": hard})
 
 
@@ -507,13 +423,9 @@ def delete_kb(kb_id: str):
 
 @kb_bp.route("/api/kb/<string:kb_id>/documents/upload", methods=["POST"])
 def upload_documents(kb_id: str):
-    with get_conn() as conn:
-        kb_row = conn.execute(
-            "SELECT kb_id, tenant_id, data_path, type FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
-        ).fetchone()
-    if kb_row is None:
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
         return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-    kb = row_to_dict(kb_row) or {}
 
     # Phase 4.2: 白名单按 kb.type 动态计算
     try:
@@ -529,42 +441,35 @@ def upload_documents(kb_id: str):
     raw_dir = Path(kb["data_path"]) / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    uploaded = []
-    now = now_iso()
-    with get_conn() as conn:
-        for f in files:
-            if not f.filename:
-                continue
-            safe_name = unicode_safe_filename(f.filename)
-            ext = Path(safe_name).suffix.lower()
-            if ext not in allowed_exts:
-                continue
-            # 同名冲突时追加序号，保证多个 Unicode 名各自落盘
-            dest = raw_dir / safe_name
-            if dest.exists():
-                stem = Path(safe_name).stem
-                idx = 1
-                while True:
-                    candidate = raw_dir / f"{stem}_{idx}{ext}"
-                    if not candidate.exists():
-                        dest = candidate
-                        safe_name = candidate.name
-                        break
-                    idx += 1
-            f.save(str(dest))
-            doc_id = f"{kb_id}:{safe_name}"
-            conn.execute(
-                """INSERT INTO kb_documents
-                   (kb_id, tenant_id, doc_id, file_name, file_type, file_path,
-                    channel, status, error_message, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, 'web', 'uploaded', '', ?, ?)
-                   ON CONFLICT(kb_id, doc_id) DO UPDATE SET
-                     file_name=excluded.file_name, file_type=excluded.file_type,
-                     file_path=excluded.file_path, channel='web',
-                     status='uploaded', error_message='', updated_at=excluded.updated_at""",
-                (kb_id, kb["tenant_id"], doc_id, safe_name, ext.lstrip("."), str(dest), now, now),
-            )
-            uploaded.append(safe_name)
+    doc_repo = DocumentRepository()
+    uploaded: list[str] = []
+    for f in files:
+        if not f.filename:
+            continue
+        safe_name = unicode_safe_filename(f.filename)
+        ext = Path(safe_name).suffix.lower()
+        if ext not in allowed_exts:
+            continue
+        # 同名冲突时追加序号，保证多个 Unicode 名各自落盘
+        dest = raw_dir / safe_name
+        if dest.exists():
+            stem = Path(safe_name).stem
+            idx = 1
+            while True:
+                candidate = raw_dir / f"{stem}_{idx}{ext}"
+                if not candidate.exists():
+                    dest = candidate
+                    safe_name = candidate.name
+                    break
+                idx += 1
+        f.save(str(dest))
+        doc_repo.upsert(
+            kb_id=kb_id, tenant_id=kb["tenant_id"],
+            doc_id=f"{kb_id}:{safe_name}", file_name=safe_name,
+            file_type=ext.lstrip("."), file_path=str(dest),
+            channel="web", status="uploaded", updated_at=now_iso(),
+        )
+        uploaded.append(safe_name)
 
     if not uploaded:
         allowed_display = ", ".join(sorted(allowed_exts))
@@ -584,24 +489,17 @@ def create_ingest_job(kb_id: str):
     force_reindex = bool(body.get("force_reindex", False))
     async_mode = bool(body.get("async", False))
 
-    with get_conn() as conn:
-        kb = conn.execute(
-            "SELECT kb_id, tenant_id, data_path, index_path, embedding_path FROM knowledge_bases WHERE kb_id = ?",
-            (kb_id,),
-        ).fetchone()
-        if kb is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        if _has_running_job(kb_id):
-            return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    if _has_running_job(kb_id):
+        return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
 
-        job_id = new_id("job")
-        now = now_iso()
-        conn.execute(
-            """INSERT INTO kb_jobs
-               (job_id, tenant_id, kb_id, job_type, status, payload_json, result_json, created_at, updated_at)
-               VALUES (?, ?, ?, 'ingest', 'pending', ?, '{}', ?, ?)""",
-            (job_id, kb["tenant_id"], kb_id, json.dumps({"force_reindex": force_reindex}), now, now),
-        )
+    job_id = new_id("job")
+    JobRepository().create_ingest_job(
+        job_id=job_id, tenant_id=kb["tenant_id"], kb_id=kb_id,
+        payload={"force_reindex": force_reindex}, created_at=now_iso(),
+    )
 
     if async_mode:
         _JOB_EXECUTOR.submit(_run_ingest_job, dict(kb), kb_id, job_id, force_reindex)
@@ -616,30 +514,20 @@ def create_ingest_job(kb_id: str):
 @kb_bp.route("/api/kb/<string:kb_id>/jobs", methods=["GET"])
 def list_jobs(kb_id: str):
     limit, offset = _parse_pagination(request.args)
-    with get_conn() as conn:
-        if conn.execute("SELECT kb_id FROM knowledge_bases WHERE kb_id = ?", (kb_id,)).fetchone() is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        rows = conn.execute(
-            """SELECT job_id, kb_id, job_type, status, retry_count, last_error,
-                      payload_json, result_json, started_at, finished_at, created_at, updated_at
-               FROM kb_jobs WHERE kb_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?""",
-            (kb_id, limit, offset),
-        ).fetchall()
-    return _ok([_decorate_job_row(row_to_dict(r)) for r in rows])
+    kb_repo = KbRepository()
+    if not kb_repo.exists(kb_id):
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    rows = JobRepository().list_for_kb(kb_id, limit=limit, offset=offset)
+    return _ok([_decorate_job_row(r) for r in rows])
 
 
 @kb_bp.route("/api/kb/<string:kb_id>/jobs/<string:job_id>", methods=["GET"])
 def get_job(kb_id: str, job_id: str):
-    with get_conn() as conn:
-        if conn.execute("SELECT kb_id FROM knowledge_bases WHERE kb_id = ?", (kb_id,)).fetchone() is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        row = conn.execute(
-            """SELECT job_id, kb_id, job_type, status, retry_count, last_error,
-                      payload_json, result_json, started_at, finished_at, created_at, updated_at
-               FROM kb_jobs WHERE kb_id=? AND job_id=?""",
-            (kb_id, job_id),
-        ).fetchone()
-    item = _decorate_job_row(row_to_dict(row))
+    kb_repo = KbRepository()
+    if not kb_repo.exists(kb_id):
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    job = JobRepository().get_for_kb(kb_id, job_id)
+    item = _decorate_job_row(job)
     if item is None:
         return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
     return _ok(item)
@@ -647,43 +535,32 @@ def get_job(kb_id: str, job_id: str):
 
 @kb_bp.route("/api/kb/<string:kb_id>/jobs/<string:job_id>/cancel", methods=["POST"])
 def cancel_job(kb_id: str, job_id: str):
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT status FROM kb_jobs WHERE kb_id=? AND job_id=?", (kb_id, job_id)
-        ).fetchone()
-        if row is None:
-            return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
-        if row["status"] in ("success", "failed", "cancelled"):
-            return _ok({"job_id": job_id, "status": row["status"], "cancelled": False})
-        conn.execute(
-            "UPDATE kb_jobs SET status='cancelled', finished_at=?, updated_at=? WHERE kb_id=? AND job_id=?",
-            (now_iso(), now_iso(), kb_id, job_id),
-        )
+    job_repo = JobRepository()
+    job = job_repo.get_for_kb(kb_id, job_id)
+    if job is None:
+        return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
+    if job["status"] in ("success", "failed", "cancelled"):
+        return _ok({"job_id": job_id, "status": job["status"], "cancelled": False})
+    job_repo.mark_cancelled(kb_id, job_id, finished_at=now_iso())
     return _ok({"job_id": job_id, "status": "cancelled", "cancelled": True})
 
 
 @kb_bp.route("/api/kb/<string:kb_id>/jobs/<string:job_id>/retry", methods=["POST"])
 def retry_job(kb_id: str, job_id: str):
-    with get_conn() as conn:
-        kb = conn.execute(
-            "SELECT kb_id, tenant_id, data_path, index_path, embedding_path FROM knowledge_bases WHERE kb_id = ?",
-            (kb_id,),
-        ).fetchone()
-        if kb is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        job = conn.execute("SELECT * FROM kb_jobs WHERE kb_id=? AND job_id=?", (kb_id, job_id)).fetchone()
-        if job is None:
-            return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
-        if job["status"] == "running":
-            return _err("job is running", "JOB_RUNNING", 409)
-        if _has_running_job(kb_id):
-            return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
-        payload = json.loads(job["payload_json"] or "{}")
-        force_reindex = bool(payload.get("force_reindex", False))
-        conn.execute(
-            "UPDATE kb_jobs SET status='pending', last_error='', retry_count=retry_count+1, updated_at=? WHERE kb_id=? AND job_id=?",
-            (now_iso(), kb_id, job_id),
-        )
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    job_repo = JobRepository()
+    job = job_repo.get_for_kb(kb_id, job_id)
+    if job is None:
+        return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
+    if job["status"] == "running":
+        return _err("job is running", "JOB_RUNNING", 409)
+    if _has_running_job(kb_id):
+        return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
+    payload = json.loads(job["payload_json"] or "{}")
+    force_reindex = bool(payload.get("force_reindex", False))
+    job_repo.reset_for_retry(kb_id, job_id, updated_at=now_iso())
     return _run_ingest_job(kb, kb_id, job_id, force_reindex)
 
 
@@ -691,26 +568,20 @@ def retry_job(kb_id: str, job_id: str):
 def run_pending_job(kb_id: str, job_id: str):
     body = request.get_json(silent=True) or {}
     async_mode = bool(body.get("async", False))
-    with get_conn() as conn:
-        kb = conn.execute(
-            "SELECT kb_id, tenant_id, data_path, index_path, embedding_path FROM knowledge_bases WHERE kb_id = ?",
-            (kb_id,),
-        ).fetchone()
-        if kb is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        job = conn.execute("SELECT * FROM kb_jobs WHERE kb_id=? AND job_id=?", (kb_id, job_id)).fetchone()
-        if job is None:
-            return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
-        if job["status"] == "running":
-            return _err("job is running", "JOB_RUNNING", 409)
-        if _has_running_job(kb_id):
-            return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
-        payload = json.loads(job["payload_json"] or "{}")
-        force_reindex = bool(payload.get("force_reindex", False))
-        conn.execute(
-            "UPDATE kb_jobs SET status='pending', last_error='', updated_at=? WHERE kb_id=? AND job_id=?",
-            (now_iso(), kb_id, job_id),
-        )
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    job_repo = JobRepository()
+    job = job_repo.get_for_kb(kb_id, job_id)
+    if job is None:
+        return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)
+    if job["status"] == "running":
+        return _err("job is running", "JOB_RUNNING", 409)
+    if _has_running_job(kb_id):
+        return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
+    payload = json.loads(job["payload_json"] or "{}")
+    force_reindex = bool(payload.get("force_reindex", False))
+    job_repo.reset_for_run(kb_id, job_id, updated_at=now_iso())
     if async_mode:
         _JOB_EXECUTOR.submit(_run_ingest_job, dict(kb), kb_id, job_id, force_reindex)
         return _ok({"job_id": job_id, "status": "pending", "async": True})
@@ -723,16 +594,10 @@ def run_pending_job(kb_id: str, job_id: str):
 @kb_bp.route("/api/kb/<string:kb_id>/documents", methods=["GET"])
 def list_documents(kb_id: str):
     limit, offset = _parse_pagination(request.args)
-    with get_conn() as conn:
-        if conn.execute("SELECT kb_id FROM knowledge_bases WHERE kb_id = ?", (kb_id,)).fetchone() is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        rows = conn.execute(
-            """SELECT doc_id, kb_id, file_name, file_type, file_path, channel, status,
-                      error_message, created_at, updated_at
-               FROM kb_documents WHERE kb_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?""",
-            (kb_id, limit, offset),
-        ).fetchall()
-    return _ok([row_to_dict(r) for r in rows])
+    if not KbRepository().exists(kb_id):
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    rows = DocumentRepository().list_for_kb(kb_id, limit=limit, offset=offset)
+    return _ok(rows)
 
 
 @kb_bp.route("/api/kb/<string:kb_id>/documents", methods=["DELETE"])
@@ -742,29 +607,24 @@ def delete_document(kb_id: str):
     if not doc_id:
         return _err("doc_id is required", "DOC_ID_REQUIRED", 400)
 
-    with get_conn() as conn:
-        kb = conn.execute(
-            "SELECT kb_id, data_path FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
-        ).fetchone()
-        if kb is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
 
-        row = conn.execute(
-            "SELECT doc_id, file_path FROM kb_documents WHERE kb_id = ? AND doc_id = ?",
-            (kb_id, doc_id),
-        ).fetchone()
-        if row is None:
-            return _err(f"document not found: {doc_id}", "DOC_NOT_FOUND", 404)
+    doc_repo = DocumentRepository()
+    row = doc_repo.get(kb_id, doc_id)
+    if row is None:
+        return _err(f"document not found: {doc_id}", "DOC_NOT_FOUND", 404)
 
-        kb_root = Path(kb["data_path"]).resolve()
-        fp = Path(row["file_path"])
-        try:
-            resolved = fp.resolve()
-            resolved.relative_to(kb_root)
-        except (OSError, ValueError):
-            return _err("invalid file path", "INVALID_PATH", 400)
+    kb_root = Path(kb["data_path"]).resolve()
+    fp = Path(row["file_path"])
+    try:
+        resolved = fp.resolve()
+        resolved.relative_to(kb_root)
+    except (OSError, ValueError):
+        return _err("invalid file path", "INVALID_PATH", 400)
 
-        conn.execute("DELETE FROM kb_documents WHERE kb_id = ? AND doc_id = ?", (kb_id, doc_id))
+    doc_repo.delete(kb_id, doc_id)
 
     if fp.exists():
         try:
@@ -785,10 +645,7 @@ def list_chunks(kb_id: str):
       max_chars int   preview 字段的最大字符数，默认 300
       doc       str   按文档名过滤（精确匹配 chunks 的 doc 字段）
     """
-    with get_conn() as conn:
-        kb = conn.execute(
-            "SELECT data_path FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
-        ).fetchone()
+    kb = KbRepository().get_basic(kb_id)
     if kb is None:
         return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
 
@@ -841,16 +698,9 @@ def get_job_progress(kb_id: str, job_id: str):
       file_count   解析的文件数量（parse 完成后有值）
       error        错误信息（failed 时有值）
     """
-    with get_conn() as conn:
-        if conn.execute(
-            "SELECT kb_id FROM knowledge_bases WHERE kb_id = ?", (kb_id,)
-        ).fetchone() is None:
-            return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-        row = conn.execute(
-            """SELECT job_id, status, last_error, result_json
-               FROM kb_jobs WHERE kb_id=? AND job_id=?""",
-            (kb_id, job_id),
-        ).fetchone()
+    if not KbRepository().exists(kb_id):
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    row = JobRepository().get_for_kb(kb_id, job_id)
 
     if row is None:
         return _err(f"job not found: {job_id}", "JOB_NOT_FOUND", 404)

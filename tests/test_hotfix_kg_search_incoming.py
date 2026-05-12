@@ -20,19 +20,21 @@ import pytest
 
 
 @pytest.fixture
-def mem_db(monkeypatch):
-    """共享一个内存 SQLite 连接，跨多个模块的 get_conn 都用它。"""
-    conn = sqlite3.connect(":memory:")
+def mem_db(monkeypatch, tmp_path):
+    """Phase 5.1.7：临时文件型 SQLite + 默认 sqlite provider。"""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "db").mkdir()
+    from custom_app.repositories import set_default_provider
+    set_default_provider(None)
+    monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
+    import custom_app.db as db_module
+    db_module.init_db()
+    conn = sqlite3.connect(tmp_path / "db" / "app.sqlite")
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    import custom_app.db as db_module
-    monkeypatch.setattr(db_module, "get_conn", lambda: conn)
-    db_module.init_db()
-    # kg_search 也需要走同一个连接
-    import custom_app.services.kg_search as kg_search
-    monkeypatch.setattr(kg_search, "get_conn", lambda: conn)
     yield conn
     conn.close()
+    set_default_provider(None)
 
 
 def _seed(conn, kb_id: str, entities: list[dict], relations: list[dict]) -> dict[str, int]:
@@ -55,6 +57,7 @@ def _seed(conn, kb_id: str, entities: list[dict], relations: list[dict]) -> dict
             (kb_id, name_to_id[r["src"]], name_to_id[r["tgt"]],
              r["rel"], r.get("desc", ""), r.get("strength", 5), ts),
         )
+    conn.commit()  # Phase 5.1.7：Repository 用独立连接读，需 commit
     return name_to_id
 
 

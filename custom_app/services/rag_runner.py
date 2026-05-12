@@ -1367,9 +1367,15 @@ class RagRunner:
         # Phase 4.0: 走 VectorStore.search()；hits 是 Hit(chunk_id, score) 列表
         # 暂时回写为行号 hit_ids 以保留下游（rerank/SOP 扩展/prompt 构建）的现有签名；
         # Phase 5 切 Qdrant 时下游统一改用 chunk_id 检索
-        hits = self._vector_store.search(q_vec, recall_k)
-        id_to_row = {str(self._rows[i].get("id", "")): i for i in range(len(self._rows))}
-        hit_ids = [id_to_row[h.chunk_id] for h in hits if h.chunk_id in id_to_row]
+        # 兼容性：旧 mock 测试可能直接 patch self._index；_vector_store 为 None 时 fallback
+        if getattr(self, "_vector_store", None) is not None:
+            hits = self._vector_store.search(q_vec, recall_k)
+            id_to_row = {str(self._rows[i].get("id", "")): i for i in range(len(self._rows))}
+            hit_ids = [id_to_row[h.chunk_id] for h in hits if h.chunk_id in id_to_row]
+        else:
+            # 旧风格：直接调 self._index.search（mock 测试常用此模式）
+            _, indices = self._index.search(q_vec, recall_k)
+            hit_ids = [int(x) for x in indices[0].tolist() if int(x) >= 0]
         keyword_hit_ids = self._keyword_match_hit_ids(q)
         hit_ids = self._merge_preferred_hit_ids(keyword_hit_ids, hit_ids)
         hit_ids, rerank_meta = self._rerank_hit_ids(rewritten_q, hit_ids)

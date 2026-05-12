@@ -22,25 +22,29 @@ import pytest
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def mem_db(monkeypatch):
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-
-    def fake_get_conn():
-        return conn
+def mem_db(monkeypatch, tmp_path):
+    """Phase 5.1.7：临时文件型 SQLite + 默认 sqlite provider。"""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "db").mkdir()
+    from custom_app.repositories import set_default_provider
+    set_default_provider(None)
+    monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
 
     import custom_app.db as db_module
-    monkeypatch.setattr(db_module, "get_conn", fake_get_conn)
     db_module.init_db()
+
+    conn = sqlite3.connect(tmp_path / "db" / "app.sqlite")
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     yield conn
     conn.close()
+    set_default_provider(None)
 
 
 @pytest.fixture
 def patched_store(mem_db, monkeypatch):
+    """Phase 5.1.7：session_store 不再用 get_conn；走 Repository default provider。"""
     import custom_app.services.session_store as ss
-    monkeypatch.setattr(ss, "get_conn", lambda: mem_db)
     return ss
 
 
@@ -68,6 +72,7 @@ class TestAppendChatTurnReasoning:
             "VALUES (?, ?, '', 'agent', ?, ?)",
             (sid, kb, ts, ts),
         )
+        mem_db.commit()  # Phase 5.1.7: 用文件型 SQLite 后必须 commit，Repository 才能读到
 
     def test_default_reasoning_is_empty_dict(self, patched_store, mem_db):
         self._seed_session(mem_db)
@@ -138,6 +143,7 @@ class TestAppendChatTurnReasoning:
             "VALUES (?, 'assistant', ?, ?, ?)",
             ("sess_x", "answer", "{not valid json", now_iso()),
         )
+        mem_db.commit()  # Phase 5.1.7: Repository 读独立连接，需 commit
         msgs = patched_store.list_messages("sess_x")
         assert msgs[0]["reasoning"] == {}
 
@@ -263,9 +269,8 @@ class TestSessionsApiReasoning:
             monkeypatch.setitem(sys.modules, "faiss", mod)
 
     def test_messages_endpoint_returns_reasoning(self, mem_db, monkeypatch):
-        # patch session_store + sessions API 共用同一内存连接
+        # Phase 5.1.7：mem_db fixture 已设置好 sqlite provider，无需 patch get_conn
         import custom_app.services.session_store as ss
-        monkeypatch.setattr(ss, "get_conn", lambda: mem_db)
         from custom_app.db import now_iso
         ts = now_iso()
         mem_db.execute(
@@ -273,6 +278,7 @@ class TestSessionsApiReasoning:
             "VALUES (?, ?, '', 'agent', ?, ?)",
             ("sess_x", "kb_x", ts, ts),
         )
+        mem_db.commit()  # Phase 5.1.7: Repository 用独立连接读，必须 commit
         ss.append_chat_turn(
             "sess_x", "kb_x", "q1", "a1",
             agent_mode="agent",

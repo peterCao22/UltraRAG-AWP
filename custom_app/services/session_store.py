@@ -1,10 +1,12 @@
 # 文件说明：Phase 1 会话落库的轻量访问层，供 REST 与流式对话完成后追加消息使用。
+# Phase 5.1.7：通过 SessionRepository 访问 DB，原生 SQL 已全部迁移。
 from __future__ import annotations
 
 import json
 from typing import Any, List, Optional
 
-from custom_app.db import get_conn, new_id, now_iso
+from custom_app.db import new_id, now_iso
+from custom_app.repositories import SessionRepository
 
 
 def _safe_dump_reasoning(value: Any) -> str:
@@ -38,15 +40,9 @@ def create_session(
     am = (agent_mode or "quick").strip().lower()
     if am not in ("quick", "agent"):
         am = "quick"
-    with get_conn() as conn:
-        conn.execute(
-            """
-            INSERT INTO kb_sessions
-              (session_id, kb_id, title, agent_mode, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (sid, kb_id, t, am, ts, ts),
-        )
+    SessionRepository().create_session(
+        session_id=sid, kb_id=kb_id, title=t, agent_mode=am, created_at=ts,
+    )
     return {
         "session_id": sid,
         "kb_id": kb_id,
@@ -59,52 +55,24 @@ def create_session(
 
 def list_sessions_for_kb(kb_id: str, *, limit: int = 100) -> List[dict[str, Any]]:
     """按更新时间倒序列出某知识库下的会话。"""
-    lim = max(1, min(int(limit), 500))
-    with get_conn() as conn:
-        cur = conn.execute(
-            """
-            SELECT session_id, kb_id, title, agent_mode, created_at, updated_at
-            FROM kb_sessions
-            WHERE kb_id = ?
-            ORDER BY updated_at DESC
-            LIMIT ?
-            """,
-            (kb_id, lim),
-        )
-        return [dict(r) for r in cur.fetchall()]
+    return SessionRepository().list_sessions_for_kb(kb_id, limit=limit)
 
 
 def get_session(session_id: str) -> dict[str, Any] | None:
     """按 id 取会话一行；不存在返回 None。"""
-    with get_conn() as conn:
-        row = conn.execute(
-            """
-            SELECT session_id, kb_id, title, agent_mode, created_at, updated_at
-            FROM kb_sessions WHERE session_id = ?
-            """,
-            (session_id,),
-        ).fetchone()
-    return dict(row) if row else None
+    return SessionRepository().get_session(session_id)
 
 
 def list_messages(session_id: str) -> List[dict[str, Any]]:
     """列出会话内消息（含反序列化的 reasoning 字段），按插入顺序。"""
-    with get_conn() as conn:
-        cur = conn.execute(
-            """
-            SELECT id, session_id, role, content, reasoning_json, created_at
-            FROM kb_session_messages
-            WHERE session_id = ?
-            ORDER BY id ASC
-            """,
-            (session_id,),
-        )
-        rows = []
-        for r in cur.fetchall():
-            d = dict(r)
-            d["reasoning"] = _safe_load_reasoning(d.pop("reasoning_json", None))
-            rows.append(d)
-        return rows
+    raw_msgs = SessionRepository().list_messages(session_id)
+    rows = []
+    for r in raw_msgs:
+        d = dict(r)
+        d["reasoning"] = _safe_load_reasoning(d.pop("reasoning_json", None))
+        d["session_id"] = session_id  # Repository 输出未含 session_id
+        rows.append(d)
+    return rows
 
 
 def update_session_title(session_id: str, title: str) -> bool:
@@ -112,13 +80,13 @@ def update_session_title(session_id: str, title: str) -> bool:
     t = (title or "").strip()
     if not t:
         return False
-    ts = now_iso()
-    with get_conn() as conn:
-        cur = conn.execute(
-            "UPDATE kb_sessions SET title = ?, updated_at = ? WHERE session_id = ?",
-            (t[:500], ts, session_id),
-        )
-        return cur.rowcount > 0
+    # Repository 的 update_title 接口固定截断 title[:500]；这里保持现有 ts 行为
+    repo = SessionRepository()
+    # 先检查存在性（保留原 rowcount>0 语义）
+    if repo.get_session(session_id) is None:
+        return False
+    repo.update_title(session_id, title=t, updated_at=now_iso())
+    return True
 
 
 def delete_session(session_id: str) -> bool:
@@ -126,10 +94,7 @@ def delete_session(session_id: str) -> bool:
     sid = (session_id or "").strip()
     if not sid:
         return False
-    with get_conn() as conn:
-        conn.execute("DELETE FROM kb_session_messages WHERE session_id = ?", (sid,))
-        cur = conn.execute("DELETE FROM kb_sessions WHERE session_id = ?", (sid,))
-        return cur.rowcount > 0
+    return SessionRepository().delete_session(sid)
 
 
 def append_chat_turn(
@@ -150,8 +115,8 @@ def append_chat_turn(
         user_text: 用户问题原文。
         assistant_text: 助手最终展示文本（与 SSE done.answer 对齐）。
         agent_mode: 本轮使用的模式（quick / agent），同步更新会话的 agent_mode 字段。
-        reasoning_for_assistant: 仅对 assistant 消息生效的推理元数据 dict
-            （如 {"iterations": int, "events": [...]}）。非 dict 或解析失败一律落 {}。
+        reasoning_for_assistant: 仅对 assistant 消息生效的推理元数据 dict。
+            非 dict 或解析失败一律落 {}。
 
     返回:
         是否写入成功（会话不存在或 kb 不匹配时为 False）。
@@ -160,35 +125,24 @@ def append_chat_turn(
     if am not in ("quick", "agent"):
         am = "quick"
     reasoning_blob = _safe_dump_reasoning(reasoning_for_assistant)
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT kb_id, title FROM kb_sessions WHERE session_id = ?",
-            (session_id,),
-        ).fetchone()
-        if row is None or row["kb_id"] != kb_id:
-            return False
-        prev_title = (row["title"] or "").strip()
-        ts1 = now_iso()
-        ts2 = now_iso()
-        conn.execute(
-            """
-            INSERT INTO kb_session_messages (session_id, role, content, reasoning_json, created_at)
-            VALUES (?, 'user', ?, '{}', ?)
-            """,
-            (session_id, user_text, ts1),
-        )
-        conn.execute(
-            """
-            INSERT INTO kb_session_messages (session_id, role, content, reasoning_json, created_at)
-            VALUES (?, 'assistant', ?, ?, ?)
-            """,
-            (session_id, assistant_text, reasoning_blob, ts2),
-        )
-        new_title = prev_title
-        if (not prev_title or prev_title == "新对话") and user_text.strip():
-            new_title = user_text.strip()[:120]
-        conn.execute(
-            "UPDATE kb_sessions SET title = ?, agent_mode = ?, updated_at = ? WHERE session_id = ?",
-            (new_title, am, ts2, session_id),
-        )
+
+    repo = SessionRepository()
+    row = repo.get_session_kb_and_title(session_id)
+    if row is None or row.get("kb_id") != kb_id:
+        return False
+    prev_title = (row.get("title") or "").strip()
+
+    ts1 = now_iso()
+    repo.append_user_message(session_id, content=user_text, created_at=ts1)
+    ts2 = now_iso()
+    repo.append_assistant_message(
+        session_id, content=assistant_text,
+        reasoning_json=reasoning_blob, created_at=ts2,
+    )
+    new_title = prev_title
+    if (not prev_title or prev_title == "新对话") and user_text.strip():
+        new_title = user_text.strip()[:120]
+    repo.update_title_and_mode(
+        session_id, title=new_title, agent_mode=am, updated_at=ts2,
+    )
     return True

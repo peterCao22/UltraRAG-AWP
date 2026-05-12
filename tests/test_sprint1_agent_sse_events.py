@@ -318,27 +318,50 @@ def _make_session_conn(session_id: str, kb_id: str) -> "sqlite3.Connection":
     return conn
 
 
+@pytest.fixture
+def make_session_env(tmp_path, monkeypatch):
+    """Phase 5.1.7：临时文件型 SQLite + 默认 sqlite provider + seed session 工厂。
+
+    替代 _make_session_conn（用 :memory: + monkeypatch get_conn 的老方式）。
+    """
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "db").mkdir()
+    from custom_app.repositories import set_default_provider
+    set_default_provider(None)
+    monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
+    import custom_app.db as db_module
+    db_module.init_db()
+
+    import sqlite3
+    db_path = tmp_path / "db" / "app.sqlite"
+
+    def _seed(session_id: str, kb_id: str):
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "INSERT INTO kb_sessions (session_id, kb_id, title, agent_mode, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (session_id, kb_id, "新对话", "quick", "2026-01-01", "2026-01-01"),
+        )
+        conn.commit()
+        conn.close()
+
+    yield _seed
+    set_default_provider(None)
+
+
 class TestAppendChatTurnAgentMode:
     """append_chat_turn 应接受并存储 agent_mode 参数。"""
 
-    def test_append_chat_turn_accepts_agent_mode_param(self, monkeypatch):
+    def test_append_chat_turn_accepts_agent_mode_param(self, make_session_env):
         """append_chat_turn(session_id, kb_id, user, assistant, agent_mode=...) 不应报错。"""
-        import custom_app.services.session_store as ss_module
-
-        conn = _make_session_conn("sess1", "kb1")
-        monkeypatch.setattr(ss_module, "get_conn", lambda: conn)
-
+        make_session_env("sess1", "kb1")
         result = append_chat_turn(
             "sess1", "kb1", "用户问题", "助手回答", agent_mode="agent"
         )
         assert result is True
 
-    def test_append_chat_turn_default_agent_mode_quick(self, monkeypatch):
+    def test_append_chat_turn_default_agent_mode_quick(self, make_session_env):
         """不传 agent_mode 时，默认值为 quick，向后兼容。"""
-        import custom_app.services.session_store as ss_module
-
-        conn = _make_session_conn("sess2", "kb1")
-        monkeypatch.setattr(ss_module, "get_conn", lambda: conn)
-
+        make_session_env("sess2", "kb1")
         result = append_chat_turn("sess2", "kb1", "用户问题", "助手回答")
         assert result is True

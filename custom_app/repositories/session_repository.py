@@ -59,13 +59,17 @@ class SessionRepository:
             cur = conn.execute(adapt_sql(sql, self._provider), (session_id,))
             return fetch_one_as_dict(cur)
 
-    def list_sessions_for_kb(self, kb_id: str) -> list[dict[str, Any]]:
+    def list_sessions_for_kb(
+        self, kb_id: str, *, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """按 updated_at DESC 返回某 KB 的会话；limit 上限 500。"""
+        lim = max(1, min(int(limit), 500))
         sql = (
             "SELECT session_id, kb_id, title, agent_mode, created_at, updated_at "
-            "FROM kb_sessions WHERE kb_id = ? ORDER BY updated_at DESC"
+            "FROM kb_sessions WHERE kb_id = ? ORDER BY updated_at DESC LIMIT ?"
         )
         with self._provider.connect() as conn:
-            cur = conn.execute(adapt_sql(sql, self._provider), (kb_id,))
+            cur = conn.execute(adapt_sql(sql, self._provider), (kb_id, lim))
             return fetch_all_as_dicts(cur)
 
     def update_title(self, session_id: str, *, title: str, updated_at: str) -> None:

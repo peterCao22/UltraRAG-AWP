@@ -127,3 +127,39 @@ class JobRepository:
         sql = "UPDATE kb_jobs SET result_json=?, updated_at=? WHERE job_id=?"
         with self._provider.connect() as conn:
             conn.execute(adapt_sql(sql, self._provider), (result_json, updated_at, job_id))
+
+    def mark_cancelled(self, kb_id: str, job_id: str, *, finished_at: str) -> None:
+        sql = (
+            "UPDATE kb_jobs SET status='cancelled', finished_at=?, updated_at=? "
+            "WHERE kb_id=? AND job_id=?"
+        )
+        with self._provider.connect() as conn:
+            conn.execute(
+                adapt_sql(sql, self._provider),
+                (finished_at, finished_at, kb_id, job_id),
+            )
+
+    def reset_for_retry(self, kb_id: str, job_id: str, *, updated_at: str) -> None:
+        """重试：status=pending, last_error 清空, retry_count+1。"""
+        sql = (
+            "UPDATE kb_jobs SET status='pending', last_error='', "
+            "retry_count=retry_count+1, updated_at=? WHERE kb_id=? AND job_id=?"
+        )
+        with self._provider.connect() as conn:
+            conn.execute(adapt_sql(sql, self._provider), (updated_at, kb_id, job_id))
+
+    def reset_for_run(self, kb_id: str, job_id: str, *, updated_at: str) -> None:
+        """重置为 pending（用于手动 run pending job），不动 retry_count。"""
+        sql = (
+            "UPDATE kb_jobs SET status='pending', last_error='', updated_at=? "
+            "WHERE kb_id=? AND job_id=?"
+        )
+        with self._provider.connect() as conn:
+            conn.execute(adapt_sql(sql, self._provider), (updated_at, kb_id, job_id))
+
+    def get_for_kb(self, kb_id: str, job_id: str) -> Optional[dict[str, Any]]:
+        """取 kb_id 限定下的单条 job（防止跨 KB 访问）。"""
+        sql = "SELECT * FROM kb_jobs WHERE kb_id=? AND job_id=?"
+        with self._provider.connect() as conn:
+            cur = conn.execute(adapt_sql(sql, self._provider), (kb_id, job_id))
+            return fetch_one_as_dict(cur)

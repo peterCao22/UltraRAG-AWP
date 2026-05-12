@@ -84,33 +84,68 @@ def _migrate_table(
     columns: list[str],
     *,
     batch_size: int = 200,
+    entity_id_map: "dict[int, int] | None" = None,
 ) -> int:
     """把单表数据从 SQLite 搬到 Postgres，返回迁移行数。
 
     注意：不带 SQLite 的 id 列（让 Postgres SERIAL 重新分配）。
-    """
-    col_csv = ", ".join(columns)
-    placeholders = ", ".join(["?"] * len(columns))  # SQLite 风格，Postgres 会被 adapt_sql 改
 
-    select_sql = f"SELECT {col_csv} FROM {table}"
+    kg_entities 特殊处理：用 INSERT...RETURNING id 拿到新 ID，建立 old_id→new_id
+    映射，写入 entity_id_map（调用方提供）。
+
+    kg_relations 特殊处理：source_id/target_id 通过 entity_id_map 重映射，
+    跳过映射不到的孤儿关系。
+    """
+    from custom_app.repositories.base import adapt_sql
+
+    col_csv = ", ".join(columns)
+    placeholders = ", ".join(["?"] * len(columns))
+    select_sql = f"SELECT id, {col_csv} FROM {table}" if table == "kg_entities" else f"SELECT {col_csv} FROM {table}"
     insert_sql = f"INSERT INTO {table} ({col_csv}) VALUES ({placeholders})"
+    if table == "kg_entities":
+        insert_sql = f"INSERT INTO {table} ({col_csv}) VALUES ({placeholders}) RETURNING id"
+    adapted_sql = adapt_sql(insert_sql, pg_provider)
 
     sqlite_conn.row_factory = sqlite3.Row
     rows = sqlite_conn.execute(select_sql).fetchall()
     if not rows:
         return 0
 
-    # Postgres 需要 %s placeholder
-    from custom_app.repositories.base import adapt_sql
-
-    adapted_sql = adapt_sql(insert_sql, pg_provider)
-
     inserted = 0
+    skipped = 0
     with pg_provider.connect() as adapter:
         for row in rows:
-            params = tuple(row[c] for c in columns)
-            adapter.execute(adapted_sql, params)
+            if table == "kg_relations" and entity_id_map is not None:
+                # 重映射 source_id / target_id
+                old_src = row["source_id"]
+                old_tgt = row["target_id"]
+                new_src = entity_id_map.get(old_src)
+                new_tgt = entity_id_map.get(old_tgt)
+                if new_src is None or new_tgt is None:
+                    skipped += 1
+                    continue
+                params = tuple(
+                    new_src if c == "source_id" else
+                    new_tgt if c == "target_id" else
+                    row[c]
+                    for c in columns
+                )
+            else:
+                params = tuple(row[c] for c in columns)
+
+            cur = adapter.execute(adapted_sql, params)
             inserted += 1
+
+            # kg_entities：抓 RETURNING id 建映射
+            if table == "kg_entities" and entity_id_map is not None:
+                ret_row = cur.fetchone()
+                if ret_row is None:
+                    continue
+                new_id = ret_row["id"] if isinstance(ret_row, dict) else ret_row[0]
+                entity_id_map[int(row["id"])] = int(new_id)
+
+    if skipped:
+        print(f"    (skipped {skipped} rows with unmapped entity_id)")
     return inserted
 
 
@@ -150,6 +185,8 @@ def cmd_migrate(args) -> int:
     print(f"\n[3/3] 数据迁移 ({'DRY RUN' if args.dry_run else '实际写入'})...")
     sqlite_conn = sqlite3.connect(str(sqlite_path))
     total_migrated = 0
+    # kg_entities 迁移时填充 old_id → new_id 映射，kg_relations 迁移时用它重映射 FK
+    entity_id_map: dict[int, int] = {}
     try:
         for table, columns in TABLE_MIGRATION_ORDER:
             row_count = _count_sqlite_rows(sqlite_conn, table)
@@ -159,7 +196,10 @@ def cmd_migrate(args) -> int:
             if args.dry_run:
                 print(f"  {table:30s} {row_count} rows (dry-run)")
                 continue
-            migrated = _migrate_table(sqlite_conn, pg_provider, table, columns)
+            migrated = _migrate_table(
+                sqlite_conn, pg_provider, table, columns,
+                entity_id_map=entity_id_map,
+            )
             total_migrated += migrated
             status = "OK" if migrated == row_count else f"WARN ({migrated}/{row_count})"
             print(f"  {table:30s} {row_count} rows [{status}]")

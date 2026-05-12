@@ -10,7 +10,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from custom_app.db import get_conn
+from custom_app.repositories import KgRepository
 
 logger = logging.getLogger(__name__)
 
@@ -36,60 +36,7 @@ def search_graph(kb_id: str, entity_names: List[str],
     if not entity_names:
         return {"entities": [], "relations": [], "neighbor_entities": [], "all_chunk_ids": []}
 
-    placeholders = ",".join("?" for _ in entity_names)
-    params = [kb_id] + entity_names
-
-    # 1-hop 邻居查询：查找与输入实体有关系的节点
-    # UNION 查询双向关系
-    query = f"""
-    SELECT e.id as entity_id, e.entity_name, e.entity_type, e.description,
-           e.chunk_ids, 'self' as direction,
-           NULL as rel_id, NULL as relation_type,
-           NULL as rel_description, NULL as strength,
-           NULL as neighbor_id, NULL as neighbor_name,
-           NULL as neighbor_type, NULL as neighbor_desc,
-           NULL as neighbor_chunks,
-           NULL as source_name, NULL as target_name
-    FROM kg_entities e
-    WHERE e.kb_id = ? AND e.entity_name IN ({placeholders})
-
-    UNION ALL
-
-    -- outgoing 段：种子实体在 e（source）位置，邻居是 t（target）。
-    -- 主列输出邻居 t 的字段，与 incoming 段保持一致："主列 = 邻居"。
-    SELECT t.id as entity_id, t.entity_name, t.entity_type, t.description,
-           t.chunk_ids, 'source' as direction,
-           r.id as rel_id, r.relation_type, r.description as rel_description, r.strength,
-           e.id as neighbor_id, e.entity_name as neighbor_name,
-           e.entity_type as neighbor_type, e.description as neighbor_desc,
-           e.chunk_ids as neighbor_chunks,
-           e.entity_name as source_name, t.entity_name as target_name
-    FROM kg_entities e
-    JOIN kg_relations r ON r.source_id = e.id
-    JOIN kg_entities t ON t.id = r.target_id
-    WHERE e.kb_id = ? AND e.entity_name IN ({placeholders})
-
-    UNION ALL
-
-    -- incoming 段：种子实体在 t（target）位置，邻居是 e（source）。
-    -- 主列输出邻居 e 的字段，与 outgoing 段保持一致："主列 = 邻居"。
-    SELECT e.id as entity_id, e.entity_name, e.entity_type, e.description,
-           e.chunk_ids, 'target' as direction,
-           r.id as rel_id, r.relation_type, r.description as rel_description, r.strength,
-           t.id as neighbor_id, t.entity_name as neighbor_name,
-           t.entity_type as neighbor_type, t.description as neighbor_desc,
-           t.chunk_ids as neighbor_chunks,
-           e.entity_name as source_name, t.entity_name as target_name
-    FROM kg_entities t
-    JOIN kg_relations r ON r.target_id = t.id
-    JOIN kg_entities e ON e.id = r.source_id
-    WHERE t.kb_id = ? AND t.entity_name IN ({placeholders})
-    """
-    full_params = [kb_id] + entity_names + [kb_id] + entity_names + [kb_id] + entity_names
-
-    rows: list[dict] = []
-    with get_conn() as conn:
-        rows = [dict(row) for row in conn.execute(query, full_params).fetchall()]
+    rows = KgRepository().find_relations_for_entities(kb_id, entity_names)
 
     # 去重处理
     seen_entities: Dict[str, dict] = {}
@@ -183,25 +130,7 @@ def get_graph_stats(kb_id: Optional[str] = None) -> dict:
     返回:
         {"kb_id": str, "entity_count": int, "relation_count": int}
     """
-    with get_conn() as conn:
-        if kb_id:
-            row = conn.execute(
-                "SELECT COUNT(DISTINCT e.id) as ec, COUNT(DISTINCT r.id) as rc "
-                "FROM kg_entities e LEFT JOIN kg_relations r ON r.source_id = e.id "
-                "WHERE e.kb_id = ?",
-                (kb_id,),
-            ).fetchone()
-        else:
-            row = conn.execute(
-                "SELECT COUNT(DISTINCT e.id) as ec, COUNT(DISTINCT r.id) as rc "
-                "FROM kg_entities e LEFT JOIN kg_relations r ON r.source_id = e.id"
-            ).fetchone()
-
-    return {
-        "kb_id": kb_id or "all",
-        "entity_count": row["ec"] if row else 0,
-        "relation_count": row["rc"] if row else 0,
-    }
+    return KgRepository().count_entities_and_relations(kb_id)
 
 
 def clear_graph(kb_id: str) -> int:
@@ -209,10 +138,5 @@ def clear_graph(kb_id: str) -> int:
 
     返回删除的关系记录数。
     """
-    with get_conn() as conn:
-        rel_count = conn.execute(
-            "SELECT COUNT(*) FROM kg_relations WHERE kb_id=?", (kb_id,)
-        ).fetchone()[0]
-        conn.execute("DELETE FROM kg_relations WHERE kb_id=?", (kb_id,))
-        conn.execute("DELETE FROM kg_entities WHERE kb_id=?", (kb_id,))
+    rel_count, _ = KgRepository().delete_all_for_kb(kb_id)
     return rel_count

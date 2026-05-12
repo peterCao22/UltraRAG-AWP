@@ -11,7 +11,8 @@ from __future__ import annotations
 import json
 from typing import Iterable, List
 
-from custom_app.db import get_conn, now_iso
+from custom_app.db import now_iso
+from custom_app.repositories import AgentConfigRepository
 
 # 全部已实现的工具名（与 services/tools/ 下的 name 字段一一对应）
 ALL_TOOLS: List[str] = [
@@ -45,15 +46,11 @@ def get_enabled_tools(kb_id: str) -> List[str]:
     kid = (kb_id or "").strip()
     if not kid:
         return list(ALL_TOOLS)
-    with get_conn() as conn:
-        row = conn.execute(
-            "SELECT enabled_tools_json FROM kb_agent_configs WHERE kb_id = ?",
-            (kid,),
-        ).fetchone()
-    if row is None:
+    enabled_json = AgentConfigRepository().get_enabled_tools_json(kid)
+    if enabled_json is None:
         return list(ALL_TOOLS)
     try:
-        raw = json.loads(row["enabled_tools_json"] or "[]")
+        raw = json.loads(enabled_json or "[]")
     except (TypeError, ValueError, json.JSONDecodeError):
         return list(ALL_TOOLS)
     return _normalize(raw if isinstance(raw, list) else [])
@@ -65,17 +62,9 @@ def set_enabled_tools(kb_id: str, tools: Iterable[str]) -> List[str]:
     if not kid:
         raise ValueError("kb_id is required")
     normalized = _normalize(tools)
-    payload = json.dumps(normalized, ensure_ascii=False)
-    ts = now_iso()
-    with get_conn() as conn:
-        conn.execute(
-            """
-            INSERT INTO kb_agent_configs (kb_id, enabled_tools_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(kb_id) DO UPDATE SET
-                enabled_tools_json = excluded.enabled_tools_json,
-                updated_at = excluded.updated_at
-            """,
-            (kid, payload, ts, ts),
-        )
+    AgentConfigRepository().upsert(
+        kb_id=kid,
+        enabled_tools_json=json.dumps(normalized, ensure_ascii=False),
+        updated_at=now_iso(),
+    )
     return normalized

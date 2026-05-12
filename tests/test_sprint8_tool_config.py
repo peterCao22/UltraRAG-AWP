@@ -22,20 +22,31 @@ import pytest
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def mem_db(monkeypatch):
-    """共享一个内存 SQLite 连接，monkeypatch 各模块的 get_conn 指向它。"""
-    conn = sqlite3.connect(":memory:")
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+def mem_db(monkeypatch, tmp_path):
+    """Phase 5.1.7：用文件型 SQLite 隔离测试 + 通过 Repository default provider 串通。
 
-    def fake_get_conn():
-        return conn
+    旧版本用 :memory: + monkeypatch get_conn；Repository 层接管后这种方式不工作
+    （SqliteConnectionProvider 每次 connect/close 独立 conn，:memory: 不能共享）。
+    现在改成临时文件型 SQLite + 切换工作目录。
+    """
+    # 切到 tmp_path 让 db/app.sqlite 在临时目录
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "db").mkdir()
+    # 重置 default provider，下次 get_default_provider 按当前环境重新创建
+    from custom_app.repositories import set_default_provider
+    set_default_provider(None)
+    monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
 
     import custom_app.db as db_module
-    monkeypatch.setattr(db_module, "get_conn", fake_get_conn)
     db_module.init_db()
+
+    # 给老测试一个可直接执行 SQL 的 conn（不参与 Repository 流程，仅用于 fixture 内部）
+    conn = sqlite3.connect(tmp_path / "db" / "app.sqlite")
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     yield conn
     conn.close()
+    set_default_provider(None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -81,9 +92,8 @@ class TestAgentConfigStore:
     """services/agent_config_store.py: 工具启用列表 CRUD。"""
 
     def _patch_module_get_conn(self, monkeypatch, mem_db):
-        """让 store 模块也用同一个内存连接。"""
-        import custom_app.services.agent_config_store as store
-        monkeypatch.setattr(store, "get_conn", lambda: mem_db)
+        """Phase 5.1.7：mem_db fixture 已切到临时 SQLite + sqlite provider，no-op。"""
+        return
 
     def test_module_imports(self):
         from custom_app.services.agent_config_store import (
@@ -179,8 +189,8 @@ class TestAgentConfigApi:
             monkeypatch.setitem(sys.modules, "faiss", mod)
 
     def _client(self, monkeypatch, mem_db):
-        import custom_app.services.agent_config_store as store
-        monkeypatch.setattr(store, "get_conn", lambda: mem_db)
+        # Phase 5.1.7: agent_config_store 不再用 get_conn，走 AgentConfigRepository
+        # mem_db fixture 已经准备好临时 SQLite + 默认 sqlite provider
         from custom_app.app import create_app
         return create_app().test_client()
 

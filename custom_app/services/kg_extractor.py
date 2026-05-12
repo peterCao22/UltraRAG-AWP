@@ -13,7 +13,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from custom_app.db import get_conn, now_iso
+from custom_app.db import now_iso
+from custom_app.repositories import KgRepository
 from custom_app.services.google_embedder import strip_images_footer
 
 logger = logging.getLogger(__name__)
@@ -171,52 +172,48 @@ def extract_relations_from_text(entities: List[dict], text: str) -> List[dict]:
 
 def _upsert_entity(kb_id: str, entity: dict, chunk_id: str) -> int:
     """插入或更新实体，返回实体 id。"""
-    with get_conn() as conn:
-        # 查找是否已存在
-        row = conn.execute(
-            "SELECT id, chunk_ids FROM kg_entities WHERE kb_id=? AND entity_name=?",
-            (kb_id, entity["title"]),
-        ).fetchone()
+    kg_repo = KgRepository()
+    existing = kg_repo.find_entity_by_name(kb_id, entity["title"])
+    if existing:
+        entity_id = int(existing["id"])
+        chunk_ids = json.loads(existing.get("chunk_ids") or "[]")
+        if chunk_id not in chunk_ids:
+            chunk_ids.append(chunk_id)
+        kg_repo.update_entity_full(
+            entity_id,
+            entity_type=entity["type"],
+            description=entity["description"],
+            chunk_ids_json=json.dumps(chunk_ids, ensure_ascii=False),
+        )
+        return entity_id
 
-        if row:
-            entity_id = row["id"]
-            chunk_ids = json.loads(row["chunk_ids"] or "[]")
-            if chunk_id not in chunk_ids:
-                chunk_ids.append(chunk_id)
-            conn.execute(
-                "UPDATE kg_entities SET description=?, chunk_ids=?, entity_type=? WHERE id=?",
-                (entity["description"], json.dumps(chunk_ids, ensure_ascii=False),
-                 entity["type"], entity_id),
-            )
-        else:
-            ts = now_iso()
-            conn.execute(
-                "INSERT INTO kg_entities (kb_id, entity_name, entity_type, description, chunk_ids, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (kb_id, entity["title"], entity["type"], entity["description"],
-                 json.dumps([chunk_id], ensure_ascii=False), ts),
-            )
-            entity_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    return entity_id
+    return kg_repo.insert_entity(
+        kb_id=kb_id,
+        entity_name=entity["title"],
+        entity_type=entity["type"],
+        description=entity["description"],
+        chunk_ids_json=json.dumps([chunk_id], ensure_ascii=False),
+        created_at=now_iso(),
+    )
 
 
 def _add_relation_if_not_exists(kb_id: str, source_id: int, target_id: int, relation: dict) -> bool:
     """添加关系，若已存在则跳过。返回是否新增。"""
-    with get_conn() as conn:
-        exists = conn.execute(
-            "SELECT id FROM kg_relations WHERE kb_id=? AND source_id=? AND target_id=? AND relation_type=?",
-            (kb_id, source_id, target_id, relation["relation_type"]),
-        ).fetchone()
-        if exists:
-            return False
-        ts = now_iso()
-        conn.execute(
-            "INSERT INTO kg_relations (kb_id, source_id, target_id, relation_type, description, strength, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (kb_id, source_id, target_id, relation["relation_type"],
-             relation["description"], relation["strength"], ts),
-        )
-        return True
+    kg_repo = KgRepository()
+    if kg_repo.find_relation(
+        kb_id=kb_id, source_id=source_id, target_id=target_id,
+        relation_type=relation["relation_type"],
+    ):
+        return False
+    kg_repo.insert_relation(
+        kb_id=kb_id,
+        source_id=source_id, target_id=target_id,
+        relation_type=relation["relation_type"],
+        description=relation["description"],
+        strength=relation["strength"],
+        created_at=now_iso(),
+    )
+    return True
 
 
 def extract_and_store_chunk(kb_id: str, chunk: dict) -> Tuple[int, int]:
@@ -276,9 +273,7 @@ def extract_kb(kb_id: str, chunks_path: str, batch_size: int = 20) -> dict:
     errors = 0
 
     # 清除旧图谱数据
-    with get_conn() as conn:
-        conn.execute("DELETE FROM kg_relations WHERE kb_id=?", (kb_id,))
-        conn.execute("DELETE FROM kg_entities WHERE kb_id=?", (kb_id,))
+    KgRepository().delete_all_for_kb(kb_id)
 
     logger.info("Starting KG extraction for kb_id=%s from %s", kb_id, chunks_path)
 

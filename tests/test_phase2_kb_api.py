@@ -35,7 +35,12 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "db").mkdir()
     (tmp_path / "data" / "kb").mkdir(parents=True)
+    # Phase 5.1.7: 重置 Repository default provider，避免跨测试单例污染
+    from custom_app.repositories import set_default_provider
+    set_default_provider(None)
+    monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
     yield tmp_path
+    set_default_provider(None)
 
 
 @pytest.fixture()
