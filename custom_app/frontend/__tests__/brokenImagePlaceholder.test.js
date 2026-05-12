@@ -66,6 +66,48 @@ describe('brokenImagePlaceholder', () => {
     expect(() => attachMarkdownImageFallbacks(null)).not.toThrow()
   })
 
+  it('encodes raw spaces in img src so the browser can fetch them', () => {
+    const wrap = document.createElement('div')
+    const img = document.createElement('img')
+    // happy-dom 的 setAttribute('src', ...) 不会自动 encode，模拟 LLM 直接写
+    img.setAttribute('src', '/images/IFS 系统培训手册/img_0001.png')
+    wrap.append(img)
+    document.body.append(wrap)
+
+    attachMarkdownImageFallbacks(wrap)
+
+    const got = img.getAttribute('src')
+    expect(got).not.toContain(' ')
+    expect(got).toContain('%20')
+    expect(got).toMatch(/img_0001\.png$/)
+  })
+
+  it('does not double-encode an already-encoded src', () => {
+    const wrap = document.createElement('div')
+    const img = document.createElement('img')
+    const already = '/images/IFS%20%E7%B3%BB%E7%BB%9F/img_0001.png'
+    img.setAttribute('src', already)
+    wrap.append(img)
+    document.body.append(wrap)
+
+    attachMarkdownImageFallbacks(wrap)
+
+    expect(img.getAttribute('src')).toBe(already)
+  })
+
+  it('leaves data: URLs untouched', () => {
+    const wrap = document.createElement('div')
+    const img = document.createElement('img')
+    const dataUrl = 'data:image/png;base64,iVBORw0KGgo='
+    img.setAttribute('src', dataUrl)
+    wrap.append(img)
+    document.body.append(wrap)
+
+    attachMarkdownImageFallbacks(wrap)
+
+    expect(img.getAttribute('src')).toBe(dataUrl)
+  })
+
   it('estimateDataUrlDecodedBytes returns 0 for non-data or empty payload', () => {
     expect(estimateDataUrlDecodedBytes('https://x/')).toBe(0)
     expect(estimateDataUrlDecodedBytes('data:,')).toBe(0)

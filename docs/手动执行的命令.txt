@@ -12,3 +12,14 @@ ultrarag run examples/agv_index_only.yaml
 2. phase2 多知识库管理
 
 
+# 禁止neo4j启动
+sudo docker update --restart=no neo4j
+
+sudo docker compose --profile qdrant up -d
+ sudo docker restart WeKnora-postgres
+
+sudo docker compose --profile neo4j up -d
+ 
+ sudo docker logs WeKnora-postgres
+ 
+ 

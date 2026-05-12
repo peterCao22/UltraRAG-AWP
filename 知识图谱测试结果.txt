@@ -1,0 +1,40 @@
+● 核心链路全部验证通过。总结测试结果：
+
+  ---
+  测试结果                                                                                                                                                                                                                                   
+  1. 实体抽取 ✅                                                                                                                                                                                                                             ─
+
+  - ifs_docs 6 个 chunk → 抽取 53 个实体，47 个关系
+  - 实体类型：Operation(18)、Resource(14)、Concept(12)、Product(7)
+  - 关键实体正确识别：IFS、Oracle数据库、IFS中层服务、500错误、404错误
+  - 关键关系正确识别：500错误 --caused_by→ Oracle数据库、重启 --operates_on→ IFS中层服务
+
+  2. 图谱查询 ✅
+
+  - search_graph('ifs_docs', ['IFS中层服务', '重启']) → 正确返回 2 条关系和 1 个邻居实体
+  - 无重复关系（已修复 UNION ALL 去重）
+
+  3. Agent 工具 ✅
+
+  - QueryKnowledgeGraphTool.run(entities=['重启', 'IFS中层服务']) → 返回格式化摘要、关系列表、chunk IDs
+  - 遵循现有 tool 模式（name + openai_schema + run）
+
+  4. Agent 集成 ✅
+
+  - agent_runner.py 注册了 QueryKnowledgeGraphTool
+  - agent_config_store.py 白名单包含 query_knowledge_graph
+  - agv_agent_system.jinja Prompt 增加了图谱检索步骤
+
+  5. 统计功能 ✅
+
+  - get_graph_stats('ifs_docs') → {"entity_count": 53, "relation_count": 47}
+
+  ---
+  当前局限（原型阶段）
+
+  由于实体抽取是逐 chunk 独立进行的，关系只在同 chunk 内形成：
+  - ifs_docs 只有 1 个文档（6 个 section），关系只在 section 内部
+  - 真正的跨文档关联需要多个文档都提到相同实体，才能在 SQLite 中通过 entity_name merge 形成关联链
+  - 你之前提到的 IFS 例子（"重启数据库"文档和"重启中间层服务"文档）在同一个 chunk 中提到"Oracle数据库"才能建立跨文档关系
+
+  如果 ifs_docs 知识库增加了第二个文档（比如"如何重启IFS数据库"），两个文档都提到 Oracle数据库 实体，图谱就能在文档间形成桥接。

@@ -168,10 +168,31 @@ export function getImageEffectiveSrc(img) {
  * @param {HTMLElement | null} contentRoot 通常为 `[data-role="message-content"]`
  * @param {{ byteThreshold?: number, scheduleApply?: (cb: () => void) => void }} [options]
  */
+/**
+ * 兜底：LLM 偶尔会输出未编码的 src（如 "/images/IFS 系统培训手册/x.png"），
+ * 浏览器请求时空格不会自动转 %20，会 404。检测到 src 含空格或非 ASCII 时
+ * 用 encodeURI 重写（保留 ASCII 字母/数字/-_./ 等不变）。data: 和已编码的 URL 跳过。
+ */
+function ensureEncodedImageSrc(img) {
+  const raw = img.getAttribute('src') || ''
+  if (!raw) return
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return
+  // 已经包含 % 转义且没有原始空格，认为已编码
+  if (raw.includes('%') && !/\s/.test(raw)) return
+  // 只在 src 内容里实际有空格或非 ASCII 时才重写
+  if (!/\s/.test(raw) && /^[\x00-\x7F]*$/.test(raw)) return
+  try {
+    img.setAttribute('src', encodeURI(raw))
+  } catch {
+    /* 极端 URL 编码失败时保持原状 */
+  }
+}
+
 export function attachMarkdownImageFallbacks(contentRoot, options = {}) {
   if (!contentRoot) return
   contentRoot.querySelectorAll('img').forEach((node) => {
     if (node instanceof HTMLImageElement) {
+      ensureEncodedImageSrc(node)
       deferOversizedDataUrlIfNeeded(node, options)
       bindImageErrorToPlaceholder(node)
     }

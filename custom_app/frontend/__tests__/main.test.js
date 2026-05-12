@@ -357,7 +357,7 @@ describe('initChatApp', () => {
     expect(root.querySelector('[data-role="composer-input"]').value).toBe('')
     const panel = root.querySelector('[data-role="source-panel"]')
     expect(panel).toBeTruthy()
-    expect(panel.querySelector('[data-role="source-panel-toggle"]').textContent).toContain('引用来源（1 处）')
+    expect(panel.querySelector('[data-role="source-panel-toggle"]').textContent).toContain('引用来源（1）')
     expect(panel.querySelector('.source-card__title').textContent).toBe('电池 SOP')
   })
 
@@ -722,6 +722,111 @@ describe('initChatApp', () => {
     expect(aiBody.querySelectorAll('.kb-citation').length).toBeGreaterThanOrEqual(1)
     const cites = [...aiBody.querySelectorAll('.kb-citation')]
     expect(cites.some((el) => el.textContent.includes('AGV维护手册'))).toBe(true)
+  })
+
+  // ── Sprint 10: Tool result details (collapsible) ─────────────────────────
+
+  it('renders tool_result with details as a collapsible block', async () => {
+    const root = renderChatShell()
+    const sendChatMessage = vi.fn().mockImplementation(async ({ onToolStart, onToolResult, onChunk, onDone }) => {
+      onToolStart({ type: 'tool_call', tool_name: 'knowledge_search', hint: '搜索知识库："换电"' })
+      onToolResult({
+        tool_name: 'knowledge_search',
+        summary: '找到 2 个结果',
+        duration_ms: 80,
+        details: '[\n  {"title": "STEP 1", "contents": "打开舱门"},\n  {"title": "STEP 2", "contents": "取出电池"}\n]',
+      })
+      onChunk('', '答案')
+      onDone('答案')
+    })
+    const app = initChatApp({
+      root,
+      kbApi: { listKnowledgeBases: vi.fn().mockResolvedValue([{ kb_id: 'agv_demo', name: 'AGV Demo', status: 'active' }]) },
+      chatApi: { sendChatMessage },
+      storage: createStorage(),
+    })
+    await app.ready
+
+    root.querySelector('[data-role="composer-input"]').value = '问'
+    await app.sendCurrentMessage()
+    await app.waitForIdle()
+
+    const detailsEls = root.querySelectorAll('[data-role="tool-result-details"]')
+    expect(detailsEls.length).toBe(1)
+    // 默认折叠
+    expect(detailsEls[0].open).toBe(false)
+    // 展开后能看到原始内容
+    expect(detailsEls[0].textContent).toContain('打开舱门')
+    expect(detailsEls[0].textContent).toContain('STEP 2')
+  })
+
+  it('omits collapsible block when tool_result has no details', async () => {
+    const root = renderChatShell()
+    const sendChatMessage = vi.fn().mockImplementation(async ({ onToolStart, onToolResult, onChunk, onDone }) => {
+      onToolStart({ type: 'tool_call', tool_name: 'final_answer', hint: '提交最终答案' })
+      onToolResult({ tool_name: 'final_answer', summary: '已生成最终答案', duration_ms: 1 })
+      onChunk('', '答案')
+      onDone('答案')
+    })
+    const app = initChatApp({
+      root,
+      kbApi: { listKnowledgeBases: vi.fn().mockResolvedValue([{ kb_id: 'agv_demo', name: 'AGV Demo', status: 'active' }]) },
+      chatApi: { sendChatMessage },
+      storage: createStorage(),
+    })
+    await app.ready
+
+    root.querySelector('[data-role="composer-input"]').value = '问'
+    await app.sendCurrentMessage()
+    await app.waitForIdle()
+
+    expect(root.querySelectorAll('[data-role="tool-result-details"]').length).toBe(0)
+  })
+
+  it('replays tool_result details from stored history', async () => {
+    const root = renderChatShell({ withSessionList: true })
+    window.location.hash = '#session=sess_details_replay'
+    const sessionApi = {
+      getSession: vi.fn().mockResolvedValue({ session_id: 'sess_details_replay', kb_id: 'agv_demo' }),
+      listSessions: vi.fn().mockResolvedValue([]),
+      fetchSessionMessages: vi.fn().mockResolvedValue([
+        { id: 1, role: 'user', content: 'q', reasoning: {} },
+        {
+          id: 2,
+          role: 'assistant',
+          content: 'a',
+          reasoning: {
+            iterations: 1,
+            events: [
+              { type: 'tool_call', tool_name: 'knowledge_search', hint: '搜索知识库' },
+              {
+                type: 'tool_result',
+                tool_name: 'knowledge_search',
+                summary: '找到 1 个结果',
+                duration_ms: 50,
+                details: '原始 chunk: 打开舱门按钮',
+              },
+            ],
+          },
+        },
+      ]),
+      createSession: vi.fn(),
+      renameSession: vi.fn(),
+      deleteSession: vi.fn(),
+    }
+    const app = initChatApp({
+      root,
+      kbApi: { listKnowledgeBases: vi.fn().mockResolvedValue([{ kb_id: 'agv_demo', name: 'AGV Demo', status: 'active' }]) },
+      chatApi: { sendChatMessage: vi.fn() },
+      sessionApi,
+      storage: createStorage(),
+    })
+    await app.ready
+
+    const detailsEls = root.querySelectorAll('[data-role="tool-result-details"]')
+    expect(detailsEls.length).toBe(1)
+    expect(detailsEls[0].textContent).toContain('打开舱门按钮')
+    window.location.hash = ''
   })
 
   // ── Sprint 9: Reasoning replay on session reload ─────────────────────────

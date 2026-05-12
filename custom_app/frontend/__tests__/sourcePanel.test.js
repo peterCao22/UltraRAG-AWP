@@ -69,8 +69,7 @@ describe('buildSourcesPanel', () => {
 
     const toggle = panel.querySelector('[data-role="source-panel-toggle"]')
     const body = panel.querySelector('[data-role="source-panel-body"]')
-    expect(toggle.textContent).toContain('引用来源（2 处）')
-    expect(toggle.textContent).toContain('▾')
+    expect(toggle.textContent).toContain('引用来源（2）')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(body.hidden).toBe(true)
     expect(panel.querySelectorAll('[data-role="source-card"]')).toHaveLength(2)
@@ -78,7 +77,7 @@ describe('buildSourcesPanel', () => {
     toggle.click()
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     expect(body.hidden).toBe(false)
-    expect(toggle.textContent).toContain('▴')
+    expect(toggle.textContent).toContain('收起')
 
     toggle.click()
     expect(toggle.getAttribute('aria-expanded')).toBe('false')

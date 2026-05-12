@@ -104,7 +104,9 @@ export async function listKnowledgeBases({
  * 创建知识库。
  *
  * 参数：
- *   payload.kb_id / payload.name 必填；description、tenant_id 可选
+ *   payload.kb_id / payload.name 必填
+ *   payload.type   可选，"sop_docx"（默认）或 "general"；创建后不可改
+ *   payload.description / payload.tenant_id 可选
  */
 export async function createKnowledgeBase(payload, { adminToken } = {}) {
   const response = await fetch(DEFAULT_KB_ENDPOINT, {

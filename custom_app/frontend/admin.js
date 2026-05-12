@@ -280,6 +280,13 @@ export function initAdminApp({
         <label>显示名称 <span class="required">*</span>
           <input name="name" class="field" required maxlength="120" placeholder="展示给用户的名称" />
         </label>
+        <label>知识库类型 <span class="required">*</span>
+          <select name="type" class="field" required>
+            <option value="sop_docx">SOP 知识库（DOCX，业务定制分块）</option>
+            <option value="general">通用知识库（PDF / 图片 / DOCX / MD）</option>
+          </select>
+          <small class="muted">类型创建后无法修改。SOP 用于带 STEP 编号的标准作业流程；通用支持多种格式。</small>
+        </label>
         <label>描述（可选）
           <textarea name="description" class="field" rows="2" maxlength="500" placeholder="用途说明"></textarea>
         </label>
@@ -302,9 +309,10 @@ export function initAdminApp({
       const fd = new FormData(form)
       const kb_id = String(fd.get('kb_id') || '').trim()
       const name = String(fd.get('name') || '').trim()
+      const type = String(fd.get('type') || 'sop_docx').trim() || 'sop_docx'
       const description = String(fd.get('description') || '').trim()
       try {
-        await api.createKnowledgeBase({ kb_id, name, description })
+        await api.createKnowledgeBase({ kb_id, name, type, description })
         overlay.remove()
         window.location.hash = `#/kb/${encodeURIComponent(kb_id)}`
       } catch (err) {
@@ -376,7 +384,10 @@ export function initAdminApp({
       sub.className = 'muted admin-detail-sub'
       sub.append('标识 ', document.createTextNode(kb.kb_id), ' · ')
       sub.append(createStatusBadge(kb.status))
-      sub.append(document.createTextNode(` · 文档 ${kb.document_count ?? docs.length} · 块 ${chunkHint}`))
+      const kbType = kb.type === 'general' ? '通用' : 'SOP'
+      sub.append(document.createTextNode(
+        ` · 类型 ${kbType}（创建后不可改） · 文档 ${kb.document_count ?? docs.length} · 块 ${chunkHint}`
+      ))
 
       head.append(back, h1, sub)
 

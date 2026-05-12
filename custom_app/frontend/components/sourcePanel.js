@@ -76,7 +76,7 @@ export function buildSourcesPanel(sources) {
   toggle.dataset.role = 'source-panel-toggle'
   toggle.setAttribute('aria-expanded', 'false')
   const n = list.length
-  toggle.textContent = `📄 引用来源（${n} 处）▾`
+  toggle.textContent = `引用来源（${n}）`
 
   const body = document.createElement('div')
   body.className = 'source-panel-body'
@@ -92,7 +92,7 @@ export function buildSourcesPanel(sources) {
     const next = !open
     toggle.setAttribute('aria-expanded', String(next))
     body.hidden = !next
-    toggle.textContent = next ? `📄 引用来源（${n} 处）▴` : `📄 引用来源（${n} 处）▾`
+    toggle.textContent = next ? `引用来源（${n}）收起` : `引用来源（${n}）`
   })
 
   section.append(toggle, body)

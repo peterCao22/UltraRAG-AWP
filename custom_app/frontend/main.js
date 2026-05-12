@@ -98,6 +98,10 @@ function createReasoningStepsPanel(article, bodyEl) {
   function toolCall(hint) {
     const t = String(hint || '').trim()
     if (!t) return
+    // 如果上一轮已有 tool_result，tool_call 应开启新轮次（后端可能没有 thought 事件）
+    if (currentRound && hasToolResult) {
+      currentRound = null
+    }
     _ensureRound()
     const p = document.createElement('p')
     p.className = 'reasoning-steps__tool-call'
@@ -105,7 +109,7 @@ function createReasoningStepsPanel(article, bodyEl) {
     currentRound.append(p)
   }
 
-  function toolResult(summary) {
+  function toolResult(summary, detailsText) {
     const t = String(summary || '').trim()
     if (!t) return
     _ensureRound()
@@ -113,6 +117,20 @@ function createReasoningStepsPanel(article, bodyEl) {
     p.className = 'reasoning-steps__tool-result'
     p.textContent = t
     currentRound.append(p)
+    const dt = String(detailsText || '').trim()
+    if (dt) {
+      const block = document.createElement('details')
+      block.className = 'reasoning-steps__tool-details'
+      block.dataset.role = 'tool-result-details'
+      const sm = document.createElement('summary')
+      sm.className = 'reasoning-steps__tool-details-summary'
+      sm.textContent = '查看原始结果'
+      const pre = document.createElement('pre')
+      pre.className = 'reasoning-steps__tool-details-body'
+      pre.textContent = dt
+      block.append(sm, pre)
+      currentRound.append(block)
+    }
     hasToolResult = true
   }
 
@@ -125,6 +143,8 @@ function createReasoningStepsPanel(article, bodyEl) {
       details.remove()
       return
     }
+    // Update summary with round count
+    sum.textContent = `推理步骤 · ${roundCount} 轮`
     details.open = false
   }
 
@@ -186,7 +206,7 @@ function replayReasoningEvents(article, bodyEl, reasoning) {
     const t = ev?.type
     if (t === 'thought') panel.thought(ev.content || '')
     else if (t === 'tool_call') panel.toolCall(ev.hint || ev.tool_name || '')
-    else if (t === 'tool_result') panel.toolResult(ev.summary || '')
+    else if (t === 'tool_result') panel.toolResult(ev.summary || '', ev.details || '')
   }
   panel.finish()
 }
@@ -247,6 +267,26 @@ export function initChatApp({
   mountAgentSelect(elements.agentSelect)
   bindChatImageLightbox(elements.messageList)
 
+  function scrollMessageListToBottom() {
+    const list = elements.messageList
+    list.scrollTop = list.scrollHeight
+    const raf = typeof window !== 'undefined' ? window.requestAnimationFrame : null
+    if (typeof raf === 'function') {
+      raf(() => {
+        list.scrollTop = list.scrollHeight
+      })
+    }
+
+    const timers = typeof window !== 'undefined' ? window : null
+    if (timers?.setTimeout) {
+      ;[40, 120, 280].forEach((delay) => {
+        timers.setTimeout(() => {
+          list.scrollTop = list.scrollHeight
+        }, delay)
+      })
+    }
+  }
+
   function renderWelcome() {
     elements.messageList.innerHTML = ''
     const { article } = createMessageElement('ai', '您好！请选择知识库后开始提问。')
@@ -260,7 +300,9 @@ export function initChatApp({
   function addMessage(role, content, options = {}) {
     const { article, body } = createMessageElement(role, content, options)
     elements.messageList.append(article)
-    elements.messageList.scrollTop = elements.messageList.scrollHeight
+    if (options.scroll !== false) {
+      scrollMessageListToBottom()
+    }
     return { article, body }
   }
 
@@ -547,7 +589,7 @@ export function initChatApp({
       }
     }
     if (!msgs.length) renderWelcome()
-    elements.messageList.scrollTop = elements.messageList.scrollHeight
+    scrollMessageListToBottom()
     await refreshSessionList()
   }
 
@@ -596,12 +638,12 @@ export function initChatApp({
           return
         }
       }
-      addMessage('user', question)
+      addMessage('user', question, { scroll: false })
       elements.input.value = ''
       updateCharCount()
     }
 
-    const aiMessage = addMessage('ai', '', { streaming: true, thinking: true })
+    const aiMessage = addMessage('ai', '', { streaming: true, thinking: true, scroll: false })
     const reasoning = createReasoningStepsPanel(aiMessage.article, aiMessage.body)
     let sourcesPanelEl = null
     let degradedNotified = false
@@ -610,6 +652,7 @@ export function initChatApp({
     const ac = new AbortController()
     state.streamAbort = ac
     setStreaming(true)
+    scrollMessageListToBottom()
 
     let profileRequest = false
     try {
@@ -651,14 +694,19 @@ export function initChatApp({
         },
         onThought: (ev) => {
           reasoning.thought(formatThoughtSnippet(ev))
+          scrollMessageListToBottom()
         },
         onToolStart: (ev) => {
           const label = ev?.hint || ev?.name || String(ev?.tool_name ?? '?')
           reasoning.toolCall(label)
+          scrollMessageListToBottom()
         },
         onToolResult: (ev) => {
           const summary = ev?.summary
-          if (summary) reasoning.toolResult(summary)
+          if (summary) {
+            reasoning.toolResult(summary, ev?.details || '')
+            scrollMessageListToBottom()
+          }
         },
         onChunk: (_chunk, answer) => {
           accumulatedAnswer = answer
@@ -667,6 +715,7 @@ export function initChatApp({
             clearThinkingIndicator(aiMessage.body)
           }
           renderTextContent(aiMessage.body, answer)
+          scrollMessageListToBottom()
         },
         onSources: (sources) => {
           if (!sources?.length) return
@@ -678,6 +727,7 @@ export function initChatApp({
           if (!panel) return
           sourcesPanelEl = panel
           aiMessage.article.append(panel)
+          scrollMessageListToBottom()
         },
         onDone: (answer) => {
           clearThinkingIndicator(aiMessage.body)
@@ -686,6 +736,7 @@ export function initChatApp({
           highlightKbCitations(aiMessage.body)
           attachMarkdownImageFallbacks(aiMessage.body)
           reasoning.finish()
+          scrollMessageListToBottom()
           void refreshSessionList()
         },
         onAbort: (partial) => {
@@ -699,6 +750,7 @@ export function initChatApp({
             renderTextContent(aiMessage.body, '已停止生成')
           }
           reasoning.finish()
+          scrollMessageListToBottom()
         },
         onError: (message) => {
           reasoning.remove()
@@ -718,6 +770,7 @@ export function initChatApp({
             void sendCurrentMessage({ resendText: question })
           })
           aiMessage.article.append(retry)
+          scrollMessageListToBottom()
         },
       })
     } finally {
