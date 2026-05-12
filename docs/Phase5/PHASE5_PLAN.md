@@ -33,7 +33,7 @@
 
 ### 2.1 双后端抽象
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │                  Application Layer                  │
 │  custom_app/api/{kb,roles}.py + services/*          │
@@ -67,7 +67,7 @@ vector_backend: qdrant
 
 ### 2.3 数据流（Phase 5 后）
 
-```
+```text
 docx → docx_parser → chunks.jsonl
                       ↓
                   embedding (Gemini)
@@ -78,7 +78,7 @@ docx → docx_parser → chunks.jsonl
    (本地 .index 文件)         (Qdrant 服务)
 ```
 
-```
+```text
 api/kb.py → KbRepository.create()
               ↓
               SqliteConnectionProvider 或 PostgresConnectionProvider
@@ -94,7 +94,7 @@ api/kb.py → KbRepository.create()
 
 ### 新增
 
-```
+```text
 custom_app/repositories/
   __init__.py
   base.py                       # ConnectionProvider Protocol + adapter helpers
@@ -129,7 +129,7 @@ docs/Phase5/
 
 ### 修改
 
-```
+```text
 custom_app/db.py                # init_db 不变；不再被业务层直接调用
 custom_app/api/kb.py            # 46 处 SQL → Repository（0 raw SQL）
 custom_app/api/roles.py         # 14 处 SQL → Repository（0 raw SQL）
@@ -151,14 +151,14 @@ pyproject.toml                  # [storage] extras + 新 marker
 
 ### 4.1 服务可达性（5.1.0）
 
-```
+```text
 [OK] qdrant version=1.16.2 at http://192.168.8.40:6333
 [OK] PostgreSQL 16.13 at 192.168.8.40:5432
 ```
 
 ### 4.2 Qdrant 数据迁移（5.1.4）
 
-```
+```text
 agv_demo: 23 chunks → custom_app__agv_demo collection
 ifs_docs: 16 chunks → custom_app__ifs_docs collection
 一致性验证 (7 queries, top-5):
@@ -168,7 +168,25 @@ ifs_docs: 16 chunks → custom_app__ifs_docs collection
 
 ### 4.3 PostgreSQL 数据迁移（5.1.6）
 
+**专用数据库**：项目使用 `awprag`（全小写，避免 PG 大小写引号问题），
+默认 `postgres` 库保持系统原样（仅 `WeKnora` 等其他项目共享 PG 服务）。
+
+首次部署的 bootstrap 流程：
+
+```powershell
+# 1. 创建 awprag 数据库（连默认 postgres 库执行 CREATE DATABASE）
+.venv/Scripts/python.exe -m custom_app.scripts.bootstrap_postgres_database
+
+# 2. .env 中 ULTRARAG_POSTGRES_URI 末尾改为 /awprag
+ULTRARAG_POSTGRES_URI=postgresql://postgres:PASS@HOST:5432/awprag
+
+# 3. 跑迁移
+.venv/Scripts/python.exe -m custom_app.scripts.migrate_sqlite_to_postgres --truncate
 ```
+
+实测迁移结果（awprag 库内）：
+
+```text
 knowledge_bases       5 rows  [OK]
 kb_jobs               20 rows [OK]
 kb_documents          16 rows [OK]
@@ -182,7 +200,7 @@ kg_relations          177 rows [OK]
 
 ### 4.4 Repository 双后端 E2E（5.1.8）
 
-```
+```text
 KB list 顺序:        SQLite == Postgres ✓
 Job list:            SQLite == Postgres ✓
 Document count:      SQLite == Postgres ✓
@@ -207,6 +225,7 @@ Qdrant ifs_docs:     16 points 在线 ✓
 | 其他 Phase 5 相关测试 | 全套 398 passed | |
 
 **已知 5 项 fails 在 Phase 5 范围外**：
+
 - 2 项 `test_phase2_kb_api.py`：FakeRagRunner.chat() 不接受 agent_mode（Phase 3 遗留）
 - 3 项 `test_rag_runner_agent_mode.py`：mock 风格不兼容新 VectorStore 抽象（Phase 4.0 遗留）
 
@@ -230,30 +249,36 @@ Qdrant ifs_docs:     16 points 在线 ✓
 
 切换到 Phase 5 后端：
 
-1. **数据迁移**（仅一次）：
-   ```bash
-   # SQLite → Postgres
-   .venv/Scripts/python.exe -m custom_app.scripts.migrate_sqlite_to_postgres --truncate
+**1. 数据迁移**（仅一次）：
 
-   # FAISS → Qdrant（按 KB 迁移）
-   .venv/Scripts/python.exe -m custom_app.scripts.migrate_faiss_to_qdrant --kb agv_demo --recreate
-   .venv/Scripts/python.exe -m custom_app.scripts.migrate_faiss_to_qdrant --kb ifs_docs --recreate
-   ```
+```bash
+# 首次部署时先创建 awprag 数据库（已存在则跳过）
+.venv/Scripts/python.exe -m custom_app.scripts.bootstrap_postgres_database
 
-2. **切换配置**：
-   ```bash
-   # .env
-   ULTRARAG_VECTOR_BACKEND=qdrant
-   ULTRARAG_DB_BACKEND=postgres
-   ```
+# SQLite → Postgres（awprag）
+.venv/Scripts/python.exe -m custom_app.scripts.migrate_sqlite_to_postgres --truncate
 
-3. **验证**：
-   ```bash
-   .venv/Scripts/python.exe -m custom_app.scripts.verify_phase5_dual_backend
-   # 应输出：通过：7 失败：0
-   ```
+# FAISS → Qdrant（按 KB 迁移）
+.venv/Scripts/python.exe -m custom_app.scripts.migrate_faiss_to_qdrant --kb agv_demo --recreate
+.venv/Scripts/python.exe -m custom_app.scripts.migrate_faiss_to_qdrant --kb ifs_docs --recreate
+```
 
-4. **回滚**（如需）：把上面 2 行环境变量改回 `faiss` / `sqlite` 重启 Flask 即可。
+**2. 切换配置**：
+
+```bash
+# .env
+ULTRARAG_VECTOR_BACKEND=qdrant
+ULTRARAG_DB_BACKEND=postgres
+```
+
+**3. 验证**：
+
+```bash
+.venv/Scripts/python.exe -m custom_app.scripts.verify_phase5_dual_backend
+# 应输出：通过：7 失败：0
+```
+
+**4. 回滚**（如需）：把上面 2 行环境变量改回 `faiss` / `sqlite` 重启 Flask 即可。
 
 ---
 
