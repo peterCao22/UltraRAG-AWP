@@ -83,7 +83,7 @@ parsing = [
 # 部署：Qdrant + Postgres 都是局域网 Docker 服务，连接信息见 .env
 storage = [
     "qdrant-client>=1.10",      # 官方 Python 客户端（也支持纯 HTTP）
-    "psycopg[binary,pool]>=3.2", # PostgreSQL driver + 连接池
+    "psycopg[binary,pool]>=3.3.4", # PostgreSQL driver + 连接池
 ]
 
 all = [
