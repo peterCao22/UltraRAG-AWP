@@ -54,7 +54,7 @@ retriever = [
 ]
 
 generation = [
-    "vllm>=0.13.0",
+    "vllm>=0.20.2",
     "openai",
     "transformers",
     "torch",
