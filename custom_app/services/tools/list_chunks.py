@@ -53,6 +53,8 @@ class ListChunksTool:
             "name": "list_knowledge_chunks",
             "description": (
                 "获取指定文档的全部分块内容，用于深度阅读完整步骤。"
+                "【幂等】同一 doc_id 多次调用返回完全相同的内容，**严禁对同一文档重复调用本工具**；"
+                "如已读过该文档则直接基于已有内容回答（调用 final_answer）。"
                 "返回字段说明：每个 chunk 含 image_urls 字段（已 URL 编码，可直接放入 Markdown）。"
                 "**强制规则**：当某个步骤的 chunk 含 image_urls 时，必须在该步骤文字下方"
                 "**单独一行**写 ![](URL)，URL 直接复制 image_urls 数组里的字符串，"

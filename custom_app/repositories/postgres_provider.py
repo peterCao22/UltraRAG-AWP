@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS kb_documents (
   channel       TEXT NOT NULL DEFAULT 'api',
   status        TEXT NOT NULL DEFAULT 'pending',
   error_message TEXT DEFAULT '',
+  -- Phase 6.1: per-document tracking. For existing deployments these are
+  -- added by migrations/postgres/001_phase6_1_doc_status.sql.
+  processed_at  TIMESTAMPTZ,
+  chunk_count   INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,
   UNIQUE (kb_id, doc_id)

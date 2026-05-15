@@ -17,6 +17,7 @@ from flask import Flask, jsonify, make_response, redirect, request, send_from_di
 
 from custom_app.api import chat_bp, kb_bp, roles_bp, sessions_bp
 from custom_app.db import init_db
+from custom_app.logging_setup import setup_logging
 
 
 # 文件实现说明：当前文件核心职责是 1) 定位 frontend 目录 -> 2) 初始化 DB 与 API 蓝图 -> 3) 挂载页面入口和静态资源。
@@ -96,6 +97,10 @@ def create_app() -> Flask:
     返回：
         Flask: 已注册 API 蓝图与 Phase 3 前端路由的应用实例。
     """
+    # 必须在任何 logger.info/warning 之前挂 handler，否则那些早期日志会被
+    # Python 默认 lastResort handler 吞掉，且永远不会写入 logs/app.log。
+    setup_logging()
+
     app = Flask(
         __name__,
         static_folder=str(FRONTEND_DIR),
@@ -108,6 +113,17 @@ def create_app() -> Flask:
         )
 
     init_db()
+
+    # Phase 6.1: 把上一次 Flask 崩溃后残留在 parsing/embedding/indexing/deleting
+    # 状态超过 10 分钟的文档标 failed，避免前端轮询永远转圈圈。
+    try:
+        from custom_app.services.doc_status_recovery import recover_stale_documents
+        recover_stale_documents()
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "recover_stale_documents failed at startup; continuing"
+        )
+
     app.register_blueprint(chat_bp)
     app.register_blueprint(kb_bp)
     app.register_blueprint(roles_bp)

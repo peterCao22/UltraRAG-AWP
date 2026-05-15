@@ -209,7 +209,8 @@ class TestDocumentUpload:
             content_type="multipart/form-data",
         )
         docs_resp = client.get(f"/api/kb/{kb_id}/documents")
-        docs = docs_resp.get_json()["data"]
+        # Phase 6.1：响应改为 {documents, summary}
+        docs = docs_resp.get_json()["data"]["documents"]
         assert any(d["file_name"] == "reg.docx" for d in docs)
 
     def test_upload_to_nonexistent_kb(self, client):
@@ -297,7 +298,8 @@ class TestPagination:
         assert resp.status_code == 200
         assert len(resp.get_json()["data"]) == 2
 
-    def test_list_documents_pagination(self, client):
+    def test_list_documents_returns_summary(self, client):
+        """Phase 6.1：分页参数被废弃，列表一次性返回所有文档 + summary。"""
         kb_id = "kb_docs_page"
         client.post("/api/kb", json={"kb_id": kb_id, "name": "Docs Page KB"})
         from custom_app.db import get_conn, now_iso, new_id
@@ -308,12 +310,15 @@ class TestPagination:
                 conn.execute(
                     """INSERT INTO kb_documents
                        (kb_id, tenant_id, doc_id, file_name, file_type, file_path, channel, status, error_message, created_at, updated_at)
-                       VALUES (?, 'default', ?, ?, 'docx', '/tmp/x.docx', 'api', 'indexed', '', ?, ?)""",
+                       VALUES (?, 'default', ?, ?, 'docx', '/tmp/x.docx', 'api', 'completed', '', ?, ?)""",
                     (kb_id, did, f"doc_{i}.docx", now, now),
                 )
-        resp = client.get(f"/api/kb/{kb_id}/documents?limit=2")
+        resp = client.get(f"/api/kb/{kb_id}/documents")
         assert resp.status_code == 200
-        assert len(resp.get_json()["data"]) == 2
+        data = resp.get_json()["data"]
+        assert isinstance(data, dict)
+        assert len(data["documents"]) == 4
+        assert data["summary"]["completed"] == 4
 
 
 class TestKbDocumentCountAndDelete:
@@ -343,7 +348,8 @@ class TestKbDocumentCountAndDelete:
         client.post("/api/kb", json={"kb_id": kb_id, "name": "Del Doc KB"})
         data = {"files": (io.BytesIO(b"content"), "gone.docx")}
         client.post(f"/api/kb/{kb_id}/documents/upload", data=data, content_type="multipart/form-data")
-        docs = client.get(f"/api/kb/{kb_id}/documents").get_json()["data"]
+        # Phase 6.1：响应改为 {documents, summary}
+        docs = client.get(f"/api/kb/{kb_id}/documents").get_json()["data"]["documents"]
         assert len(docs) == 1
         doc_id = docs[0]["doc_id"]
         raw_file = Path(docs[0]["file_path"])
@@ -354,7 +360,7 @@ class TestKbDocumentCountAndDelete:
         assert resp.status_code == 200
         assert resp.get_json()["data"]["deleted"] is True
 
-        docs2 = client.get(f"/api/kb/{kb_id}/documents").get_json()["data"]
+        docs2 = client.get(f"/api/kb/{kb_id}/documents").get_json()["data"]["documents"]
         assert docs2 == []
         assert not raw_file.exists()
 

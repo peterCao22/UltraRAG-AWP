@@ -305,6 +305,7 @@ class TestDocumentRepository:
         assert rows[0]["channel"] == "web"
 
     def test_mark_all_indexed(self, doc_repo):
+        """Phase 6.1：mark_all_indexed 现在写 'completed'（旧 'indexed' 仍兼容读取）。"""
         self._create_kb()
         for i in range(3):
             doc_repo.upsert(
@@ -314,25 +315,34 @@ class TestDocumentRepository:
             )
         doc_repo.mark_all_indexed("k1", updated_at="2026-05-11T01:00:00Z")
         rows = doc_repo.list_for_kb("k1", limit=10, offset=0)
-        assert all(r["status"] == "indexed" for r in rows)
+        assert all(r["status"] == "completed" for r in rows)
 
-    def test_mark_pending_failed_only_affects_pending(self, doc_repo):
+    def test_mark_pending_failed_only_affects_in_flight(self, doc_repo):
+        """Phase 6.1：扩展到 pending/parsing/embedding/indexing 都受影响，completed 不动。"""
         self._create_kb()
+        # 已完成的不应被改
         doc_repo.upsert(
             kb_id="k1", tenant_id="t1", doc_id="k1:a",
             file_name="a", file_type="docx", file_path="/p",
-            channel="api", status="indexed", updated_at="2026-05-11T00:00:00Z",
+            channel="api", status="completed", updated_at="2026-05-11T00:00:00Z",
         )
         doc_repo.upsert(
             kb_id="k1", tenant_id="t1", doc_id="k1:b",
             file_name="b", file_type="docx", file_path="/p",
             channel="api", status="pending", updated_at="2026-05-11T00:00:00Z",
         )
+        doc_repo.upsert(
+            kb_id="k1", tenant_id="t1", doc_id="k1:c",
+            file_name="c", file_type="docx", file_path="/p",
+            channel="api", status="parsing", updated_at="2026-05-11T00:00:00Z",
+        )
         doc_repo.mark_pending_failed("k1", error="boom", updated_at="2026-05-11T01:00:00Z")
         rows = {r["doc_id"]: r for r in doc_repo.list_for_kb("k1", limit=10, offset=0)}
-        assert rows["k1:a"]["status"] == "indexed"  # 不动
+        assert rows["k1:a"]["status"] == "completed"  # 不动
         assert rows["k1:b"]["status"] == "failed"
         assert rows["k1:b"]["error_message"] == "boom"
+        assert rows["k1:c"]["status"] == "failed"
+        assert rows["k1:c"]["error_message"] == "boom"
 
     def test_delete(self, doc_repo):
         self._create_kb()

@@ -32,7 +32,11 @@ class KbRepository:
     # ------------------------------------------------------------------
 
     def exists(self, kb_id: str) -> bool:
-        sql = "SELECT 1 FROM knowledge_bases WHERE kb_id = ?"
+        """检查 kb_id 是否被活跃（非 archived）的知识库占用。
+
+        archived 的知识库视为已删除，其 kb_id 可被重新创建。
+        """
+        sql = "SELECT 1 FROM knowledge_bases WHERE kb_id = ? AND status != 'archived'"
         with self._provider.connect() as conn:
             cur = conn.execute(adapt_sql(sql, self._provider), (kb_id,))
             return cur.fetchone() is not None

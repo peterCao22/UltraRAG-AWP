@@ -1,0 +1,713 @@
+{
+  "summary": {
+    "kb": "agv_demo",
+    "queries_count": 10,
+    "chunks_count": 23,
+    "top_k": 5,
+    "total_new_hits": 0,
+    "total_promoted": 0,
+    "avg_jaccard": 1.0
+  },
+  "results": [
+    {
+      "query": "更换 AGV 电池的步骤",
+      "baseline_top": [
+        {
+          "idx": 1,
+          "score": 0.7536575794219971,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 8,
+          "score": 0.752480685710907,
+          "id": "BatteryChangeSequenceSOP_step_6",
+          "title": "BatteryChangeSequenceSOP | STEP 6"
+        },
+        {
+          "idx": 9,
+          "score": 0.7427628040313721,
+          "id": "BatteryChangeSequenceSOP_step_7",
+          "title": "BatteryChangeSequenceSOP | STEP 7"
+        },
+        {
+          "idx": 3,
+          "score": 0.7387858033180237,
+          "id": "BatteryChangeSequenceSOP_step_1",
+          "title": "BatteryChangeSequenceSOP | STEP 1"
+        },
+        {
+          "idx": 5,
+          "score": 0.7358553409576416,
+          "id": "BatteryChangeSequenceSOP_step_3",
+          "title": "BatteryChangeSequenceSOP | STEP 3"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 1,
+          "score": 0.7536575794219971,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 8,
+          "score": 0.752480685710907,
+          "id": "BatteryChangeSequenceSOP_step_6",
+          "title": "BatteryChangeSequenceSOP | STEP 6"
+        },
+        {
+          "idx": 9,
+          "score": 0.7427628040313721,
+          "id": "BatteryChangeSequenceSOP_step_7",
+          "title": "BatteryChangeSequenceSOP | STEP 7"
+        },
+        {
+          "idx": 3,
+          "score": 0.7387858033180237,
+          "id": "BatteryChangeSequenceSOP_step_1",
+          "title": "BatteryChangeSequenceSOP | STEP 1"
+        },
+        {
+          "idx": 5,
+          "score": 0.7358553409576416,
+          "id": "BatteryChangeSequenceSOP_step_3",
+          "title": "BatteryChangeSequenceSOP | STEP 3"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "电池告警如何处理",
+      "baseline_top": [
+        {
+          "idx": 0,
+          "score": 0.7102341651916504,
+          "id": "Alarm Block Battery Low SOP_section_1",
+          "title": "Alarm Block Battery Low SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7090771198272705,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 16,
+          "score": 0.6899681091308594,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 17,
+          "score": 0.6728450059890747,
+          "id": "E-Stop SOP_1_intro",
+          "title": "E-Stop SOP 1"
+        },
+        {
+          "idx": 3,
+          "score": 0.6581988334655762,
+          "id": "BatteryChangeSequenceSOP_step_1",
+          "title": "BatteryChangeSequenceSOP | STEP 1"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 0,
+          "score": 0.7102341651916504,
+          "id": "Alarm Block Battery Low SOP_section_1",
+          "title": "Alarm Block Battery Low SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7090771198272705,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 16,
+          "score": 0.6899681091308594,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 17,
+          "score": 0.6728450059890747,
+          "id": "E-Stop SOP_1_intro",
+          "title": "E-Stop SOP 1"
+        },
+        {
+          "idx": 3,
+          "score": 0.6581988334655762,
+          "id": "BatteryChangeSequenceSOP_step_1",
+          "title": "BatteryChangeSequenceSOP | STEP 1"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "E-Stop Button Active 怎么恢复",
+      "baseline_top": [
+        {
+          "idx": 16,
+          "score": 0.769797146320343,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 17,
+          "score": 0.7517216205596924,
+          "id": "E-Stop SOP_1_intro",
+          "title": "E-Stop SOP 1"
+        },
+        {
+          "idx": 15,
+          "score": 0.672746479511261,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 13,
+          "score": 0.660847544670105,
+          "id": "BatteryChangeSequenceSOP_step_11",
+          "title": "BatteryChangeSequenceSOP | STEP 11"
+        },
+        {
+          "idx": 12,
+          "score": 0.6571521162986755,
+          "id": "BatteryChangeSequenceSOP_step_10",
+          "title": "BatteryChangeSequenceSOP | STEP 10"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 16,
+          "score": 0.769797146320343,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 17,
+          "score": 0.7517216205596924,
+          "id": "E-Stop SOP_1_intro",
+          "title": "E-Stop SOP 1"
+        },
+        {
+          "idx": 15,
+          "score": 0.672746479511261,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 13,
+          "score": 0.660847544670105,
+          "id": "BatteryChangeSequenceSOP_step_11",
+          "title": "BatteryChangeSequenceSOP | STEP 11"
+        },
+        {
+          "idx": 12,
+          "score": 0.6571521162986755,
+          "id": "BatteryChangeSequenceSOP_step_10",
+          "title": "BatteryChangeSequenceSOP | STEP 10"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "AGV 进入系统报错",
+      "baseline_top": [
+        {
+          "idx": 14,
+          "score": 0.8022982478141785,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 15,
+          "score": 0.7789046764373779,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 16,
+          "score": 0.7700744271278381,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 19,
+          "score": 0.768881618976593,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 21,
+          "score": 0.7666890025138855,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 14,
+          "score": 0.8022982478141785,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 15,
+          "score": 0.7789046764373779,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 16,
+          "score": 0.7700744271278381,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 19,
+          "score": 0.768881618976593,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 21,
+          "score": 0.7666890025138855,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "升降平台位置错误",
+      "baseline_top": [
+        {
+          "idx": 19,
+          "score": 0.7452573776245117,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 18,
+          "score": 0.7419170141220093,
+          "id": "Error Position Lift Table SOP_section_1",
+          "title": "Error Position Lift Table SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7120034098625183,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 22,
+          "score": 0.7114858627319336,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 21,
+          "score": 0.7105185985565186,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 19,
+          "score": 0.7452573776245117,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 18,
+          "score": 0.7419170141220093,
+          "id": "Error Position Lift Table SOP_section_1",
+          "title": "Error Position Lift Table SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7120034098625183,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 22,
+          "score": 0.7114858627319336,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 21,
+          "score": 0.7105185985565186,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "UDC presence 故障",
+      "baseline_top": [
+        {
+          "idx": 21,
+          "score": 0.7121300101280212,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        },
+        {
+          "idx": 22,
+          "score": 0.650305986404419,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 19,
+          "score": 0.6344374418258667,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 14,
+          "score": 0.6317372918128967,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 15,
+          "score": 0.6315184831619263,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 21,
+          "score": 0.7121300101280212,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        },
+        {
+          "idx": 22,
+          "score": 0.650305986404419,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 19,
+          "score": 0.6344374418258667,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 14,
+          "score": 0.6317372918128967,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 15,
+          "score": 0.6315184831619263,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "告警块电池电压低",
+      "baseline_top": [
+        {
+          "idx": 0,
+          "score": 0.7387293577194214,
+          "id": "Alarm Block Battery Low SOP_section_1",
+          "title": "Alarm Block Battery Low SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7357100248336792,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 12,
+          "score": 0.6687391996383667,
+          "id": "BatteryChangeSequenceSOP_step_10",
+          "title": "BatteryChangeSequenceSOP | STEP 10"
+        },
+        {
+          "idx": 4,
+          "score": 0.657960057258606,
+          "id": "BatteryChangeSequenceSOP_step_2",
+          "title": "BatteryChangeSequenceSOP | STEP 2"
+        },
+        {
+          "idx": 16,
+          "score": 0.6560258269309998,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 0,
+          "score": 0.7387293577194214,
+          "id": "Alarm Block Battery Low SOP_section_1",
+          "title": "Alarm Block Battery Low SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7357100248336792,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 12,
+          "score": 0.6687391996383667,
+          "id": "BatteryChangeSequenceSOP_step_10",
+          "title": "BatteryChangeSequenceSOP | STEP 10"
+        },
+        {
+          "idx": 4,
+          "score": 0.657960057258606,
+          "id": "BatteryChangeSequenceSOP_step_2",
+          "title": "BatteryChangeSequenceSOP | STEP 2"
+        },
+        {
+          "idx": 16,
+          "score": 0.6560258269309998,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "如何更换AGV的轮子",
+      "baseline_top": [
+        {
+          "idx": 1,
+          "score": 0.7155708074569702,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 3,
+          "score": 0.7113524675369263,
+          "id": "BatteryChangeSequenceSOP_step_1",
+          "title": "BatteryChangeSequenceSOP | STEP 1"
+        },
+        {
+          "idx": 5,
+          "score": 0.7080702781677246,
+          "id": "BatteryChangeSequenceSOP_step_3",
+          "title": "BatteryChangeSequenceSOP | STEP 3"
+        },
+        {
+          "idx": 8,
+          "score": 0.7036006450653076,
+          "id": "BatteryChangeSequenceSOP_step_6",
+          "title": "BatteryChangeSequenceSOP | STEP 6"
+        },
+        {
+          "idx": 10,
+          "score": 0.6982088685035706,
+          "id": "BatteryChangeSequenceSOP_step_8",
+          "title": "BatteryChangeSequenceSOP | STEP 8"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 1,
+          "score": 0.7155708074569702,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 3,
+          "score": 0.7113524675369263,
+          "id": "BatteryChangeSequenceSOP_step_1",
+          "title": "BatteryChangeSequenceSOP | STEP 1"
+        },
+        {
+          "idx": 5,
+          "score": 0.7080702781677246,
+          "id": "BatteryChangeSequenceSOP_step_3",
+          "title": "BatteryChangeSequenceSOP | STEP 3"
+        },
+        {
+          "idx": 8,
+          "score": 0.7036006450653076,
+          "id": "BatteryChangeSequenceSOP_step_6",
+          "title": "BatteryChangeSequenceSOP | STEP 6"
+        },
+        {
+          "idx": 10,
+          "score": 0.6982088685035706,
+          "id": "BatteryChangeSequenceSOP_step_8",
+          "title": "BatteryChangeSequenceSOP | STEP 8"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "Error Position Lift Table SOP",
+      "baseline_top": [
+        {
+          "idx": 18,
+          "score": 0.7939707040786743,
+          "id": "Error Position Lift Table SOP_section_1",
+          "title": "Error Position Lift Table SOP"
+        },
+        {
+          "idx": 19,
+          "score": 0.7480230331420898,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 21,
+          "score": 0.7430816888809204,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        },
+        {
+          "idx": 14,
+          "score": 0.7184304594993591,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 22,
+          "score": 0.6961038112640381,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 18,
+          "score": 0.7939707040786743,
+          "id": "Error Position Lift Table SOP_section_1",
+          "title": "Error Position Lift Table SOP"
+        },
+        {
+          "idx": 19,
+          "score": 0.7480230331420898,
+          "id": "Error Position Lift Table SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 21,
+          "score": 0.7430816888809204,
+          "id": "Error UDC Presence SOP_section_1",
+          "title": "Error UDC Presence SOP"
+        },
+        {
+          "idx": 14,
+          "score": 0.7184304594993591,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 22,
+          "score": 0.6961038112640381,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    },
+    {
+      "query": "AGV不能进入系统",
+      "baseline_top": [
+        {
+          "idx": 14,
+          "score": 0.7719643115997314,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7608602046966553,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 15,
+          "score": 0.7538542747497559,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 16,
+          "score": 0.7400649785995483,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 22,
+          "score": 0.7353932857513428,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        }
+      ],
+      "enhanced_top": [
+        {
+          "idx": 14,
+          "score": 0.7719643115997314,
+          "id": "Cannot Enter System SOP_section_1",
+          "title": "Cannot Enter System SOP"
+        },
+        {
+          "idx": 1,
+          "score": 0.7608602046966553,
+          "id": "Alarm Block Battery Low SOP_section_2",
+          "title": "To resolve the issue:"
+        },
+        {
+          "idx": 15,
+          "score": 0.7538542747497559,
+          "id": "Cannot Enter System SOP_section_2",
+          "title": "To resolve:"
+        },
+        {
+          "idx": 16,
+          "score": 0.7400649785995483,
+          "id": "E-Stop SOP_intro",
+          "title": "E-Stop SOP"
+        },
+        {
+          "idx": 22,
+          "score": 0.7353932857513428,
+          "id": "Error UDC Presence SOP_section_2",
+          "title": "To resolve the issue:"
+        }
+      ],
+      "new_hits": [],
+      "promoted": [],
+      "jaccard": 1.0
+    }
+  ]
+}

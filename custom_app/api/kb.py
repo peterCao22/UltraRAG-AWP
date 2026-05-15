@@ -1,8 +1,13 @@
 import json
+import logging
+import os
 import shutil
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import faiss
@@ -258,6 +263,101 @@ def _index_stage(chunks_path: Path, embedding_path: Path, index_path: Path) -> i
     return len(rows)
 
 
+def _qdrant_stage(
+    kb_id: str,
+    chunks_path: Path,
+    embedding_path: Path,
+    force_reindex: bool,
+) -> int:
+    """Stage 3b：embedding.npy + chunks.jsonl → Qdrant collection（主向量库）。
+
+    读取 _index_stage 已生成的磁盘文件，构建 payload，upsert 到 Qdrant。
+    若 force_reindex 或 collection 中已有数据，先重建 collection 清除旧数据。
+
+    返回 upsert 后 collection 的向量总数。
+    """
+    from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
+
+    rows = [
+        json.loads(line)
+        for line in chunks_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    emb = np.load(str(embedding_path))
+    if emb.ndim != 2 or emb.shape[0] == 0:
+        raise RuntimeError("embedding matrix is empty; cannot upsert to Qdrant")
+
+    if len(rows) != emb.shape[0]:
+        raise RuntimeError(
+            f"chunk count {len(rows)} != embedding rows {emb.shape[0]}; "
+            "data mismatch, aborting Qdrant upsert"
+        )
+
+    chunk_ids = [str(c.get("id", "")) for c in rows]
+    payloads = [
+        {
+            "kb_id": kb_id,
+            "doc": c.get("doc", ""),
+            "source_type": c.get("source_type", "unknown"),
+            "parser": c.get("parser", "unknown"),
+            "chunk_data": c,
+        }
+        for c in rows
+    ]
+
+    store = QdrantVectorStore(kb_id=kb_id, embed_dim=emb.shape[1])
+    should_recreate = force_reindex or store.size() > 0
+    store.ensure_collection(recreate=should_recreate)
+    store.upsert(chunk_ids, emb, payloads)
+
+    count = store.size()
+    logger.info(
+        "qdrant_stage kb=%s: upserted %d vectors, collection size=%d",
+        kb_id, len(chunk_ids), count,
+    )
+    return count
+
+
+def _should_extract_kg(kb_id: str) -> bool:
+    """判断该 KB 是否应在 ingest 时自动提取知识图谱。
+
+    复用 enabled_tools_json 里的 "query_knowledge_graph" 开关，无需 DB 迁移。
+    未配置时 get_enabled_tools 返回全量工具列表（含 query_knowledge_graph），
+    即默认开启 KG 提取。
+
+    参数:
+        kb_id: 知识库 ID
+
+    返回:
+        True = 应提取 KG；False = 跳过
+    """
+    from custom_app.services.agent_config_store import get_enabled_tools
+    # get_enabled_tools 空 kb_id 返回全量工具，此处无需额外守护
+    return "query_knowledge_graph" in (get_enabled_tools(kb_id) or [])
+
+
+def _kg_stage(kb_id: str, chunks_path: Path) -> dict:
+    """阶段4：chunks.jsonl → KgStore（Neo4j / SQLite），返回提取统计。
+
+    内部调用 extract_kb()，其会先 delete_all_for_kb 再全量写入，
+    因此重建索引时旧图谱自动清除，无需额外处理。
+
+    参数:
+        kb_id:       知识库 ID，用于 KgStore 隔离与旧数据清除
+        chunks_path: chunks.jsonl 路径
+
+    返回:
+        dict，含 entity_count、relation_count、chunk_count、errors
+
+    注意:
+        - 每个 chunk 约需 2 次 Gemini API 调用，整体耗时与 chunk 数线性相关
+        - ULTRARAG_KG_BACKEND 决定写入 Neo4j 还是 SQLite（当前默认 neo4j）
+    """
+    from custom_app.services.kg_extractor import extract_kb
+    return extract_kb(kb_id, str(chunks_path))
+
+
 def _mark_job_success(job_id: str, kb_id: str, chunk_count: int,
                       chunks_path: Path, embedding_path: Path, index_path: Path,
                       force_reindex: bool) -> None:
@@ -284,11 +384,97 @@ def _mark_job_success(job_id: str, kb_id: str, chunk_count: int,
 def _mark_job_failed(job_id: str, kb_id: str, exc: Exception) -> None:
     now = now_iso()
     JobRepository().mark_failed(job_id, finished_at=now, error=str(exc))
+    # Phase 6.1: 在途的所有文档（pending/parsing/embedding/indexing）都标 failed
     DocumentRepository().mark_pending_failed(kb_id, error=str(exc), updated_at=now)
 
 
+# ── Phase 6.1: per-document status helpers ──────────────────────────────────
+
+def _broadcast_doc_status(kb_id: str, status: str) -> None:
+    """把该 KB 当前所有"在途"文档批量推进到 status。
+
+    "在途"= pending / parsing / embedding / indexing。一旦 completed / failed
+    就不再被广播覆盖。这是 6.1 的折中：parse/embed/index 流水线本身是 KB 维度
+    的（一次处理全部 chunks.jsonl），所以单文件粒度的状态由 stage 广播提供，
+    单文件级别的失败/重试粒度等 6.2 拆解 chunks.jsonl 后再做。
+    """
+    repo = DocumentRepository()
+    bundle = repo.list_documents_with_status(kb_id)
+    in_flight = [
+        d for d in bundle["documents"]
+        if d.get("status") in ("pending", "parsing", "embedding", "indexing")
+    ]
+    now = now_iso()
+    for d in in_flight:
+        repo.update_document_status(
+            kb_id, d["doc_id"], status=status, updated_at=now,
+        )
+
+
+def _attribute_chunk_counts(kb_id: str, chunks_path: Path) -> None:
+    """ingest 完成后，按 chunks.jsonl 中的 doc 字段把分块数摊到每个文档行。
+
+    chunk_count 是 doc_stem 维度的；doc_id = f"{kb_id}:{fp.name}"（含扩展）。
+    匹配规则：取 doc_id 中 ':' 后的 stem 与 chunk['doc'] 对照。
+    无法对上的文档保持 chunk_count=0。
+    """
+    if not chunks_path.exists():
+        return
+    counts: dict[str, int] = {}
+    for line in chunks_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        doc_stem = str(obj.get("doc", "")).strip()
+        if not doc_stem:
+            continue
+        counts[doc_stem] = counts.get(doc_stem, 0) + 1
+
+    repo = DocumentRepository()
+    bundle = repo.list_documents_with_status(kb_id)
+    now = now_iso()
+    for d in bundle["documents"]:
+        if d.get("status") != "completed":
+            continue
+        # doc_id 形如 "{kb_id}:{file_name}"；取 file_name 的 stem
+        doc_id = d["doc_id"]
+        file_name = doc_id.split(":", 1)[1] if ":" in doc_id else doc_id
+        stem = Path(file_name).stem
+        cnt = counts.get(stem, 0)
+        repo.update_document_status(
+            kb_id, doc_id, status="completed", updated_at=now,
+            chunk_count=cnt, processed_at=now,
+        )
+
+
 def _run_ingest_job(kb: dict, kb_id: str, job_id: str, force_reindex: bool) -> dict:
-    """执行入库任务的完整三阶段流程。"""
+    """执行入库任务的完整五阶段流程（Phase X: Qdrant 为主向量库 + KG 提取）。
+
+    阶段顺序：
+        1. parse   : 原始文件 → chunks.jsonl
+        2. embed   : chunks.jsonl → embedding.npy（Gemini）
+        3a. index  : embedding.npy → FAISS 索引文件（向后兼容）
+        3b. qdrant : embedding.npy → Qdrant collection（PRIMARY）
+        4. kg      : chunks.jsonl → KgStore（可选，按 enabled_tools 决定）
+
+    参数:
+        kb:            knowledge_bases 表的一行（dict），含 data_path/embedding_path/index_path
+        kb_id:         知识库 ID
+        job_id:        当前 ingest job ID
+        force_reindex: 是否强制重建（True 时跳过旧索引检查；Qdrant collection 也重建）
+
+    返回:
+        {"ok": bool, "job_id": str, "status": str, ...}
+
+    注意:
+        - Stage 3b Qdrant upsert 失败时仅记录警告，不影响 job 最终状态
+        - Stage 4 KG 提取失败时仅记录警告，不影响 job 最终状态
+        - KG 提取耗时与 chunk 数成正比（每 chunk ~2 次 Gemini API）
+    """
     try:
         _mark_job_running(job_id)
 
@@ -305,13 +491,80 @@ def _run_ingest_job(kb: dict, kb_id: str, job_id: str, force_reindex: bool) -> d
         _register_documents(kb, kb_id, raw_dir, chunks_path)
         # Phase 4.2: file_count 不再硬编码 *.docx；按 kb.type 支持的扩展名汇总
         file_count = len(_scan_raw_files(kb, raw_dir))
+
+        # Phase 6.1: 每个 stage 进入前把在途文档批量推进到对应状态。
+        _broadcast_doc_status(kb_id, "parsing")
         _parse_stage(kb, raw_dir, kb_root, chunks_path)
         _update_job_stage(job_id, "parse", {"file_count": file_count})
+
+        _broadcast_doc_status(kb_id, "embedding")
         _embed_stage(chunks_path, embedding_path)
         _update_job_stage(job_id, "embed")
+
+        _broadcast_doc_status(kb_id, "indexing")
         chunk_count = _index_stage(chunks_path, embedding_path, index_path)
         _update_job_stage(job_id, "index", {"chunk_count": chunk_count})
+
+        # Stage 3b: Qdrant upsert（主向量库，失败只警告不阻塞）
+        try:
+            qdrant_count = _qdrant_stage(kb_id, chunks_path, embedding_path, force_reindex)
+            _update_job_stage(job_id, "qdrant", {"qdrant_chunk_count": qdrant_count})
+        except Exception as qdrant_exc:
+            logger.warning("qdrant_stage failed kb=%s: %s", kb_id, qdrant_exc)
+            _update_job_stage(job_id, "qdrant_failed", {"qdrant_error": str(qdrant_exc)})
+
+        # Stage 4: KG 实体关系提取（可选，失败不中断 ingest）
+        # 条件：KB 的 enabled_tools 包含 query_knowledge_graph
+        # 失败策略：仍然不抛出（保持索引可用），但把详细原因写进 result_json 的
+        # kg_status / kg_error / kg_error_type，前端 jobs 进度页可直接展示，
+        # 避免 KG 静默归零却没人发现（之前的 bug）。
+        if _should_extract_kg(kb_id):
+            try:
+                kg_result = _kg_stage(kb_id, chunks_path)
+                kg_entity = int(kg_result.get("entity_count", 0))
+                kg_rel = int(kg_result.get("relation_count", 0))
+                kg_errors = int(kg_result.get("errors", 0))
+                if kg_entity == 0 and kg_rel == 0:
+                    # 完成但写入 0：通常意味着 LLM 抽取全部失败，需要明确告警
+                    kg_status = "empty" if kg_errors == 0 else "errors"
+                    kg_message = (
+                        f"KG 抽取已完成但未写入任何实体/关系（chunks={kg_result.get('chunk_count', 0)}, "
+                        f"errors={kg_errors}）。请检查 logs/kg_ingest.log。"
+                    )
+                    logger.warning("kg_stage produced empty graph kb=%s: %s", kb_id, kg_message)
+                else:
+                    kg_status = "ok"
+                    kg_message = ""
+                _update_job_stage(job_id, "kg", {
+                    "kg_status": kg_status,
+                    "kg_entity_count": kg_entity,
+                    "kg_relation_count": kg_rel,
+                    "kg_chunk_count": int(kg_result.get("chunk_count", 0)),
+                    "kg_error_count": kg_errors,
+                    "kg_message": kg_message,
+                })
+            except Exception as kg_exc:
+                logger.exception("kg_stage failed kb=%s", kb_id)
+                _update_job_stage(job_id, "kg_failed", {
+                    "kg_status": "failed",
+                    "kg_error": str(kg_exc),
+                    "kg_error_type": type(kg_exc).__name__,
+                })
+
         _mark_job_success(job_id, kb_id, chunk_count, chunks_path, embedding_path, index_path, force_reindex)
+        # Phase 6.1: completed 后按文件名把 chunk_count / processed_at 分摊到每个文档
+        try:
+            _attribute_chunk_counts(kb_id, chunks_path)
+        except Exception:
+            logger.exception("attribute_chunk_counts failed kb=%s", kb_id)
+        # 重建索引后必须失效 chat.py 中按 kb_id 缓存的 RagRunner / AgentRunner，
+        # 否则它们仍持有旧 rows / 旧 FAISS，新增文档查不到、删除的文档仍可能召回。
+        # 失败路径不做失效（旧索引仍可继续服务）。
+        try:
+            from custom_app.api.chat import invalidate_runner_cache
+            invalidate_runner_cache(kb_id)
+        except Exception:
+            logger.exception("invalidate_runner_cache failed kb=%s", kb_id)
         return {"ok": True, "job_id": job_id, "status": "success"}
 
     except Exception as exc:
@@ -348,6 +601,8 @@ def create_kb():
     kb_repo = KbRepository()
     if kb_repo.exists(kb_id):
         return _err(f"kb_id already exists: {kb_id}", "KB_ALREADY_EXISTS", 409)
+    # 若有同 kb_id 的 archived 记录（软删除残留），先清掉再插入，避免主键冲突
+    kb_repo.hard_delete(kb_id)
     kb_repo.create(
         kb_id=kb_id, name=name, description=description,
         tenant_id=tenant_id, kb_type=kb_type,
@@ -414,6 +669,36 @@ def delete_kb(kb_id: str):
         kb_dir = Path(current["data_path"])
         if kb_dir.exists():
             shutil.rmtree(kb_dir, ignore_errors=True)
+
+        # 清理 Qdrant collection
+        try:
+            from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
+
+            qdrant_store = QdrantVectorStore(kb_id=kb_id)
+            qdrant_store.delete_collection()
+        except Exception as qdrant_del_exc:
+            logger.warning(
+                "Failed to delete Qdrant collection kb=%s: %s",
+                kb_id,
+                qdrant_del_exc,
+            )
+
+        # 清理 Neo4j KG 数据
+        try:
+            from custom_app.services.kgstore.base import build_kg_store
+
+            kg_store = build_kg_store()
+            rc, ec = kg_store.delete_all_for_kb(kb_id)
+            logger.info(
+                "Deleted KG data for kb=%s: %d relations, %d entities",
+                kb_id,
+                ec,
+                rc,
+            )
+        except Exception as kg_del_exc:
+            logger.warning(
+                "Failed to delete KG data kb=%s: %s", kb_id, kg_del_exc
+            )
     else:
         kb_repo.archive(kb_id, updated_at=now_iso())
     return _ok({"kb_id": kb_id, "deleted": True, "hard": hard})
@@ -463,11 +748,13 @@ def upload_documents(kb_id: str):
                     break
                 idx += 1
         f.save(str(dest))
+        # Phase 6.1：上传完成统一写 'pending'，与状态枚举对齐
+        # （uploaded 不是 6.1 枚举的合法值，前端汇总条/轮询无法识别）
         doc_repo.upsert(
             kb_id=kb_id, tenant_id=kb["tenant_id"],
             doc_id=f"{kb_id}:{safe_name}", file_name=safe_name,
             file_type=ext.lstrip("."), file_path=str(dest),
-            channel="web", status="uploaded", updated_at=now_iso(),
+            channel="web", status="pending", updated_at=now_iso(),
         )
         uploaded.append(safe_name)
 
@@ -593,11 +880,140 @@ def run_pending_job(kb_id: str, job_id: str):
 
 @kb_bp.route("/api/kb/<string:kb_id>/documents", methods=["GET"])
 def list_documents(kb_id: str):
-    limit, offset = _parse_pagination(request.args)
+    """列出该 KB 下所有文档（Phase 6.1：含 summary 派生字段）。
+
+    返回：
+        {
+          "documents": [{ doc_id, file_name, file_type, status,
+                          chunk_count, processed_at, error_message, ... }],
+          "summary":   { pending, parsing, embedding, indexing,
+                         completed, failed, deleting }
+        }
+
+    分页参数被忽略：admin 详情页一次性渲染该 KB 所有文档+汇总，且文档量级
+    一般 ≤几百。如果未来文档数量爆炸，再追加 limit/offset。
+    """
     if not KbRepository().exists(kb_id):
         return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
-    rows = DocumentRepository().list_for_kb(kb_id, limit=limit, offset=offset)
+    return _ok(DocumentRepository().list_documents_with_status(kb_id))
+
+
+@kb_bp.route(
+    "/api/kb/<string:kb_id>/documents/batch-status",
+    methods=["POST"],
+)
+def batch_document_status(kb_id: str):
+    """Phase 6.1：轮询用，返回指定 doc_ids 的最新状态字段。
+
+    body: {"doc_ids": ["kb_id:foo.docx", ...]}
+    """
+    if not KbRepository().exists(kb_id):
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("doc_ids") or []
+    if not isinstance(raw_ids, list):
+        return _err("doc_ids must be a list", "INVALID_DOC_IDS", 400)
+    doc_ids = [str(x).strip() for x in raw_ids if str(x).strip()]
+    # 上限保护：避免恶意/失控前端把整张表批回来
+    doc_ids = doc_ids[:500]
+    rows = DocumentRepository().batch_get_documents(kb_id, doc_ids)
     return _ok(rows)
+
+
+@kb_bp.route(
+    "/api/kb/<string:kb_id>/documents/<string:doc_id>/retry",
+    methods=["POST"],
+)
+def retry_document(kb_id: str, doc_id: str):
+    """Phase 6.1：单文档失败重试。
+
+    实现选择（6.1 折中版）：不做"只重跑这一个文件"——chunks.jsonl 是全 KB
+    维度的流水线，单独抽出一份成本高。本路由先把该文档行重置回 pending +
+    清错误信息，然后触发一次新的 ingest job（force_reindex=False）。这跟
+    "重建索引"按钮路径一致，但只在该 KB 有失败文档时调用更直观。
+    单文件级别的真重建留到 Phase 6.2 拆解 chunks.jsonl 后再做。
+    """
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+
+    doc_repo = DocumentRepository()
+    row = doc_repo.get(kb_id, doc_id)
+    if row is None:
+        return _err(f"document not found: {doc_id}", "DOC_NOT_FOUND", 404)
+
+    if _has_running_job(kb_id):
+        return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
+
+    now = now_iso()
+    doc_repo.update_document_status(
+        kb_id, doc_id, status="pending", updated_at=now,
+    )
+
+    job_id = new_id("job")
+    JobRepository().create_ingest_job(
+        job_id=job_id, tenant_id=kb["tenant_id"], kb_id=kb_id,
+        payload={"force_reindex": False, "doc_retry": doc_id},
+        created_at=now,
+    )
+    _JOB_EXECUTOR.submit(_run_ingest_job, dict(kb), kb_id, job_id, False)
+    return _ok({"job_id": job_id, "doc_id": doc_id, "status": "pending"})
+
+
+@kb_bp.route(
+    "/api/kb/<string:kb_id>/documents/<string:doc_id>/chunks",
+    methods=["GET"],
+)
+def list_document_chunks(kb_id: str, doc_id: str):
+    """Phase 6.1：取该文档的全部 chunk，详情面板用。
+
+    参数：
+        max_chars  contents 每块最大字符数，默认 0=不截断
+    """
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    doc = DocumentRepository().get(kb_id, doc_id)
+    if doc is None:
+        return _err(f"document not found: {doc_id}", "DOC_NOT_FOUND", 404)
+
+    file_name = doc.get("file_name") or doc_id.split(":", 1)[-1]
+    doc_stem = Path(file_name).stem
+
+    chunks_path = Path(kb["data_path"]) / "corpora" / "chunks.jsonl"
+    if not chunks_path.exists():
+        return _ok({"doc_id": doc_id, "doc_stem": doc_stem, "chunks": []})
+
+    try:
+        max_chars = int(request.args.get("max_chars", 0))
+    except (ValueError, TypeError):
+        max_chars = 0
+    if max_chars < 0:
+        max_chars = 0
+
+    out: list[dict] = []
+    for line in chunks_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            chunk = json.loads(line)
+        except Exception:
+            continue
+        if chunk.get("doc") != doc_stem:
+            continue
+        contents = str(chunk.get("contents", ""))
+        if max_chars and len(contents) > max_chars:
+            contents = contents[:max_chars] + "..."
+        out.append({
+            "id": chunk.get("id", ""),
+            "title": chunk.get("title", ""),
+            "doc": chunk.get("doc", ""),
+            "contents": contents,
+            "char_count": len(str(chunk.get("contents", ""))),
+            "image_count": len(chunk.get("images") or []),
+        })
+    return _ok({"doc_id": doc_id, "doc_stem": doc_stem, "chunks": out})
 
 
 @kb_bp.route("/api/kb/<string:kb_id>/documents", methods=["DELETE"])
@@ -728,10 +1144,129 @@ def get_job_progress(kb_id: str, job_id: str):
         "chunk_count": result.get("chunk_count"),
         "file_count": result.get("file_count"),
     }
+    # KG 阶段单独透传，便于前端 / 排障接口直接消费
+    kg_status = result.get("kg_status")
+    if kg_status is not None:
+        progress["kg"] = {
+            "status": kg_status,
+            "entity_count": result.get("kg_entity_count"),
+            "relation_count": result.get("kg_relation_count"),
+            "chunk_count": result.get("kg_chunk_count"),
+            "error_count": result.get("kg_error_count"),
+            "error": result.get("kg_error") or result.get("kg_message") or "",
+            "error_type": result.get("kg_error_type"),
+        }
     if status == "failed":
         progress["error"] = str(row["last_error"] or "")
 
     return _ok(progress)
+
+
+# ── diagnostics ──────────────────────────────────────────────────────────────
+
+@kb_bp.route("/api/kb/<string:kb_id>/diagnostics", methods=["GET"])
+def kb_diagnostics(kb_id: str):
+    """一键排障端点：聚合 KB 的关键依赖状态。
+
+    返回字段示例：
+      {
+        "kb_id": "gen_test",
+        "kb_status": "active",
+        "document_count": 3,
+        "chunks_path_exists": true,
+        "chunk_count": 13,
+        "vector_backend": "qdrant",
+        "vector_count": 13,
+        "vector_error": null,
+        "kg_backend": "neo4j",
+        "kg_entity_count": 0,
+        "kg_relation_count": 0,
+        "kg_error": null,
+        "kg_extract_enabled": true,
+        "gemini_model": "gemini-3.1-pro-preview",
+        "last_indexed_at": "...",
+        "last_job": {"job_id": "...", "status": "success", "kg": {...}}
+      }
+    """
+    kb_repo = KbRepository()
+    kb = kb_repo.get(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+
+    chunks_path = Path(kb["data_path"]) / "corpora" / "chunks.jsonl"
+    chunk_count = 0
+    if chunks_path.exists():
+        try:
+            chunk_count = sum(
+                1 for line in chunks_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            )
+        except OSError as exc:
+            logger.warning("diagnostics: read chunks.jsonl failed kb=%s: %s", kb_id, exc)
+
+    vector_backend = (os.environ.get("ULTRARAG_VECTOR_BACKEND") or "faiss").strip().lower()
+    vector_count: Optional[int] = None
+    vector_error: Optional[str] = None
+    if vector_backend == "qdrant":
+        try:
+            from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
+            store = QdrantVectorStore(kb_id=kb_id, embed_dim=768)
+            vector_count = int(store.size())
+        except Exception as exc:  # noqa: BLE001
+            vector_error = f"{type(exc).__name__}: {exc}"
+    elif vector_backend == "faiss":
+        try:
+            idx_path = Path(kb["index_path"])
+            vector_count = int(idx_path.stat().st_size > 0) if idx_path.exists() else 0
+        except OSError as exc:
+            vector_error = str(exc)
+
+    kg_backend = (os.environ.get("ULTRARAG_KG_BACKEND") or "sqlite").strip().lower()
+    kg_entity_count = 0
+    kg_relation_count = 0
+    kg_error: Optional[str] = None
+    try:
+        from custom_app.services.kg_search import get_graph_stats
+        stats = get_graph_stats(kb_id) or {}
+        kg_entity_count = int(stats.get("entity_count") or 0)
+        kg_relation_count = int(stats.get("relation_count") or 0)
+    except Exception as exc:  # noqa: BLE001
+        kg_error = f"{type(exc).__name__}: {exc}"
+
+    last_jobs = JobRepository().list_for_kb(kb_id, limit=1, offset=0)
+    last_job_summary: Optional[dict] = None
+    if last_jobs:
+        decorated = _decorate_job_row(dict(last_jobs[0]))
+        if decorated:
+            res = decorated.get("result") or {}
+            last_job_summary = {
+                "job_id": decorated.get("job_id"),
+                "status": decorated.get("status"),
+                "summary": decorated.get("summary"),
+                "finished_at": decorated.get("finished_at"),
+                "kg_status": res.get("kg_status"),
+                "kg_message": res.get("kg_message") or res.get("kg_error"),
+            }
+
+    payload = {
+        "kb_id": kb_id,
+        "kb_status": kb.get("status"),
+        "document_count": kb.get("document_count"),
+        "last_indexed_at": kb.get("last_indexed_at"),
+        "chunks_path_exists": chunks_path.exists(),
+        "chunk_count": chunk_count,
+        "vector_backend": vector_backend,
+        "vector_count": vector_count,
+        "vector_error": vector_error,
+        "kg_backend": kg_backend,
+        "kg_extract_enabled": _should_extract_kg(kb_id),
+        "kg_entity_count": kg_entity_count,
+        "kg_relation_count": kg_relation_count,
+        "kg_error": kg_error,
+        "gemini_model": os.environ.get("ULTRARAG_GEMINI_MODEL", "gemini-2.0-flash"),
+        "last_job": last_job_summary,
+    }
+    return _ok(payload)
 
 
 # ── agent tool config ────────────────────────────────────────────────────────

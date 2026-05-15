@@ -32,6 +32,7 @@ describe('normalizeKnowledgeBase', () => {
       id: 'agv_demo',
       name: 'AGV Demo',
       status: 'active',
+      type: 'sop_docx',
       description: '',
       created_at: '2026-04-01T00:00:00Z',
       updated_at: '',
@@ -165,13 +166,32 @@ describe('kbApi admin mutations', () => {
     expect(kb.document_count).toBe(3)
   })
 
-  it('listDocuments maps rows', async () => {
+  it('listDocuments maps rows and summary (Phase 6.1 shape)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: [{ doc_id: 'kb:f', file_name: 'f.docx', kb_id: 'kb', file_type: 'docx', file_path: '/p', channel: 'web', status: 'uploaded', error_message: '', created_at: '', updated_at: '' }],
+      data: {
+        documents: [{
+          doc_id: 'kb:f', file_name: 'f.docx', kb_id: 'kb', file_type: 'docx',
+          file_path: '/p', channel: 'web', status: 'completed', error_message: '',
+          chunk_count: 7, processed_at: '2026-05-15T01:00:00Z',
+          created_at: '', updated_at: '',
+        }],
+        summary: { completed: 1, parsing: 0, embedding: 0, indexing: 0, failed: 0, pending: 0, deleting: 0 },
+      },
     }))))
 
-    const docs = await listDocuments('kb')
-    expect(docs[0].file_name).toBe('f.docx')
+    const out = await listDocuments('kb')
+    expect(out.documents[0].file_name).toBe('f.docx')
+    expect(out.documents[0].chunk_count).toBe(7)
+    expect(out.summary.completed).toBe(1)
+  })
+
+  it('listDocuments falls back to legacy array shape', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ doc_id: 'kb:f', file_name: 'f.docx', status: 'completed' }],
+    }))))
+    const out = await listDocuments('kb')
+    expect(out.documents).toHaveLength(1)
+    expect(out.summary.completed).toBe(0) // legacy fixture 没有 summary
   })
 
   it('createIngestJob posts async body', async () => {
