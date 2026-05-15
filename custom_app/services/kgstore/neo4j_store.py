@@ -200,7 +200,9 @@ class Neo4jKgStore:
         description: str,
         strength: int,
         created_at: str,
+        doc_id: str = "",
     ) -> None:
+        """Phase 6.2: doc_id 标记关系来源文档，便于按 doc 删除。"""
         self.ensure_constraints()
         with self._session() as session:
             session.run(
@@ -212,14 +214,82 @@ class Neo4jKgStore:
                     relation_type: $rtype,
                     description: $description,
                     strength: $strength,
+                    doc_id: $doc_id,
                     created_at: $created_at
                 }]->(t)
                 """,
                 sid=source_id, tid=target_id,
                 kb_id=kb_id, rtype=relation_type,
                 description=description, strength=strength,
+                doc_id=doc_id,
                 created_at=created_at,
             )
+
+    def delete_by_doc(self, kb_id: str, doc_id: str) -> tuple[int, int]:
+        """Phase 6.2: 删除某 doc 的 KG 数据。
+
+        步骤：
+          1. DELETE r WHERE r.kb_id=$kb_id AND r.doc_id=$doc_id
+          2. 找该 doc 的实体（chunk_ids 包含 doc_stem 前缀的 chunk id），把这些
+             chunk_id 从 chunk_ids JSON 数组里移除；剩余为空则连实体一起 DETACH DELETE
+        老数据 doc_id='' 的不受影响。返回 (rel_deleted, ent_deleted)。
+        """
+        if not doc_id:
+            return 0, 0
+        self.ensure_constraints()
+        import json as _json
+        from custom_app.utils.chunks_io import doc_id_to_stem
+
+        doc_stem = doc_id_to_stem(doc_id)
+
+        with self._session() as session:
+            # 1) 删关系并统计
+            rel_rec = session.run(
+                """
+                MATCH ()-[r:RELATES_TO {kb_id: $kb_id, doc_id: $doc_id}]->()
+                WITH count(r) AS cnt
+                CALL {
+                  MATCH ()-[r2:RELATES_TO {kb_id: $kb_id, doc_id: $doc_id}]->()
+                  DELETE r2
+                  RETURN count(*) AS deleted
+                }
+                RETURN cnt
+                """,
+                kb_id=kb_id, doc_id=doc_id,
+            ).single()
+            rel_deleted = int(rel_rec["cnt"]) if rel_rec else 0
+
+            # 2) 找该 KB 的所有实体，剔除属于该 doc_stem 的 chunk ids
+            ent_records = session.run(
+                "MATCH (e:Entity {kb_id: $kb_id}) RETURN elementId(e) AS id, e.chunk_ids AS chunk_ids",
+                kb_id=kb_id,
+            ).data()
+
+            ent_deleted = 0
+            for rec in ent_records:
+                eid = rec["id"]
+                raw = rec.get("chunk_ids") or "[]"
+                try:
+                    chunk_ids = _json.loads(raw)
+                except Exception:
+                    chunk_ids = []
+                # chunk.id 形如 "{doc_stem}_section_N"；按前缀过滤
+                kept = [cid for cid in chunk_ids if not str(cid).startswith(f"{doc_stem}_")]
+                if len(kept) == len(chunk_ids):
+                    continue
+                if not kept:
+                    session.run(
+                        "MATCH (e:Entity) WHERE elementId(e) = $id DETACH DELETE e",
+                        id=eid,
+                    )
+                    ent_deleted += 1
+                else:
+                    session.run(
+                        "MATCH (e:Entity) WHERE elementId(e) = $id SET e.chunk_ids = $chunk_ids",
+                        id=eid, chunk_ids=_json.dumps(kept),
+                    )
+
+        return rel_deleted, ent_deleted
 
     def delete_all_for_kb(self, kb_id: str) -> tuple[int, int]:
         """删除某 KB 下所有节点+关系，返回 (rel_count, ent_count)。"""

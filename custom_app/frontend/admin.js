@@ -6,8 +6,9 @@ import { openConfirmModal } from './components/confirmModal.js'
 import { createStatusBadge } from './components/statusBadge.js'
 import { Toast } from './components/toast.js'
 import { sanitizeHtml } from './utils/sanitizeHtml.js'
-import { isAllowedKbUploadFile } from './utils/uploadGuards.js'
+import { isAllowedKbUploadFile, getAcceptAttr, getUploadHint } from './utils/uploadGuards.js'
 import {
+  batchDocumentStatus,
   createIngestJob,
   createKnowledgeBase,
   deleteDocument,
@@ -15,14 +16,17 @@ import {
   getAgentConfig,
   getJobProgress,
   getKnowledgeBase,
+  listDocumentChunks,
   listDocuments,
   listJobs,
   listKnowledgeBases,
+  retryDocument,
   updateAgentConfig,
   uploadKbDocuments,
 } from './services/kbApi.js'
 
 const defaultKbApi = {
+  batchDocumentStatus,
   listKnowledgeBases,
   createKnowledgeBase,
   createIngestJob,
@@ -31,20 +35,57 @@ const defaultKbApi = {
   getAgentConfig,
   getJobProgress,
   getKnowledgeBase,
+  listDocumentChunks,
   listDocuments,
   listJobs,
+  retryDocument,
   updateAgentConfig,
   uploadKbDocuments,
 }
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 const POLL_MS = 3000
+// Phase 6.1：文档状态轮询频率（WeKnora 用 1500ms，我们用 2000ms 折中）
+const DOC_POLL_MS = 2000
 
 function escapeHtml(text) {
   return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/"/g, '&quot;')
+}
+
+// ── Phase 6.1 helpers ──────────────────────────────────────────────────────
+
+const PROCESSING_DOC_STATUSES = new Set(['pending', 'parsing', 'embedding', 'indexing', 'deleting'])
+
+function isProcessingStatus(status) {
+  return PROCESSING_DOC_STATUSES.has(String(status || '').toLowerCase())
+}
+
+function formatDocSummary(total, summary) {
+  const s = summary || {}
+  return (
+    `共 ${total} 个文档 · ` +
+    `${s.completed || 0} 已完成 · ` +
+    `${s.parsing || 0} 解析中 · ` +
+    `${s.embedding || 0} 嵌入中 · ` +
+    `${s.indexing || 0} 索引中 · ` +
+    `${s.pending || 0} 待处理 · ` +
+    `${s.failed || 0} 失败 · ` +
+    `${s.deleting || 0} 删除中`
+  )
+}
+
+function formatDocTime(iso) {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleString('zh-CN', { hour12: false })
+  } catch {
+    return iso
+  }
 }
 
 function parseRoute() {
@@ -148,6 +189,10 @@ export function initAdminApp({
   let pollTimer = null
   let activeKbId = null
   let activeJobId = null
+  // Phase 6.1：文档级状态轮询独立计时器
+  let docPollTimer = null
+  let docPollKbId = null
+  let docPollIds = []
 
   function clearPoll() {
     if (pollTimer) {
@@ -157,12 +202,22 @@ export function initAdminApp({
     activeJobId = null
   }
 
+  function clearDocPoll() {
+    if (docPollTimer) {
+      window.clearInterval(docPollTimer)
+      docPollTimer = null
+    }
+    docPollKbId = null
+    docPollIds = []
+  }
+
   function showFlash(message, kind = 'error') {
     Toast.show(message, kind === 'success' ? 'success' : 'error')
   }
 
   async function renderList() {
     clearPoll()
+    clearDocPoll()
     activeKbId = null
     setNavActive(root, 'list')
     if (titleEl) titleEl.textContent = '知识库管理'
@@ -271,17 +326,19 @@ export function initAdminApp({
 
     const card = document.createElement('div')
     card.className = 'modal-card modal-card--wide'
-    card.innerHTML = sanitizeHtml(`
-      <h2 class="modal-title">新建知识库</h2>
-      <form class="admin-form" data-role="new-kb-form">
-        <label>知识库 ID（英文/数字/下划线）<span class="required">*</span>
-          <input name="kb_id" class="field" required pattern="[a-zA-Z0-9_-]{2,64}" autocomplete="off" placeholder="例如 my_kb_01" />
-        </label>
+    // 模态框 HTML 来自应用自身代码（非用户输入），直接赋 innerHTML 避免
+    // DOMPurify SANITIZE_DOM 干扰表单 name/pattern 等属性。
+    card.innerHTML = `
+        <h2 class="modal-title">新建知识库</h2>
+        <form class="admin-form" data-role="new-kb-form">
+          <label>知识库 ID（英文/数字/下划线）<span class="required">*</span>
+          <input name="kb_id" class="field" required autocomplete="off" placeholder="例如 my_kb_01" />
+          </label>
         <label>显示名称 <span class="required">*</span>
-          <input name="name" class="field" required maxlength="120" placeholder="展示给用户的名称" />
+          <input name="display_name" class="field" required maxlength="120" placeholder="展示给用户的名称" />
         </label>
         <label>知识库类型 <span class="required">*</span>
-          <select name="type" class="field" required>
+          <select name="kb_type" class="field" required>
             <option value="sop_docx">SOP 知识库（DOCX，业务定制分块）</option>
             <option value="general">通用知识库（PDF / 图片 / DOCX / MD）</option>
           </select>
@@ -295,7 +352,7 @@ export function initAdminApp({
           <button type="submit" class="button-primary">创建</button>
         </div>
       </form>
-    `)
+    `
 
     overlay.append(card)
     document.body.append(overlay)
@@ -308,9 +365,13 @@ export function initAdminApp({
       e.preventDefault()
       const fd = new FormData(form)
       const kb_id = String(fd.get('kb_id') || '').trim()
-      const name = String(fd.get('name') || '').trim()
-      const type = String(fd.get('type') || 'sop_docx').trim() || 'sop_docx'
+      const name = String(fd.get('display_name') || '').trim()
+      const type = String(fd.get('kb_type') || 'sop_docx').trim() || 'sop_docx'
       const description = String(fd.get('description') || '').trim()
+      if (!/^[A-Za-z0-9_-]{2,64}$/.test(kb_id)) {
+        showFlash('知识库 ID 只能包含英文、数字、下划线或横线，长度 2-64。')
+        return
+      }
       try {
         await api.createKnowledgeBase({ kb_id, name, type, description })
         overlay.remove()
@@ -346,18 +407,26 @@ export function initAdminApp({
   }
 
   async function renderDetail(kbId) {
-    if (activeKbId !== kbId) clearPoll()
+    if (activeKbId !== kbId) {
+      clearPoll()
+      clearDocPoll()
+    } else {
+      // 同一 KB 重渲染时也需要重置 doc 轮询，新一轮会按文档状态再启动
+      clearDocPoll()
+    }
     activeKbId = kbId
     setNavActive(root, 'detail')
     if (titleEl) titleEl.textContent = '知识库详情'
 
     outlet.replaceChildren(buildAdminDetailSkeleton())
     try {
-      const [kb, docs, jobs] = await Promise.all([
+      const [kb, docBundle, jobs] = await Promise.all([
         api.getKnowledgeBase(kbId),
-        api.listDocuments(kbId, { limit: 200 }),
+        api.listDocuments(kbId),
         api.listJobs(kbId, { limit: 20 }),
       ])
+      const docs = docBundle.documents
+      const docSummary = docBundle.summary
 
       let chunkHint = '—'
       const lastOk = jobs.find((j) => j.job_type === 'ingest' && j.status === 'success')
@@ -454,13 +523,22 @@ export function initAdminApp({
 
       const zone = document.createElement('div')
       zone.className = 'admin-dropzone'
-      zone.innerHTML = sanitizeHtml(
-        '<p>拖拽 .docx / .pdf 到此处，或<button type="button" class="linklike" data-role="pick-files">选择文件</button></p><p class="muted">单文件最大 50MB</p>',
-      )
+      const uploadHint = getUploadHint(kb.type)
+      const hintP = document.createElement('p')
+      const pickBtn = document.createElement('button')
+      pickBtn.type = 'button'
+      pickBtn.className = 'linklike'
+      pickBtn.dataset.role = 'pick-files'
+      pickBtn.textContent = '选择文件'
+      hintP.append(`拖拽 ${uploadHint} 到此处，或`, pickBtn)
+      const sizeP = document.createElement('p')
+      sizeP.className = 'muted'
+      sizeP.textContent = '单文件最大 50MB'
+      zone.append(hintP, sizeP)
       const input = document.createElement('input')
       input.type = 'file'
       input.multiple = true
-      input.accept = '.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      input.accept = getAcceptAttr(kb.type)
       input.className = 'visually-hidden'
       input.dataset.role = 'file-input'
 
@@ -475,9 +553,9 @@ export function initAdminApp({
         const files = Array.from(fileList || []).filter(Boolean)
         if (!files.length) return
         for (const f of files) {
-          if (!isAllowedKbUploadFile(f)) {
+          if (!isAllowedKbUploadFile(f, kb.type)) {
             showFlash(
-              `不支持的文件类型：${f.name}。仅允许 .pdf / .docx，且 MIME 须为 PDF 或 Word 文档（当前：${f.type || '未知'}）。`,
+              `不支持的文件类型：${f.name}。允许 ${uploadHint}（当前 MIME：${f.type || '未知'}）。`,
             )
             return
           }
@@ -503,7 +581,7 @@ export function initAdminApp({
         }
       }
 
-      zone.querySelector('[data-role="pick-files"]').addEventListener('click', () => input.click())
+      pickBtn.addEventListener('click', () => input.click())
       input.addEventListener('change', () => {
         handleFiles(input.files)
         input.value = ''
@@ -522,71 +600,49 @@ export function initAdminApp({
       uploadSection.append(zone, input, bar)
       wrap.append(uploadSection)
 
+      // Phase 6.1: 文档列表（卡片 + 状态徽章 + 汇总条 + 轮询）
+      const docSection = document.createElement('section')
+      docSection.className = 'admin-docs-section'
       const docTitle = document.createElement('h2')
       docTitle.textContent = '文档列表'
-      wrap.append(docTitle)
+      docSection.append(docTitle)
 
-      const tableWrap = document.createElement('div')
-      tableWrap.className = 'admin-table-wrap'
-      const table = document.createElement('table')
-      table.className = 'admin-table'
-      const thead = document.createElement('thead')
-      const trHead = document.createElement('tr')
-      for (const label of ['文件名', '类型', '状态', '上传时间', '']) {
-        const th = document.createElement('th')
-        th.textContent = label
-        trHead.append(th)
-      }
-      thead.append(trHead)
-      const tbody = document.createElement('tbody')
-      table.append(thead, tbody)
-      for (const d of docs) {
-        const tr = document.createElement('tr')
-        const tdName = document.createElement('td')
-        tdName.textContent = d.file_name
-        const tdType = document.createElement('td')
-        tdType.textContent = d.file_type
-        const tdSt = document.createElement('td')
-        tdSt.append(createStatusBadge(d.status))
-        const tdTime = document.createElement('td')
-        tdTime.textContent = d.created_at || '—'
-        const tdAct = document.createElement('td')
-        const del = document.createElement('button')
-        del.type = 'button'
-        del.className = 'button-danger button-small'
-        del.textContent = '删除'
-        del.addEventListener('click', async () => {
-          const ok = await openConfirmModal({ message: `删除文档「${d.file_name}」？` })
-          if (!ok) return
-          try {
-            await api.deleteDocument(kbId, d.doc_id)
-            await renderDetail(kbId)
-          } catch (e) {
-            showFlash(e.message || String(e))
-          }
-        })
-        tdAct.append(del)
-        tr.append(tdName, tdType, tdSt, tdTime, tdAct)
-        tbody.append(tr)
-      }
+      const summaryBar = document.createElement('p')
+      summaryBar.className = 'admin-docs-summary muted'
+      summaryBar.dataset.role = 'docs-summary'
+      summaryBar.textContent = formatDocSummary(docs.length, docSummary)
+      docSection.append(summaryBar)
+
+      const docList = document.createElement('div')
+      docList.className = 'admin-docs-list'
+      docList.dataset.role = 'docs-list'
+      docSection.append(docList)
+
       if (!docs.length) {
-        const tr = document.createElement('tr')
-        const td = document.createElement('td')
-        td.colSpan = 5
-        const box = document.createElement('div')
-        box.className = 'admin-empty-inline'
+        const emptyBox = document.createElement('div')
+        emptyBox.className = 'admin-empty-inline'
         const t = document.createElement('strong')
         t.textContent = '暂无文档'
         const hint = document.createElement('p')
         hint.className = 'muted'
-        hint.textContent = '将 .docx 或 .pdf 拖到上方区域，或点击「选择文件」。单文件不超过 50MB。'
-        box.append(t, hint)
-        td.append(box)
-        tr.append(td)
-        tbody.append(tr)
+        hint.textContent = `将 ${uploadHint} 拖到上方区域，或点击「选择文件」。单文件不超过 50MB。`
+        emptyBox.append(t, hint)
+        docList.append(emptyBox)
+      } else {
+        for (const d of docs) {
+          docList.append(buildDocRow(kbId, d))
+        }
       }
-      tableWrap.append(table)
-      wrap.append(tableWrap)
+
+      wrap.append(docSection)
+
+      // 启动文档级状态轮询（如果有在途文档）
+      const pendingDocIds = docs
+        .filter((d) => isProcessingStatus(d.status))
+        .map((d) => d.doc_id)
+      if (pendingDocIds.length > 0) {
+        startDocStatusPoll(kbId, pendingDocIds)
+      }
 
       // ── Agent 工具配置面板（侧重智能推理 KB；quick KB 也可见仅作占位）──
       try {
@@ -624,6 +680,7 @@ export function initAdminApp({
 
   function renderStatus() {
     clearPoll()
+    clearDocPoll()
     activeKbId = null
     setNavActive(root, 'status')
     if (titleEl) titleEl.textContent = '系统状态'
@@ -670,10 +727,361 @@ export function initAdminApp({
     root.dataset.ready = 'true'
   })
 
+  // ── Phase 6.1：文档卡片 + 详情面板 + 轮询 ──────────────────────────────
+
+  function buildDocRow(kbId, d) {
+    const row = document.createElement('div')
+    row.className = 'admin-doc-row'
+    row.dataset.docId = d.doc_id
+    row.dataset.status = d.status
+
+    const main = document.createElement('div')
+    main.className = 'admin-doc-row__main'
+    const name = document.createElement('div')
+    name.className = 'admin-doc-row__name'
+    name.textContent = d.file_name
+    main.append(name)
+    const meta = document.createElement('div')
+    meta.className = 'admin-doc-row__meta muted'
+    const metaBits = [d.file_type || '?', `上传 ${formatDocTime(d.created_at) || '—'}`]
+    if (d.status === 'completed' && d.chunk_count) {
+      metaBits.push(`${d.chunk_count} 分块`)
+    }
+    if (d.status === 'completed' && d.processed_at) {
+      metaBits.push(`完成 ${formatDocTime(d.processed_at)}`)
+    }
+    meta.textContent = metaBits.filter(Boolean).join(' · ')
+    main.append(meta)
+    row.append(main)
+
+    const right = document.createElement('div')
+    right.className = 'admin-doc-row__right'
+    const badge = createStatusBadge(d.status, {
+      title: d.status === 'failed' ? d.error_message || '失败' : '',
+    })
+    badge.dataset.role = 'doc-status-badge'
+    right.append(badge)
+
+    // 操作区
+    const ops = document.createElement('div')
+    ops.className = 'admin-doc-row__ops'
+
+    if (d.status === 'failed') {
+      const errSpan = document.createElement('span')
+      errSpan.className = 'admin-doc-row__err'
+      errSpan.title = d.error_message || ''
+      errSpan.textContent = '错误详情'
+      errSpan.addEventListener('click', (e) => {
+        e.stopPropagation()
+        openFailedDetailModal(kbId, d)
+      })
+      ops.append(errSpan)
+      const retryBtn = document.createElement('button')
+      retryBtn.type = 'button'
+      retryBtn.className = 'button-secondary button-small'
+      retryBtn.textContent = '重试'
+      retryBtn.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        try {
+          await api.retryDocument(kbId, d.doc_id)
+          showFlash('已重新提交', 'success')
+          await renderDetail(kbId)
+        } catch (err) {
+          showFlash(err.message || String(err))
+        }
+      })
+      ops.append(retryBtn)
+    } else if (d.status === 'completed') {
+      const viewBtn = document.createElement('button')
+      viewBtn.type = 'button'
+      viewBtn.className = 'button-secondary button-small'
+      viewBtn.textContent = '查看分块'
+      viewBtn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        openDocDetailModal(kbId, d)
+      })
+      ops.append(viewBtn)
+    }
+
+    const del = document.createElement('button')
+    del.type = 'button'
+    del.className = 'button-danger button-small'
+    del.textContent = '删除'
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      const ok = await openConfirmModal({ message: `删除文档「${d.file_name}」？` })
+      if (!ok) return
+      try {
+        await api.deleteDocument(kbId, d.doc_id)
+        await renderDetail(kbId)
+      } catch (err) {
+        showFlash(err.message || String(err))
+      }
+    })
+    ops.append(del)
+    right.append(ops)
+    row.append(right)
+
+    // completed 行点空白处也能打开详情
+    if (d.status === 'completed') {
+      row.classList.add('admin-doc-row--clickable')
+      row.addEventListener('click', () => openDocDetailModal(kbId, d))
+    }
+    return row
+  }
+
+  function startDocStatusPoll(kbId, initialDocIds) {
+    clearDocPoll()
+    docPollKbId = kbId
+    docPollIds = Array.from(new Set(initialDocIds || []))
+    if (!docPollIds.length) return
+    docPollTimer = window.setInterval(async () => {
+      if (docPollKbId !== kbId || activeKbId !== kbId) {
+        clearDocPoll()
+        return
+      }
+      if (!docPollIds.length) {
+        clearDocPoll()
+        return
+      }
+      try {
+        const updates = await api.batchDocumentStatus(kbId, docPollIds)
+        applyDocStatusUpdates(updates)
+        // 把已经离开"在途"的 doc 从轮询列表中剔除；若全部完成则停止
+        const remaining = updates
+          .filter((u) => isProcessingStatus(u.status))
+          .map((u) => u.doc_id)
+        // 如果某个 id 没出现在返回里（被删除/不存在），也从轮询中剔除
+        const returned = new Set(updates.map((u) => u.doc_id))
+        docPollIds = docPollIds.filter((id) => returned.has(id) && remaining.includes(id))
+        if (docPollIds.length === 0) {
+          clearDocPoll()
+          // 全部离开在途态：刷新一次详情拿到完整 chunk_count + summary
+          await renderDetail(kbId)
+        }
+      } catch {
+        /* 单次轮询失败不中断 */
+      }
+    }, DOC_POLL_MS)
+  }
+
+  function applyDocStatusUpdates(updates) {
+    const list = outlet.querySelector('[data-role="docs-list"]')
+    if (!list) return
+    const summaryEl = outlet.querySelector('[data-role="docs-summary"]')
+    const summaryCounts = {
+      pending: 0, parsing: 0, embedding: 0, indexing: 0,
+      completed: 0, failed: 0, deleting: 0,
+    }
+    let total = 0
+    for (const update of updates) {
+      const row = list.querySelector(`[data-doc-id="${cssEscape(update.doc_id)}"]`)
+      if (!row) continue
+      row.dataset.status = update.status
+      const badge = row.querySelector('[data-role="doc-status-badge"]')
+      if (badge) {
+        const fresh = createStatusBadge(update.status, {
+          title: update.status === 'failed' ? update.error_message || '失败' : '',
+        })
+        fresh.dataset.role = 'doc-status-badge'
+        badge.replaceWith(fresh)
+      }
+    }
+    // 重新统计 summary（看 list 内所有 row 的 data-status）
+    for (const r of list.querySelectorAll('.admin-doc-row')) {
+      total += 1
+      const st = r.dataset.status
+      if (st in summaryCounts) summaryCounts[st] += 1
+    }
+    if (summaryEl && total > 0) {
+      summaryEl.textContent = formatDocSummary(total, summaryCounts)
+    }
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(s)
+    return String(s).replace(/["\\]/g, '\\$&')
+  }
+
+  function openFailedDetailModal(kbId, doc) {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    const card = document.createElement('div')
+    card.className = 'modal-card'
+    const h = document.createElement('h2')
+    h.className = 'modal-title'
+    h.textContent = `失败详情 · ${doc.file_name}`
+    const pre = document.createElement('pre')
+    pre.className = 'admin-error-pre'
+    pre.textContent = doc.error_message || '(无错误信息)'
+    const actions = document.createElement('div')
+    actions.className = 'modal-actions'
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'button-secondary'
+    close.textContent = '关闭'
+    close.addEventListener('click', () => overlay.remove())
+    const retry = document.createElement('button')
+    retry.type = 'button'
+    retry.className = 'button-primary'
+    retry.textContent = '重试'
+    retry.addEventListener('click', async () => {
+      try {
+        await api.retryDocument(kbId, doc.doc_id)
+        overlay.remove()
+        showFlash('已重新提交', 'success')
+        await renderDetail(kbId)
+      } catch (e) {
+        showFlash(e.message || String(e))
+      }
+    })
+    actions.append(close, retry)
+    card.append(h, pre, actions)
+    overlay.append(card)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove()
+    })
+    document.body.append(overlay)
+  }
+
+  async function openDocDetailModal(kbId, doc) {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    const card = document.createElement('div')
+    card.className = 'modal-card modal-card--wide admin-doc-detail-card'
+
+    const head = document.createElement('div')
+    head.className = 'admin-doc-detail-head'
+    const h = document.createElement('h2')
+    h.className = 'modal-title'
+    h.textContent = doc.file_name
+    head.append(h)
+    const sub = document.createElement('p')
+    sub.className = 'muted'
+    sub.textContent =
+      `${doc.chunk_count || 0} 分块 · 完成 ${formatDocTime(doc.processed_at) || '—'}`
+    head.append(sub)
+
+    const tabs = document.createElement('div')
+    tabs.className = 'admin-doc-tabs'
+    const tabChunks = document.createElement('button')
+    tabChunks.type = 'button'
+    tabChunks.className = 'admin-doc-tab is-active'
+    tabChunks.textContent = '分块（chunks）'
+    const tabMerged = document.createElement('button')
+    tabMerged.type = 'button'
+    tabMerged.className = 'admin-doc-tab'
+    tabMerged.textContent = '合并（merged）'
+    const tabPreview = document.createElement('button')
+    tabPreview.type = 'button'
+    tabPreview.className = 'admin-doc-tab is-disabled'
+    tabPreview.textContent = '预览（Coming soon）'
+    tabPreview.disabled = true
+    tabPreview.title = 'Phase 6.2+ 推出'
+    tabs.append(tabChunks, tabMerged, tabPreview)
+    head.append(tabs)
+
+    const body = document.createElement('div')
+    body.className = 'admin-doc-detail-body'
+    body.textContent = '加载中…'
+
+    const actions = document.createElement('div')
+    actions.className = 'modal-actions'
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'button-secondary'
+    close.textContent = '关闭'
+    close.addEventListener('click', () => overlay.remove())
+    actions.append(close)
+
+    card.append(head, body, actions)
+    overlay.append(card)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove()
+    })
+    document.body.append(overlay)
+
+    let chunks = []
+    try {
+      const res = await api.listDocumentChunks(kbId, doc.doc_id)
+      chunks = res.chunks || []
+    } catch (e) {
+      body.textContent = `加载失败：${e.message || String(e)}`
+      return
+    }
+
+    const renderChunks = () => {
+      tabChunks.classList.add('is-active')
+      tabMerged.classList.remove('is-active')
+      body.innerHTML = ''
+      if (!chunks.length) {
+        const empty = document.createElement('p')
+        empty.className = 'muted'
+        empty.textContent = '该文档没有分块内容。'
+        body.append(empty)
+        return
+      }
+      chunks.forEach((c, idx) => {
+        const block = document.createElement('section')
+        block.className = 'admin-chunk-block'
+        const meta = document.createElement('p')
+        meta.className = 'admin-chunk-meta muted'
+        meta.textContent = `分块 ${idx + 1} · ${c.char_count} 字符${c.image_count ? ` · ${c.image_count} 张图` : ''}`
+        block.append(meta)
+        if (c.title) {
+          const t = document.createElement('h4')
+          t.className = 'admin-chunk-title'
+          t.textContent = c.title
+          block.append(t)
+        }
+        const content = document.createElement('div')
+        content.className = 'admin-chunk-content'
+        content.innerHTML = renderMarkdownSafe(c.contents || '')
+        block.append(content)
+        body.append(block)
+      })
+    }
+    const renderMerged = () => {
+      tabMerged.classList.add('is-active')
+      tabChunks.classList.remove('is-active')
+      body.innerHTML = ''
+      if (!chunks.length) {
+        const empty = document.createElement('p')
+        empty.className = 'muted'
+        empty.textContent = '该文档没有分块内容。'
+        body.append(empty)
+        return
+      }
+      const merged = chunks
+        .map((c) => (c.title ? `## ${c.title}\n\n` : '') + (c.contents || ''))
+        .join('\n\n---\n\n')
+      const wrapper = document.createElement('div')
+      wrapper.className = 'admin-chunk-content'
+      wrapper.innerHTML = renderMarkdownSafe(merged)
+      body.append(wrapper)
+    }
+    tabChunks.addEventListener('click', renderChunks)
+    tabMerged.addEventListener('click', renderMerged)
+    renderChunks()
+  }
+
+  function renderMarkdownSafe(src) {
+    try {
+      if (typeof window.marked?.parse !== 'function') {
+        return sanitizeHtml(`<pre>${escapeHtml(src)}</pre>`)
+      }
+      const html = window.marked.parse(src, { mangle: false, headerIds: false })
+      return sanitizeHtml(html)
+    } catch {
+      return sanitizeHtml(`<pre>${escapeHtml(src)}</pre>`)
+    }
+  }
+
   return {
     ready,
     destroy() {
       clearPoll()
+      clearDocPoll()
       window.removeEventListener('hashchange', handleRoute)
     },
   }

@@ -128,21 +128,90 @@ class KgRepository:
         description: str,
         strength: int,
         created_at: str,
+        doc_id: str = "",
     ) -> None:
+        """Phase 6.2: 写入时记录 doc_id；老调用省略时存空字符串（与 ALTER 默认值一致）。"""
         sql = (
             "INSERT INTO kg_relations "
-            "(kb_id, source_id, target_id, relation_type, description, strength, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+            "(kb_id, source_id, target_id, relation_type, description, strength, doc_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         )
         with self._provider.connect() as conn:
             conn.execute(
                 adapt_sql(sql, self._provider),
-                (kb_id, source_id, target_id, relation_type, description, strength, created_at),
+                (kb_id, source_id, target_id, relation_type, description, strength,
+                 doc_id, created_at),
             )
 
     # ------------------------------------------------------------------
     # 批量 / 统计
     # ------------------------------------------------------------------
+
+    def delete_by_doc(self, kb_id: str, doc_id: str) -> tuple[int, int]:
+        """Phase 6.2: 删除某 doc 的 KG 数据。
+
+        实现：
+          1. 按 (kb_id, doc_id) 删 relations
+          2. 实体的 chunk_ids 是 JSON 字符串数组（chunk.id 列表）。我们没法在 SQL
+             里高效"按 doc_stem 过滤 chunk_ids 数组"——chunk.id 形如
+             "{doc_stem}_section_N" / "{doc_stem}_step_N"，但 doc_stem 不直接等于
+             doc_id 的后缀。所以这一阶段实现策略：调用方在 ingest 流程里调
+             update_entity_chunks 把 doc 的 chunk_ids 从实体里去除；本方法仅做
+             relations 删除 + 清理孤儿实体（chunk_ids 为 '[]'）。
+
+        老数据兼容：doc_id='' 的旧关系/实体不受影响。
+
+        返回 (relations_deleted, entities_deleted)。
+        """
+        if not doc_id:
+            return 0, 0
+        with self._provider.connect() as conn:
+            rel_count_cur = conn.execute(
+                adapt_sql(
+                    "SELECT COUNT(*) AS cnt FROM kg_relations WHERE kb_id=? AND doc_id=?",
+                    self._provider,
+                ),
+                (kb_id, doc_id),
+            )
+            rel_row = fetch_one_as_dict(rel_count_cur)
+            rel_count = int(rel_row["cnt"]) if rel_row else 0
+
+            conn.execute(
+                adapt_sql(
+                    "DELETE FROM kg_relations WHERE kb_id=? AND doc_id=?",
+                    self._provider,
+                ),
+                (kb_id, doc_id),
+            )
+
+            # 删除孤儿实体：chunk_ids 是 '[]' 或空字符串
+            ent_count_cur = conn.execute(
+                adapt_sql(
+                    "SELECT COUNT(*) AS cnt FROM kg_entities "
+                    "WHERE kb_id=? AND (chunk_ids='[]' OR chunk_ids='' OR chunk_ids IS NULL)",
+                    self._provider,
+                ),
+                (kb_id,),
+            )
+            ent_row = fetch_one_as_dict(ent_count_cur)
+            ent_count = int(ent_row["cnt"]) if ent_row else 0
+
+            conn.execute(
+                adapt_sql(
+                    "DELETE FROM kg_entities "
+                    "WHERE kb_id=? AND (chunk_ids='[]' OR chunk_ids='' OR chunk_ids IS NULL)",
+                    self._provider,
+                ),
+                (kb_id,),
+            )
+            return rel_count, ent_count
+
+    def list_entities_for_kb(self, kb_id: str) -> list[dict[str, Any]]:
+        """Phase 6.2: 列出某 KB 下所有实体（id + chunk_ids JSON），用于按 doc 清理 chunk_ids。"""
+        sql = "SELECT id, chunk_ids FROM kg_entities WHERE kb_id=?"
+        with self._provider.connect() as conn:
+            cur = conn.execute(adapt_sql(sql, self._provider), (kb_id,))
+            return fetch_all_as_dicts(cur)
 
     def delete_all_for_kb(self, kb_id: str) -> tuple[int, int]:
         """删除 kb_id 下所有实体+关系；返回 (relations_count, entities_count)。

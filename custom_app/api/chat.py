@@ -11,6 +11,34 @@ from custom_app.services.session_store import (
     list_messages as list_messages_for_agent,
 )
 
+# ============================================================
+# Phase 7 backlog: 多模型切换支持（参考 WeKnora）
+# ------------------------------------------------------------
+# 目标：让用户在前端会话顶部下拉切换"思考/对话模型"，例如：
+#   - gpt-oss-120b（OpenAI 兼容/vLLM 后端）
+#   - claude-haiku-4-5
+#   - gemini-2.0-flash（当前默认）
+#
+# 实施要点（按落地顺序）：
+# 1. 后端配置（servers/generation/parameter.yaml 或 custom_app 专属配置）：
+#       chat_models:
+#         - id: gemini-2.0-flash
+#           backend: gemini
+#           env_required: [GOOGLE_API_KEY]
+#         - id: gpt-oss-120b
+#           backend: openai_compat
+#           base_url: https://...
+#           env_required: [ULTRARAG_OPENAI_API_KEY]
+# 2. 新增 GET /api/chat/models 列表端点；前端 admin/chat 页缓存。
+# 3. POST /api/chat/stream 接收 model_id 字段；按 id 在 LLMAdapter 工厂里
+#    选择 GeminiLLMAdapter / OpenAICompatAdapter 等具体实现。
+# 4. AgentRunner.__init__ 增加 model_id 参数，_runners/_agent_runners 池
+#    要按 (kb_id, model_id) 联合 key 缓存，避免不同模型互踩状态。
+# 5. messages_to_gemini_contents 等适配函数当前只服务 Gemini，OpenAI 兼容
+#    后端需要另一套 messages 转换（OpenAI 标准 tool_calls/tool role 已满足）。
+# 6. 前端 chat.html / admin.html 加模型选择器（参考用户截图样式：远程 / 本地标签）。
+# ============================================================
+
 chat_bp = Blueprint("chat_api", __name__)
 logger = logging.getLogger(__name__)
 
@@ -33,21 +61,38 @@ def _get_runner(kb_id: str) -> RagRunner:
 
 
 def _get_agent_runner(kb_id: str):
-    """返回与 kb_id 绑定的 AgentRunner，首次调用时复用 RagRunner 的 FAISS 索引与语料。"""
+    """返回与 kb_id 绑定的 AgentRunner，首次调用时复用 RagRunner 的向量存储与语料。"""
     from custom_app.services.agent_runner import AgentRunner
 
     with _agent_runners_lock:
         if kb_id not in _agent_runners:
-            # 复用 RagRunner 已加载的 rows/index，避免二次磁盘读取
+            # 复用 RagRunner 已加载的 rows / vector_store，避免二次磁盘读取
             rag = _get_runner(kb_id)
             ar = AgentRunner(kb_id=kb_id)
             ar.init(
                 rows=rag._rows,
                 index=rag._index,
                 kb_name=kb_id,
+                vector_store=getattr(rag, "_vector_store", None),
+                # 复用 RagRunner 的 _build_sources：它知道如何把图片转 base64 data URL，
+                # agent 模式的最终答案才能挂图（否则 SSE 只发文本）。
+                source_builder=rag._build_sources,
             )
             _agent_runners[kb_id] = ar
         return _agent_runners[kb_id]
+
+
+def invalidate_runner_cache(kb_id: str) -> None:
+    """重建索引后必须调用，否则 RagRunner / AgentRunner 仍持有旧的 rows / FAISS 引用，
+    新上传的文档查不到、被删除的文档可能仍在召回。
+
+    线程安全：分别拿两把锁，避免与 _get_runner / _get_agent_runner 竞争。
+    """
+    with _runners_lock:
+        _runners.pop(kb_id, None)
+    with _agent_runners_lock:
+        _agent_runners.pop(kb_id, None)
+    logger.info("invalidate_runner_cache kb_id=%s: runners evicted", kb_id)
 
 
 def _compact_reasoning_event(event: dict) -> dict:

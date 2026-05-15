@@ -23,6 +23,7 @@ export function normalizeKnowledgeBase(raw = {}) {
     id: kbId,
     name: raw.name || kbId || '未命名知识库',
     status: raw.status || '',
+    type: raw.type || 'sop_docx',
     description: raw.description || '',
     created_at: raw.created_at || '',
     updated_at: raw.updated_at || '',
@@ -41,10 +42,23 @@ export function normalizeDocument(raw = {}) {
     channel: raw.channel || '',
     status: raw.status || '',
     error_message: raw.error_message || '',
+    // Phase 6.1
+    chunk_count: Number(raw.chunk_count) || 0,
+    processed_at: raw.processed_at || '',
     created_at: raw.created_at || '',
     updated_at: raw.updated_at || '',
   }
 }
+
+const EMPTY_DOC_SUMMARY = Object.freeze({
+  pending: 0,
+  parsing: 0,
+  embedding: 0,
+  indexing: 0,
+  completed: 0,
+  failed: 0,
+  deleting: 0,
+})
 
 async function readApiError(response) {
   try {
@@ -149,22 +163,94 @@ export async function deleteKnowledgeBase(kbId, { hard = false, adminToken } = {
 }
 
 /**
- * 文档列表。
+ * 文档列表（Phase 6.1：含 summary 派生字段）。
+ *
+ * 返回：{ documents: NormalizedDocument[], summary: { pending, parsing, ... } }
  */
-export async function listDocuments(kbId, { limit = 100, offset = 0, adminToken } = {}) {
+export async function listDocuments(kbId, { adminToken } = {}) {
   const url = new URL(
     `${DEFAULT_KB_ENDPOINT}/${encodeURIComponent(kbId)}/documents`,
     window.location.origin,
   )
-  url.searchParams.set('limit', String(limit))
-  url.searchParams.set('offset', String(offset))
   const response = await fetch(url.pathname + url.search, {
     headers: adminHeaders(adminToken),
   })
   if (!response.ok) throw new Error(await readApiError(response))
   const body = await response.json()
+  const data = body.data || {}
+  // 兼容老格式：旧后端直接返回数组（如老的 e2e fixture）
+  if (Array.isArray(data)) {
+    return {
+      documents: data.map(normalizeDocument),
+      summary: { ...EMPTY_DOC_SUMMARY },
+    }
+  }
+  const docs = Array.isArray(data.documents) ? data.documents.map(normalizeDocument) : []
+  return {
+    documents: docs,
+    summary: { ...EMPTY_DOC_SUMMARY, ...(data.summary || {}) },
+  }
+}
+
+/**
+ * Phase 6.1：批量取指定 doc_ids 的最新状态（前端轮询用）。
+ */
+export async function batchDocumentStatus(kbId, docIds, { adminToken } = {}) {
+  if (!Array.isArray(docIds) || docIds.length === 0) return []
+  const url = new URL(
+    `${DEFAULT_KB_ENDPOINT}/${encodeURIComponent(kbId)}/documents/batch-status`,
+    window.location.origin,
+  )
+  const response = await fetch(url.pathname + url.search, {
+    method: 'POST',
+    headers: jsonHeaders(adminToken),
+    body: JSON.stringify({ doc_ids: docIds }),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  const body = await response.json()
   const items = Array.isArray(body.data) ? body.data : []
-  return items.map(normalizeDocument)
+  return items.map((it) => ({
+    doc_id: it.doc_id || '',
+    status: it.status || '',
+    error_message: it.error_message || '',
+    chunk_count: Number(it.chunk_count) || 0,
+    processed_at: it.processed_at || '',
+    updated_at: it.updated_at || '',
+  }))
+}
+
+/**
+ * Phase 6.1：单文档失败重试。
+ */
+export async function retryDocument(kbId, docId, { adminToken } = {}) {
+  const response = await fetch(
+    `${DEFAULT_KB_ENDPOINT}/${encodeURIComponent(kbId)}/documents/${encodeURIComponent(docId)}/retry`,
+    { method: 'POST', headers: jsonHeaders(adminToken) },
+  )
+  if (!response.ok) throw new Error(await readApiError(response))
+  const body = await response.json()
+  return body.data
+}
+
+/**
+ * Phase 6.1：取该文档的全部 chunk（详情面板用）。
+ */
+export async function listDocumentChunks(kbId, docId, { adminToken } = {}) {
+  const url = new URL(
+    `${DEFAULT_KB_ENDPOINT}/${encodeURIComponent(kbId)}/documents/${encodeURIComponent(docId)}/chunks`,
+    window.location.origin,
+  )
+  const response = await fetch(url.pathname + url.search, {
+    headers: adminHeaders(adminToken),
+  })
+  if (!response.ok) throw new Error(await readApiError(response))
+  const body = await response.json()
+  const data = body.data || {}
+  return {
+    doc_id: data.doc_id || docId,
+    doc_stem: data.doc_stem || '',
+    chunks: Array.isArray(data.chunks) ? data.chunks : [],
+  }
 }
 
 /**

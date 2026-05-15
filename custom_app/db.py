@@ -71,6 +71,9 @@ def init_db() -> None:
               channel TEXT NOT NULL DEFAULT 'api',
               status TEXT NOT NULL DEFAULT 'pending',
               error_message TEXT DEFAULT '',
+              -- Phase 6.1: per-document tracking. ALTER 迁移补在 init_db 末尾。
+              processed_at TEXT DEFAULT NULL,
+              chunk_count INTEGER NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
               UNIQUE (kb_id, doc_id)
@@ -159,6 +162,9 @@ def init_db() -> None:
               relation_type TEXT NOT NULL,
               description TEXT DEFAULT '',
               strength INTEGER DEFAULT 5,
+              -- Phase 6.2: per-document scope for single-file reindex/delete.
+              -- Old rows missing this column get '' via ALTER 迁移；老关系按 doc 删时会跳过。
+              doc_id TEXT DEFAULT '',
               created_at TEXT NOT NULL
             );
 
@@ -185,6 +191,28 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE knowledge_bases "
                 "ADD COLUMN type TEXT NOT NULL DEFAULT 'sop_docx'"
+            )
+
+        # Phase 6.1 迁移：kb_documents 加 processed_at / chunk_count 列。
+        # 与 Postgres migrations/postgres/001_phase6_1_doc_status.sql 对齐。
+        cur = conn.execute("PRAGMA table_info(kb_documents)")
+        doc_cols = {row["name"] for row in cur.fetchall()}
+        if "processed_at" not in doc_cols:
+            conn.execute(
+                "ALTER TABLE kb_documents ADD COLUMN processed_at TEXT DEFAULT NULL"
+            )
+        if "chunk_count" not in doc_cols:
+            conn.execute(
+                "ALTER TABLE kb_documents ADD COLUMN chunk_count INTEGER NOT NULL DEFAULT 0"
+            )
+
+        # Phase 6.2 迁移：kg_relations 加 doc_id 列，支持单文档级 KG 清理。
+        # 与 Postgres migrations/postgres/002_phase6_2_kg_doc_id.sql 对齐。
+        cur = conn.execute("PRAGMA table_info(kg_relations)")
+        rel_cols = {row["name"] for row in cur.fetchall()}
+        if "doc_id" not in rel_cols:
+            conn.execute(
+                "ALTER TABLE kg_relations ADD COLUMN doc_id TEXT DEFAULT ''"
             )
 
 

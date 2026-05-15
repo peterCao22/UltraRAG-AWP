@@ -89,6 +89,7 @@ class SqliteKgStore:
         description: str,
         strength: int,
         created_at: str,
+        doc_id: str = "",
     ) -> None:
         self._repo.insert_relation(
             kb_id=kb_id,
@@ -98,10 +99,15 @@ class SqliteKgStore:
             description=description,
             strength=strength,
             created_at=created_at,
+            doc_id=doc_id,
         )
 
     def delete_all_for_kb(self, kb_id: str) -> tuple[int, int]:
         return self._repo.delete_all_for_kb(kb_id)
+
+    def delete_by_doc(self, kb_id: str, doc_id: str) -> tuple[int, int]:
+        """Phase 6.2: 委托给 KgRepository.delete_by_doc。"""
+        return self._repo.delete_by_doc(kb_id, doc_id)
 
     def count_entities_and_relations(
         self, kb_id: Optional[str] = None

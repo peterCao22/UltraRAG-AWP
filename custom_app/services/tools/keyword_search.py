@@ -12,7 +12,10 @@ class KeywordSearchTool:
         "type": "function",
         "function": {
             "name": "keyword_search",
-            "description": "在知识库中进行关键词精确匹配搜索，适合查找特定术语或型号。",
+            "description": (
+                "在知识库中进行关键词精确匹配搜索，适合查找特定术语或型号。"
+                "【幂等】同一 keywords 多次调用结果完全一致，禁止以相同参数重复调用。"
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {

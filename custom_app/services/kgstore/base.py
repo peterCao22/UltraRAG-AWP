@@ -92,11 +92,25 @@ class KgStore(Protocol):
         description: str,
         strength: int,
         created_at: str,
+        doc_id: str = "",
     ) -> None:
+        """Phase 6.2: doc_id 标记关系来源文档，便于按 doc 删除；老调用可省略。"""
         ...
 
     def delete_all_for_kb(self, kb_id: str) -> tuple[int, int]:
         """删除某 KB 下所有实体+关系；返回 (relation_count, entity_count)。"""
+        ...
+
+    def delete_by_doc(self, kb_id: str, doc_id: str) -> tuple[int, int]:
+        """Phase 6.2: 删除某 doc 的 KG 数据。
+
+        实现要点：
+            1. 删除该 doc 的所有 relation（按 (kb_id, doc_id) 过滤）
+            2. 实体的 chunk_ids 移除该 doc 的 chunk ids；chunk_ids 为空时实体也删
+        返回 (relations_deleted, entities_deleted)。
+
+        老数据兼容：doc_id 为空字符串的旧关系/实体不会被这个方法影响。
+        """
         ...
 
     def count_entities_and_relations(

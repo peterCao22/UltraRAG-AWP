@@ -3,16 +3,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initAdminApp } from '../admin.js'
 
 function mockKbApi(overrides = {}) {
+  // Phase 6.1：默认 listDocuments 返回 {documents, summary} 形状
+  const emptyBundle = {
+    documents: [],
+    summary: {
+      pending: 0, parsing: 0, embedding: 0, indexing: 0,
+      completed: 0, failed: 0, deleting: 0,
+    },
+  }
   return {
+    batchDocumentStatus: vi.fn().mockResolvedValue([]),
     listKnowledgeBases: vi.fn().mockResolvedValue([]),
     createKnowledgeBase: vi.fn(),
     createIngestJob: vi.fn(),
     deleteDocument: vi.fn(),
     deleteKnowledgeBase: vi.fn(),
+    getAgentConfig: vi.fn().mockResolvedValue({ all_tools: [], enabled_tools: [] }),
     getJobProgress: vi.fn(),
     getKnowledgeBase: vi.fn(),
-    listDocuments: vi.fn(),
+    listDocumentChunks: vi.fn().mockResolvedValue({ chunks: [], doc_id: '', doc_stem: '' }),
+    listDocuments: vi.fn().mockResolvedValue(emptyBundle),
     listJobs: vi.fn(),
+    retryDocument: vi.fn(),
+    updateAgentConfig: vi.fn(),
     uploadKbDocuments: vi.fn(),
     ...overrides,
   }
@@ -74,7 +87,13 @@ describe('initAdminApp', () => {
         status: 'active',
         document_count: 0,
       }),
-      listDocuments: vi.fn().mockResolvedValue([]),
+      listDocuments: vi.fn().mockResolvedValue({
+        documents: [],
+        summary: {
+          pending: 0, parsing: 0, embedding: 0, indexing: 0,
+          completed: 0, failed: 0, deleting: 0,
+        },
+      }),
       listJobs: vi.fn().mockResolvedValue([]),
     })
     const app = initAdminApp({ root, kbApi })
@@ -100,4 +119,5 @@ describe('initAdminApp', () => {
     expect(sidebar.classList.contains('is-open')).toBe(false)
     app.destroy()
   })
+
 })

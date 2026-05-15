@@ -303,6 +303,111 @@ RETURN e, r, n LIMIT 20;
 
 ---
 
+## F. Phase 6.1 文档级状态显示 + 详情面板（约 15 分钟）
+
+> 目标：验证每个文档卡片显示独立状态、失败可重试、完成可查看分块，
+> 以及 Flask 异常重启后卡死状态被恢复。
+
+**前置**：
+
+- 已跑过 §A.1 / §A.2，conda env `ultrarag` 可用
+- 已对老 Postgres 库执行迁移：
+  ```bash
+  psql "$ULTRARAG_POSTGRES_URI" -f migrations/postgres/001_phase6_1_doc_status.sql
+  ```
+  （SQLite 后端无需手工迁移，`init_db()` 会自动 ALTER）
+
+### F.1 状态实时流转（必过）
+
+1. `python -m custom_app.app --port 8080`，打开 `http://localhost:8080/admin`
+2. 进入一个已有的 KB（或新建一个 SOP KB 上传 3 份 DOCX）
+3. 点击「重建索引」
+4. 文档列表区域应出现「N 已完成 · N 解析中 · …」的汇总条
+5. 每行卡片右上角按 1.5-2s 频率刷新徽章：`待处理 → 解析中… → 嵌入中… → 写入索引… → 已完成`
+6. 完成态行的 meta 文本应出现「{chunk_count} 分块 · 完成 {时间}」
+
+**通过判据**：
+
+- [ x] 汇总条文字随状态变化
+- [x ] 每行状态徽章带 spinner（处理中态）/ 绿色徽章（完成）
+- [ x] 完成后 chunk_count 正确（与 chunks.jsonl 中相同 doc_stem 的行数一致）
+
+### F.2 失败文件的错误信息 + 重试（必过）
+
+1. 在该 KB 下放一个明显损坏的文件，例如复制一个 `.docx` 文件但内容只有 `not a real docx`
+2. 点击「重建索引」
+3. 该文件行应变为红色「失败」徽章，旁边出现「错误详情」和「重试」按钮
+4. 鼠标悬停徽章应能看到 `error_message` tooltip（截断到 500 字符）
+5. 点击「错误详情」弹出模态显示完整错误堆栈摘要
+6. 点击模态里的「重试」（或行尾的「重试」按钮）
+
+**通过判据**：
+
+- [ x] 失败行显著区分（红色徽章 + 错误链接）
+- [x ] 错误信息可读（不是 `unknown error`）
+- [x ] 「重试」后该行回到 `pending → parsing → …`
+
+### F.3 完成文档的详情面板（必过）
+
+1. 找一个「已完成」状态的行，点击空白处 / 「查看分块」按钮
+2. 模态打开，标题是文件名，副标题显示 `{N} 分块 · 完成 {时间}`
+3. 默认 chunks tab 显示分块列表：每块「分块 N · {字符数} 字符」+ markdown 渲染内容
+4. 切到 merged tab，所有 chunks 顺序拼接显示
+5. preview tab 是 disabled 状态、显示 "Coming soon" 提示（Phase 6.2+ 推出）
+
+**通过判据**：
+
+- [ x] chunks tab 至少能看到第一块的 markdown 渲染（不是裸 HTML）
+- [ x] merged tab 拼接结果与 KB 的 chunks.jsonl 顺序一致
+- [ x] preview tab 不可点（disabled）
+
+### F.4 进程崩溃后的卡死恢复（必过）
+
+1. 触发「重建索引」，立刻 `Ctrl-C` 杀掉 Flask 进程
+2. 不修改任何数据，直接重启：`python -m custom_app.app --port 8080`
+3. 刷新 `/admin` 进入该 KB 详情页
+4. 启动时跑过的 `recover_stale_documents` 会把停留在 `parsing/embedding/indexing/deleting`
+   超过 10 分钟的行标 `failed`，错误信息为「进程异常中断，请重试」
+5. **加速验证**：如果不想等 10 分钟，设环境变量 `ULTRARAG_DOC_STALE_MINUTES=1` 再重启 Flask，
+   1 分钟前的卡死行会立即转 failed
+
+**通过判据**：
+
+- [x ] 重启后被卡死的文档行变为「失败」+ 错误信息
+- [ x] 「重试」按钮可用，点击后能进入新的 ingest 流程
+
+### F.5 API 自检（可选，2 分钟）
+
+```bash
+KB=your_kb_id
+curl -s "http://localhost:8080/api/kb/$KB/documents" | jq '.data.summary'
+# {"completed": 3, "failed": 1, "parsing": 0, ...}
+
+# 拉某文档的 chunks 看格式
+DID=$(curl -s "http://localhost:8080/api/kb/$KB/documents" | jq -r '.data.documents[0].doc_id')
+curl -s "http://localhost:8080/api/kb/$KB/documents/$DID/chunks" | jq '.data.chunks | length'
+
+# batch-status 轮询接口
+curl -s -X POST "http://localhost:8080/api/kb/$KB/documents/batch-status" \
+  -H 'Content-Type: application/json' \
+  -d "{\"doc_ids\":[\"$DID\"]}" | jq '.data'
+```
+
+**通过判据**：
+
+- [ ] `data.summary` 字段存在且数字合理
+- [ ] 拉某文档 chunks 不会越权返回其它文档的块
+
+### F.6 Phase 6.1 自动化测试（5 分钟）
+
+```bash
+& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" -m pytest tests/test_phase6_1_doc_status.py tests/test_phase6_1_ingest_per_doc.py -q
+```
+
+**期望**：14 个用例全过。
+
+---
+
 ## 最终结论
 
 ```

@@ -63,7 +63,11 @@ def _call_gemini_json(system_prompt: str, text: str, max_retries: int = 3) -> di
 
     api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("ULTRARAG_GEMINI_API_KEY") or ""
     model = os.environ.get("ULTRARAG_GEMINI_MODEL", "gemini-2.0-flash")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
 
     body = {
         "systemInstruction": {"parts": [{"text": system_prompt}]},
@@ -76,7 +80,7 @@ def _call_gemini_json(system_prompt: str, text: str, max_retries: int = 3) -> di
 
     for attempt in range(max_retries):
         try:
-            resp = requests.post(url, json=body, timeout=60)
+            resp = requests.post(url, json=body, headers=headers, timeout=60)
             resp.raise_for_status()
             result = resp.json()
             candidates = result.get("candidates") or []

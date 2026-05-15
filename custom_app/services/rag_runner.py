@@ -186,20 +186,35 @@ class RagRunner:
         """
         拆分 chunk 内容中的正文与图片路径列表。
 
+        支持两种存储格式：
+          1. 旧版：正文末尾附 "\n[IMAGES]\n" 分隔区块，之后每行一个路径。
+          2. 新版（docx_parser Phase 3+）：contents 正文内嵌 "[IMG: path]" 行；
+             同时 chunk JSON 的 "images" 字段也存有路径（由 _build_sources 处理）。
+
         参数:
-            contents: 原始内容字符串，可能包含 [IMAGES] 区块。
+            contents: 原始内容字符串。
         返回:
-            tuple[str, List[str]]: (正文文本, 图片相对路径列表)。
+            tuple[str, List[str]]: (去掉图片标记后的正文, 图片相对路径列表)。
         """
-        # chunks.jsonl 中 contents 末尾可能拼接 [IMAGES] 区块，这里拆正文和图片路径
         raw = contents or ""
-        if IMAGES_MARK not in raw:
-            return raw.strip(), []
-        # 通过IMAGES_MARK分割，text_part是正文部分，image_part是图片路径部分
-        text_part, image_part = raw.split(IMAGES_MARK, 1)
-        # 按换行切断，获取多张图片路径
-        images = [ln.strip() for ln in image_part.splitlines() if ln.strip()]
-        return text_part.strip(), images
+
+        # 格式1：\n[IMAGES]\n 分隔区块
+        if IMAGES_MARK in raw:
+            text_part, image_part = raw.split(IMAGES_MARK, 1)
+            images = [ln.strip() for ln in image_part.splitlines() if ln.strip()]
+            return text_part.strip(), images
+
+        # 格式2：行内 [IMG: path] 标记，把图片行提取出来，正文里剔除
+        _IMG_LINE_RE = re.compile(r"^\[IMG:\s*(.+?)\]\s*$")
+        text_lines: List[str] = []
+        images: List[str] = []
+        for line in raw.splitlines():
+            m = _IMG_LINE_RE.match(line.strip())
+            if m:
+                images.append(m.group(1).strip())
+            else:
+                text_lines.append(line)
+        return "\n".join(text_lines).strip(), images
 
     def _image_path_to_data_url(self, img_rel: str) -> str:
         """
@@ -242,6 +257,9 @@ class RagRunner:
             plain_text, image_paths = self._split_contents_and_images(
                 row.get("contents", "")
             )
+            # 若 contents 内无图片标记，回退读 chunk JSON 顶层 "images" 字段
+            if not image_paths:
+                image_paths = [p for p in (row.get("images") or []) if p]
             images_b64 = []
             for p in image_paths:
                 data_url = self._image_path_to_data_url(p)
@@ -441,16 +459,16 @@ class RagRunner:
 
     def _format_display_heading(self, row: Dict[str, Any]) -> str:
         """
-        面向前端的章节标题：步骤用「第 N 步」，避免重复冗长的「Doc | STEP N」技术标题。
+        面向前端的章节标题：去掉「Doc | 」前缀，保留文档原始步骤标签（如 STEP 1）。
+
+        例：「BatteryChangeSequenceSOP | STEP 1」→「STEP 1」
+        非步骤块去前缀后若与 doc 相同，返回「流程说明」。
         """
-        step = self._parse_step_number(row)
-        if step is not None:
-            return f"第 {step} 步"
         doc = (row.get("doc") or "").strip()
         title = (row.get("title") or "").strip()
         prefix = f"{doc} | " if doc else ""
         if prefix and title.startswith(prefix):
-            tail = title[len(prefix) :].strip()
+            tail = title[len(prefix):].strip()
             if tail:
                 title = tail
         if doc and title == doc:
@@ -651,7 +669,9 @@ class RagRunner:
                     % (heading, sid_note, excerpt)
                 )
             source_id = src.get("source_id", "")
-            blocks.append({"type": "text", "source_id": source_id, "content": f"### {heading}\n\n{zh}"})
+            # 用 ## 级标题呈现章节名，与 WeKnora 风格保持一致
+            display = f"## {heading}\n\n{zh}" if heading and heading != "(untitled)" else zh
+            blocks.append({"type": "text", "source_id": source_id, "content": display})
             if self._section_text_allows_images(zh):
                 for img_idx, data_url in enumerate(src.get("images") or []):
                     blocks.append(
@@ -685,6 +705,11 @@ class RagRunner:
                 continue
             row = self._rows[idx]
             plain_text, _ = self._split_contents_and_images(row.get("contents", ""))
+            # 剥掉 contents 开头的「STEP N:」或「步骤 N：」前缀，避免 LLM 翻译时将其
+            # 带入答案（标题已由 _format_display_heading 单独生成，无需在内容中重复）
+            plain_text = re.sub(
+                r"^(?:STEP|步骤)\s*\d+\s*[：:]\s*", "", plain_text, count=1, flags=re.IGNORECASE
+            )
             passages.append({
                 "title": row.get("title", ""),
                 "contents": plain_text,
@@ -761,6 +786,9 @@ class RagRunner:
             "top_p": self._chat_cfg["top_p"],
             "max_tokens": self._chat_cfg["max_tokens"],
         }
+        # 若配置了 chat_template_kwargs（如 Qwen3 关闭 thinking），注入请求体
+        if self._chat_cfg.get("chat_template_kwargs"):
+            payload["chat_template_kwargs"] = self._chat_cfg["chat_template_kwargs"]
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self._chat_cfg['api_key']}",
@@ -1379,6 +1407,12 @@ class RagRunner:
         keyword_hit_ids = self._keyword_match_hit_ids(q)
         hit_ids = self._merge_preferred_hit_ids(keyword_hit_ids, hit_ids)
         hit_ids, rerank_meta = self._rerank_hit_ids(rewritten_q, hit_ids)
+        # Rerank 后必须把 keyword 精确命中重新顶到最前：CrossEncoder 只按语义相似度
+        # 排，不知道用户输入的英文短语本身就是高置信检索键。否则像
+        # "PH Box Presence UDC" 与 "Error UDC Presence" 这种关键词高度重叠的告警，
+        # 容易被 rerank 互换顺序，让 LLM 把另一份文档当作主答案。
+        if keyword_hit_ids:
+            hit_ids = self._merge_preferred_hit_ids(keyword_hit_ids, hit_ids)
         final_k_cfg = int(self._final_top_k)
         if final_k_cfg > 0:
             final_k = max(1, min(final_k_cfg, len(hit_ids)))

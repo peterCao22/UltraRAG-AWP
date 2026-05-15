@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS kb_documents (
   channel       TEXT NOT NULL DEFAULT 'api',
   status        TEXT NOT NULL DEFAULT 'pending',
   error_message TEXT DEFAULT '',
+  -- Phase 6.1: per-document tracking. For existing deployments these are
+  -- added by migrations/postgres/001_phase6_1_doc_status.sql.
+  processed_at  TIMESTAMPTZ,
+  chunk_count   INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,
   UNIQUE (kb_id, doc_id)
@@ -238,6 +242,8 @@ CREATE TABLE IF NOT EXISTS kg_relations (
   relation_type TEXT NOT NULL,
   description   TEXT DEFAULT '',
   strength      INTEGER DEFAULT 5,
+  -- Phase 6.2: per-document scope; old rows get '' via migration script.
+  doc_id        TEXT DEFAULT '',
   created_at    TEXT NOT NULL
 );
 
