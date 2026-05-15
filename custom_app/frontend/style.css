@@ -1894,3 +1894,38 @@ a {
   word-break: break-word;
 }
 
+/* ───────────────────────── Phase 6.2: 单文件重建 + 批量工具栏 ───────────────────────── */
+
+.admin-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+  padding: 6px var(--space-sm);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.admin-bulk-toolbar__select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.admin-bulk-toolbar__count {
+  font-size: 12px;
+}
+
+.admin-doc-row__cb {
+  margin-right: 4px;
+  cursor: pointer;
+}
+
+.admin-doc-row__cb:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+

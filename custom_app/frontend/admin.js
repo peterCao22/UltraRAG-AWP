@@ -9,6 +9,7 @@ import { sanitizeHtml } from './utils/sanitizeHtml.js'
 import { isAllowedKbUploadFile, getAcceptAttr, getUploadHint } from './utils/uploadGuards.js'
 import {
   batchDocumentStatus,
+  batchReindexDocuments,
   createIngestJob,
   createKnowledgeBase,
   deleteDocument,
@@ -20,6 +21,7 @@ import {
   listDocuments,
   listJobs,
   listKnowledgeBases,
+  reindexDocument,
   retryDocument,
   updateAgentConfig,
   uploadKbDocuments,
@@ -27,6 +29,7 @@ import {
 
 const defaultKbApi = {
   batchDocumentStatus,
+  batchReindexDocuments,
   listKnowledgeBases,
   createKnowledgeBase,
   createIngestJob,
@@ -38,6 +41,7 @@ const defaultKbApi = {
   listDocumentChunks,
   listDocuments,
   listJobs,
+  reindexDocument,
   retryDocument,
   updateAgentConfig,
   uploadKbDocuments,
@@ -601,6 +605,7 @@ export function initAdminApp({
       wrap.append(uploadSection)
 
       // Phase 6.1: 文档列表（卡片 + 状态徽章 + 汇总条 + 轮询）
+      // Phase 6.2: 增加批量工具栏（全选 / 重建所选 / 删除所选）
       const docSection = document.createElement('section')
       docSection.className = 'admin-docs-section'
       const docTitle = document.createElement('h2')
@@ -612,6 +617,10 @@ export function initAdminApp({
       summaryBar.dataset.role = 'docs-summary'
       summaryBar.textContent = formatDocSummary(docs.length, docSummary)
       docSection.append(summaryBar)
+
+      // Phase 6.2: 批量工具栏
+      const bulkBar = buildBulkToolbar(kbId)
+      docSection.append(bulkBar)
 
       const docList = document.createElement('div')
       docList.className = 'admin-docs-list'
@@ -628,6 +637,7 @@ export function initAdminApp({
         hint.textContent = `将 ${uploadHint} 拖到上方区域，或点击「选择文件」。单文件不超过 50MB。`
         emptyBox.append(t, hint)
         docList.append(emptyBox)
+        bulkBar.hidden = true
       } else {
         for (const d of docs) {
           docList.append(buildDocRow(kbId, d))
@@ -728,12 +738,126 @@ export function initAdminApp({
   })
 
   // ── Phase 6.1：文档卡片 + 详情面板 + 轮询 ──────────────────────────────
+  // ── Phase 6.2：批量工具栏 + 单文件重建按钮 ─────────────────────────────
+
+  function getSelectedDocIds() {
+    return Array.from(
+      outlet.querySelectorAll('[data-role="doc-select"]:checked'),
+    ).map((cb) => cb.dataset.docId)
+  }
+
+  function updateBulkToolbar() {
+    const bar = outlet.querySelector('[data-role="bulk-toolbar"]')
+    if (!bar) return
+    const ids = getSelectedDocIds()
+    const countEl = bar.querySelector('[data-role="bulk-count"]')
+    const reBtn = bar.querySelector('[data-role="bulk-reindex"]')
+    const delBtn = bar.querySelector('[data-role="bulk-delete"]')
+    if (countEl) countEl.textContent = ids.length ? `已选 ${ids.length}` : ''
+    if (reBtn) reBtn.disabled = ids.length === 0
+    if (delBtn) delBtn.disabled = ids.length === 0
+  }
+
+  function buildBulkToolbar(kbId) {
+    const bar = document.createElement('div')
+    bar.className = 'admin-bulk-toolbar'
+    bar.dataset.role = 'bulk-toolbar'
+
+    const selectAll = document.createElement('label')
+    selectAll.className = 'admin-bulk-toolbar__select-all'
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.dataset.role = 'bulk-select-all'
+    cb.addEventListener('change', () => {
+      const checked = cb.checked
+      outlet
+        .querySelectorAll('[data-role="doc-select"]:not(:disabled)')
+        .forEach((node) => {
+          node.checked = checked
+        })
+      updateBulkToolbar()
+    })
+    selectAll.append(cb, document.createTextNode(' 全选'))
+    bar.append(selectAll)
+
+    const count = document.createElement('span')
+    count.className = 'admin-bulk-toolbar__count muted'
+    count.dataset.role = 'bulk-count'
+    bar.append(count)
+
+    const spacer = document.createElement('span')
+    spacer.style.flex = '1'
+    bar.append(spacer)
+
+    const reBtn = document.createElement('button')
+    reBtn.type = 'button'
+    reBtn.className = 'button-secondary button-small'
+    reBtn.dataset.role = 'bulk-reindex'
+    reBtn.textContent = '重建所选'
+    reBtn.disabled = true
+    reBtn.addEventListener('click', async () => {
+      const ids = getSelectedDocIds()
+      if (!ids.length) return
+      const ok = await openConfirmModal({
+        message: `重建所选 ${ids.length} 个文件？该 KB 下其它文件不受影响。`,
+        confirmLabel: '开始重建',
+      })
+      if (!ok) return
+      try {
+        await api.batchReindexDocuments(kbId, ids)
+        showFlash(`已提交 ${ids.length} 个文件的增量重建`, 'success')
+        await renderDetail(kbId)
+      } catch (e) {
+        showFlash(e.message || String(e))
+      }
+    })
+    bar.append(reBtn)
+
+    const delBtn = document.createElement('button')
+    delBtn.type = 'button'
+    delBtn.className = 'button-danger button-small'
+    delBtn.dataset.role = 'bulk-delete'
+    delBtn.textContent = '删除所选'
+    delBtn.disabled = true
+    delBtn.addEventListener('click', async () => {
+      const ids = getSelectedDocIds()
+      if (!ids.length) return
+      const ok = await openConfirmModal({
+        message: `删除所选 ${ids.length} 个文件？将同步清理向量与知识图谱（不可恢复）。`,
+        confirmLabel: '删除',
+      })
+      if (!ok) return
+      try {
+        for (const id of ids) {
+          await api.deleteDocument(kbId, id)
+        }
+        showFlash(`已删除 ${ids.length} 个文件`, 'success')
+        await renderDetail(kbId)
+      } catch (e) {
+        showFlash(e.message || String(e))
+      }
+    })
+    bar.append(delBtn)
+
+    return bar
+  }
 
   function buildDocRow(kbId, d) {
     const row = document.createElement('div')
     row.className = 'admin-doc-row'
     row.dataset.docId = d.doc_id
     row.dataset.status = d.status
+
+    // Phase 6.2: 选择框（批量操作用；处理中的文档禁用）
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.className = 'admin-doc-row__cb'
+    cb.dataset.role = 'doc-select'
+    cb.dataset.docId = d.doc_id
+    if (isProcessingStatus(d.status)) cb.disabled = true
+    cb.addEventListener('click', (e) => e.stopPropagation())
+    cb.addEventListener('change', () => updateBulkToolbar())
+    row.append(cb)
 
     const main = document.createElement('div')
     main.className = 'admin-doc-row__main'
@@ -801,6 +925,25 @@ export function initAdminApp({
         openDocDetailModal(kbId, d)
       })
       ops.append(viewBtn)
+    }
+
+    // Phase 6.2: 「重建该文件」按钮（pending / completed 行）
+    if (d.status === 'pending' || d.status === 'completed') {
+      const rebuildBtn = document.createElement('button')
+      rebuildBtn.type = 'button'
+      rebuildBtn.className = 'button-secondary button-small'
+      rebuildBtn.textContent = '重建该文件'
+      rebuildBtn.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        try {
+          await api.reindexDocument(kbId, d.doc_id)
+          showFlash('已提交单文件重建', 'success')
+          await renderDetail(kbId)
+        } catch (err) {
+          showFlash(err.message || String(err))
+        }
+      })
+      ops.append(rebuildBtn)
     }
 
     const del = document.createElement('button')

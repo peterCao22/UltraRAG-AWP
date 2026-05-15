@@ -233,6 +233,36 @@ export async function retryDocument(kbId, docId, { adminToken } = {}) {
 }
 
 /**
+ * Phase 6.2：单文档增量重建（不动其它文件）。
+ */
+export async function reindexDocument(kbId, docId, { adminToken } = {}) {
+  const response = await fetch(
+    `${DEFAULT_KB_ENDPOINT}/${encodeURIComponent(kbId)}/documents/${encodeURIComponent(docId)}/reindex`,
+    { method: 'POST', headers: jsonHeaders(adminToken) },
+  )
+  if (!response.ok) throw new Error(await readApiError(response))
+  const body = await response.json()
+  return body.data
+}
+
+/**
+ * Phase 6.2：批量增量重建。
+ */
+export async function batchReindexDocuments(kbId, docIds, { adminToken } = {}) {
+  const response = await fetch(
+    `${DEFAULT_KB_ENDPOINT}/${encodeURIComponent(kbId)}/documents/batch-reindex`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(adminToken),
+      body: JSON.stringify({ doc_ids: docIds }),
+    },
+  )
+  if (!response.ok) throw new Error(await readApiError(response))
+  const body = await response.json()
+  return body.data
+}
+
+/**
  * Phase 6.1：取该文档的全部 chunk（详情面板用）。
  */
 export async function listDocumentChunks(kbId, docId, { adminToken } = {}) {

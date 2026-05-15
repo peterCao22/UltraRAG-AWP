@@ -13,6 +13,7 @@ function mockKbApi(overrides = {}) {
   }
   return {
     batchDocumentStatus: vi.fn().mockResolvedValue([]),
+    batchReindexDocuments: vi.fn(),
     listKnowledgeBases: vi.fn().mockResolvedValue([]),
     createKnowledgeBase: vi.fn(),
     createIngestJob: vi.fn(),
@@ -24,6 +25,7 @@ function mockKbApi(overrides = {}) {
     listDocumentChunks: vi.fn().mockResolvedValue({ chunks: [], doc_id: '', doc_stem: '' }),
     listDocuments: vi.fn().mockResolvedValue(emptyBundle),
     listJobs: vi.fn(),
+    reindexDocument: vi.fn(),
     retryDocument: vi.fn(),
     updateAgentConfig: vi.fn(),
     uploadKbDocuments: vi.fn(),

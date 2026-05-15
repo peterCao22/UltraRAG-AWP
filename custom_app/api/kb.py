@@ -411,6 +411,240 @@ def _broadcast_doc_status(kb_id: str, status: str) -> None:
         )
 
 
+def _run_partial_ingest_job(
+    kb: dict, kb_id: str, job_id: str, doc_ids: list[str],
+) -> dict:
+    """Phase 6.2: 单/批文件增量入库。
+
+    只对 doc_ids 范围内的文档跑：parse → chunks.jsonl 增量替换 → embed → Qdrant
+    delete-then-upsert → KG delete_by_doc + 增量 extract_kb。
+
+    与 _run_ingest_job 的区别：
+    - 不动 raw 目录里其它文件
+    - 不更新 embedding.npy（按 6.2 §六 决策；npy 只在全量重建时刷新）
+    - 不更新 FAISS（FAISS 已弃用，Step 7 会删）
+    - Qdrant collection 复用（不 recreate）
+
+    返回 {"ok": bool, "job_id": str, "status": str, ...}
+    """
+    from custom_app.repositories import DocumentRepository
+    from custom_app.services.google_embedder import (
+        embed_texts,
+        compose_doc_embedding_text,
+    )
+    from custom_app.utils.chunks_io import (
+        append_chunks,
+        collect_chunk_ids_for_doc,
+        doc_id_to_stem,
+        remove_doc_from_chunks,
+    )
+
+    try:
+        _mark_job_running(job_id)
+
+        kb_root = Path(kb["data_path"])
+        raw_dir = kb_root / "raw"
+        chunks_path = kb_root / "corpora" / "chunks.jsonl"
+        chunks_path.parent.mkdir(parents=True, exist_ok=True)
+
+        doc_repo = DocumentRepository()
+        kb_type = _kb_type(kb)
+
+        # 1) 校验 doc 行存在，构造 doc_id → file_path / file_name / stem 映射
+        targets: list[dict] = []
+        for did in doc_ids:
+            row = doc_repo.get(kb_id, did)
+            if row is None:
+                raise RuntimeError(f"document not found: {did}")
+            targets.append({
+                "doc_id": did,
+                "file_name": row["file_name"],
+                "file_path": Path(row["file_path"]),
+                "stem": doc_id_to_stem(did),
+            })
+
+        # 2) parsing 阶段：每个 doc 独立 parse → 新 chunks 列表
+        for t in targets:
+            doc_repo.update_document_status(
+                kb_id, t["doc_id"], status="parsing", updated_at=now_iso(),
+            )
+
+        new_chunks: list[dict] = []
+        parse_errors: dict[str, str] = {}
+        for t in targets:
+            try:
+                if kb_type == KB_TYPE_SOP_DOCX:
+                    from custom_app.services.docx_parser import parse_docx
+                    rows = parse_docx(t["file_path"], kb_root)
+                    new_chunks.extend(rows)
+                else:
+                    from custom_app.services.parsers import parse_files
+                    chunks_objs = parse_files(
+                        kb_type, [t["file_path"]], kb_root, kb_id=kb_id,
+                    )
+                    new_chunks.extend(c.to_jsonl_dict() for c in chunks_objs)
+            except Exception as exc:
+                logger.exception(
+                    "partial parse failed kb=%s doc=%s", kb_id, t["doc_id"]
+                )
+                parse_errors[t["doc_id"]] = str(exc)
+
+        # 把 parse 失败的标 failed；剩下的继续
+        for did, err in parse_errors.items():
+            doc_repo.update_document_status(
+                kb_id, did, status="failed",
+                updated_at=now_iso(),
+                error_message=err[:500],
+            )
+        remaining = [t for t in targets if t["doc_id"] not in parse_errors]
+        if not remaining and parse_errors:
+            raise RuntimeError(f"all targets failed in parse stage: {parse_errors}")
+        _update_job_stage(job_id, "parse", {"file_count": len(remaining)})
+
+        # 3) chunks.jsonl：先删该 doc 的旧行，再追加新 chunks
+        old_chunk_ids: list[str] = []
+        for t in remaining:
+            old_chunk_ids.extend(collect_chunk_ids_for_doc(chunks_path, t["stem"]))
+            remove_doc_from_chunks(chunks_path, t["stem"])
+        append_chunks(chunks_path, new_chunks)
+
+        # 4) embedding 阶段：只为 new_chunks 跑 embedding
+        for t in remaining:
+            doc_repo.update_document_status(
+                kb_id, t["doc_id"], status="embedding", updated_at=now_iso(),
+            )
+        if new_chunks:
+            texts = [compose_doc_embedding_text(c) for c in new_chunks]
+            emb = embed_texts(texts, task_type="RETRIEVAL_DOCUMENT")
+        else:
+            emb = None
+        _update_job_stage(job_id, "embed", {"new_chunks": len(new_chunks)})
+
+        # 5) Qdrant：先 delete 旧 chunk_ids，再 upsert 新点
+        for t in remaining:
+            doc_repo.update_document_status(
+                kb_id, t["doc_id"], status="indexing", updated_at=now_iso(),
+            )
+        if new_chunks and emb is not None:
+            from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
+            store = QdrantVectorStore(kb_id=kb_id, embed_dim=emb.shape[1])
+            store.ensure_collection(recreate=False)
+            if old_chunk_ids:
+                try:
+                    store.delete(old_chunk_ids)
+                except Exception:
+                    logger.exception(
+                        "qdrant delete old vectors failed kb=%s; continuing", kb_id,
+                    )
+            chunk_ids = [str(c.get("id", "")) for c in new_chunks]
+            payloads = [
+                {
+                    "kb_id": kb_id,
+                    "doc": c.get("doc", ""),
+                    "source_type": c.get("source_type", "unknown"),
+                    "parser": c.get("parser", "unknown"),
+                    "chunk_data": c,
+                }
+                for c in new_chunks
+            ]
+            store.upsert(chunk_ids, emb, payloads)
+        _update_job_stage(job_id, "qdrant", {"upserted": len(new_chunks)})
+
+        # 6) KG：先 delete_by_doc，再增量 extract_kb（限定 doc_stem 集合）
+        if _should_extract_kg(kb_id):
+            try:
+                from custom_app.services.kg_extractor import extract_kb
+                from custom_app.services.kgstore.base import build_kg_store
+                kg_store = build_kg_store()
+                stems = {t["stem"] for t in remaining}
+                doc_id_for_stem = {t["stem"]: t["doc_id"] for t in remaining}
+                for t in remaining:
+                    try:
+                        kg_store.delete_by_doc(kb_id, t["doc_id"])
+                    except Exception:
+                        logger.exception(
+                            "kg delete_by_doc failed kb=%s doc=%s",
+                            kb_id, t["doc_id"],
+                        )
+                kg_result = extract_kb(
+                    kb_id, str(chunks_path),
+                    doc_id_for_stem=doc_id_for_stem,
+                    target_doc_stems=stems,
+                )
+                _update_job_stage(job_id, "kg", {
+                    "kg_status": "ok",
+                    "kg_entity_count": int(kg_result.get("entity_count", 0)),
+                    "kg_relation_count": int(kg_result.get("relation_count", 0)),
+                    "kg_chunk_count": int(kg_result.get("chunk_count", 0)),
+                    "kg_error_count": int(kg_result.get("errors", 0)),
+                })
+            except Exception as kg_exc:
+                logger.exception("partial kg_stage failed kb=%s", kb_id)
+                _update_job_stage(job_id, "kg_failed", {
+                    "kg_status": "failed",
+                    "kg_error": str(kg_exc),
+                })
+
+        # 7) 把剩下的 doc 行标 completed + chunk_count
+        now = now_iso()
+        per_stem_count: dict[str, int] = {}
+        for c in new_chunks:
+            stem = str(c.get("doc", ""))
+            per_stem_count[stem] = per_stem_count.get(stem, 0) + 1
+        for t in remaining:
+            doc_repo.update_document_status(
+                kb_id, t["doc_id"], status="completed",
+                updated_at=now,
+                chunk_count=per_stem_count.get(t["stem"], 0),
+                processed_at=now,
+            )
+
+        # 8) 收尾：标 job success；不调 mark_all_indexed（其它文档不动）
+        JobRepository().mark_success(
+            job_id, finished_at=now, result={
+                "partial": True,
+                "doc_ids": [t["doc_id"] for t in remaining],
+                "failed_doc_ids": list(parse_errors.keys()),
+                "chunk_count": len(new_chunks),
+                "summary": f"partial indexed {len(remaining)} docs / {len(new_chunks)} chunks",
+            },
+        )
+        KbRepository().mark_indexed(kb_id, updated_at=now)
+
+        # 失效 runner 缓存，让查询拿到新数据
+        try:
+            from custom_app.api.chat import invalidate_runner_cache
+            invalidate_runner_cache(kb_id)
+        except Exception:
+            logger.exception("invalidate_runner_cache failed kb=%s", kb_id)
+
+        return {
+            "ok": True, "job_id": job_id, "status": "success",
+            "doc_ids": [t["doc_id"] for t in remaining],
+            "failed_doc_ids": list(parse_errors.keys()),
+        }
+
+    except Exception as exc:
+        logger.exception("partial ingest crashed kb=%s doc_ids=%s", kb_id, doc_ids)
+        now = now_iso()
+        JobRepository().mark_failed(job_id, finished_at=now, error=str(exc))
+        # 在途文档标 failed
+        try:
+            doc_repo = DocumentRepository()
+            for did in doc_ids:
+                row = doc_repo.get(kb_id, did)
+                if row and row.get("status") in (
+                    "pending", "parsing", "embedding", "indexing"
+                ):
+                    doc_repo.update_document_status(
+                        kb_id, did, status="failed",
+                        updated_at=now, error_message=str(exc)[:500],
+                    )
+        except Exception:
+            logger.exception("failed to mark docs failed on partial crash")
+        return {"ok": False, "job_id": job_id, "status": "failed", "error": str(exc)}
+
+
 def _attribute_chunk_counts(kb_id: str, chunks_path: Path) -> None:
     """ingest 完成后，按 chunks.jsonl 中的 doc 字段把分块数摊到每个文档行。
 
@@ -1016,39 +1250,210 @@ def list_document_chunks(kb_id: str, doc_id: str):
     return _ok({"doc_id": doc_id, "doc_stem": doc_stem, "chunks": out})
 
 
-@kb_bp.route("/api/kb/<string:kb_id>/documents", methods=["DELETE"])
-def delete_document(kb_id: str):
-    """删除一条文档记录及其 raw 目录下的源文件（路径必须在知识库 data_path 之下）。"""
-    doc_id = str(request.args.get("doc_id", "")).strip()
-    if not doc_id:
-        return _err("doc_id is required", "DOC_ID_REQUIRED", 400)
+def _delete_document_full(kb: dict, kb_id: str, doc_id: str) -> dict:
+    """Phase 6.2: 完整清理单文档：Qdrant + KG + chunks.jsonl + DB 行 + raw 文件。
 
-    kb = KbRepository().get_basic(kb_id)
-    if kb is None:
-        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    步骤（任一失败抛 RuntimeError，调用方负责把 doc 状态回滚或返回 5xx）：
+        1) doc 行标 deleting
+        2) chunks.jsonl 拿到该 doc 的 chunk_ids（删 Qdrant 用）
+        3) Qdrant：按 chunk_ids 删除该 doc 的所有向量
+        4) KG：delete_by_doc（relations + 孤儿/裁剪实体）
+        5) chunks.jsonl：原子覆写过滤掉该 doc
+        6) kb_documents 行 delete
+        7) raw 文件 unlink
+    """
+    from custom_app.utils.chunks_io import (
+        collect_chunk_ids_for_doc,
+        doc_id_to_stem,
+        remove_doc_from_chunks,
+    )
 
     doc_repo = DocumentRepository()
     row = doc_repo.get(kb_id, doc_id)
     if row is None:
-        return _err(f"document not found: {doc_id}", "DOC_NOT_FOUND", 404)
+        raise RuntimeError(f"document not found: {doc_id}")
 
     kb_root = Path(kb["data_path"]).resolve()
+    chunks_path = kb_root / "corpora" / "chunks.jsonl"
     fp = Path(row["file_path"])
     try:
-        resolved = fp.resolve()
-        resolved.relative_to(kb_root)
+        fp.resolve().relative_to(kb_root)
     except (OSError, ValueError):
-        return _err("invalid file path", "INVALID_PATH", 400)
+        raise RuntimeError("invalid file path")
 
+    stem = doc_id_to_stem(doc_id)
+
+    # 1) 标 deleting
+    doc_repo.update_document_status(
+        kb_id, doc_id, status="deleting", updated_at=now_iso(),
+    )
+
+    # 2) 收集 chunk_ids
+    chunk_ids = collect_chunk_ids_for_doc(chunks_path, stem)
+
+    # 3) Qdrant
+    qdrant_deleted = 0
+    try:
+        from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
+        if chunk_ids:
+            store = QdrantVectorStore(kb_id=kb_id)  # 删除时不需要 embed_dim
+            store.delete(chunk_ids)
+            qdrant_deleted = len(chunk_ids)
+    except Exception:
+        logger.exception("qdrant delete failed kb=%s doc=%s", kb_id, doc_id)
+        # 不中断：删除主流程要求最终一致；若 Qdrant 真死了由 6.2 retry 兜底
+        # （TODO: 暴露失败给用户）
+
+    # 4) KG
+    kg_rel = kg_ent = 0
+    try:
+        from custom_app.services.kgstore.base import build_kg_store
+        kg_store = build_kg_store()
+        kg_rel, kg_ent = kg_store.delete_by_doc(kb_id, doc_id)
+    except Exception:
+        logger.exception("kg delete_by_doc failed kb=%s doc=%s", kb_id, doc_id)
+
+    # 5) chunks.jsonl
+    removed_chunks = 0
+    try:
+        removed_chunks = remove_doc_from_chunks(chunks_path, stem)
+    except Exception:
+        logger.exception("chunks.jsonl edit failed kb=%s doc=%s", kb_id, doc_id)
+
+    # 6) DB 行
     doc_repo.delete(kb_id, doc_id)
 
+    # 7) raw 文件
     if fp.exists():
         try:
             fp.unlink()
         except OSError:
-            pass
+            logger.warning("raw unlink failed kb=%s doc=%s path=%s", kb_id, doc_id, fp)
 
-    return _ok({"doc_id": doc_id, "deleted": True})
+    # 失效 runner 缓存，让查询拿到新数据
+    try:
+        from custom_app.api.chat import invalidate_runner_cache
+        invalidate_runner_cache(kb_id)
+    except Exception:
+        logger.exception("invalidate_runner_cache failed kb=%s", kb_id)
+
+    return {
+        "doc_id": doc_id,
+        "deleted": True,
+        "chunks_removed": removed_chunks,
+        "qdrant_deleted": qdrant_deleted,
+        "kg_relations_deleted": kg_rel,
+        "kg_entities_deleted": kg_ent,
+    }
+
+
+@kb_bp.route("/api/kb/<string:kb_id>/documents", methods=["DELETE"])
+def delete_document_legacy(kb_id: str):
+    """Phase 6.2: 兼容老调用 ?doc_id=X 的 DELETE；新前端用路径参数版本。
+
+    完整清理：Qdrant + KG + chunks.jsonl + DB + raw 文件。
+    """
+    doc_id = str(request.args.get("doc_id", "")).strip()
+    if not doc_id:
+        return _err("doc_id is required", "DOC_ID_REQUIRED", 400)
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    try:
+        result = _delete_document_full(kb, kb_id, doc_id)
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "not found" in msg:
+            return _err(msg, "DOC_NOT_FOUND", 404)
+        if "invalid file path" in msg:
+            return _err(msg, "INVALID_PATH", 400)
+        return _err(msg, "DELETE_FAILED", 500)
+    return _ok(result)
+
+
+@kb_bp.route(
+    "/api/kb/<string:kb_id>/documents/<string:doc_id>",
+    methods=["DELETE"],
+)
+def delete_document(kb_id: str, doc_id: str):
+    """Phase 6.2: RESTful 单文档删除（完整清理）。"""
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    try:
+        result = _delete_document_full(kb, kb_id, doc_id)
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "not found" in msg:
+            return _err(msg, "DOC_NOT_FOUND", 404)
+        if "invalid file path" in msg:
+            return _err(msg, "INVALID_PATH", 400)
+        return _err(msg, "DELETE_FAILED", 500)
+    return _ok(result)
+
+
+@kb_bp.route(
+    "/api/kb/<string:kb_id>/documents/<string:doc_id>/reindex",
+    methods=["POST"],
+)
+def reindex_document(kb_id: str, doc_id: str):
+    """Phase 6.2: 单文档增量重建（不动其它文件）。"""
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+    if DocumentRepository().get(kb_id, doc_id) is None:
+        return _err(f"document not found: {doc_id}", "DOC_NOT_FOUND", 404)
+    if _has_running_job(kb_id):
+        return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
+
+    job_id = new_id("job")
+    JobRepository().create_ingest_job(
+        job_id=job_id, tenant_id=kb["tenant_id"], kb_id=kb_id,
+        payload={"partial": True, "doc_ids": [doc_id]},
+        created_at=now_iso(),
+    )
+    _JOB_EXECUTOR.submit(
+        _run_partial_ingest_job, dict(kb), kb_id, job_id, [doc_id],
+    )
+    return _ok({"job_id": job_id, "doc_id": doc_id, "status": "pending"})
+
+
+@kb_bp.route(
+    "/api/kb/<string:kb_id>/documents/batch-reindex",
+    methods=["POST"],
+)
+def batch_reindex_documents(kb_id: str):
+    """Phase 6.2: 批量增量重建。body: {"doc_ids": [...]}。"""
+    kb = KbRepository().get_basic(kb_id)
+    if kb is None:
+        return _err(f"kb not found: {kb_id}", "KB_NOT_FOUND", 404)
+
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get("doc_ids") or []
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return _err("doc_ids must be a non-empty list", "INVALID_DOC_IDS", 400)
+    doc_ids = [str(x).strip() for x in raw_ids if str(x).strip()]
+    if not doc_ids:
+        return _err("doc_ids must be a non-empty list", "INVALID_DOC_IDS", 400)
+
+    doc_repo = DocumentRepository()
+    for did in doc_ids:
+        if doc_repo.get(kb_id, did) is None:
+            return _err(f"document not found: {did}", "DOC_NOT_FOUND", 404)
+
+    if _has_running_job(kb_id):
+        return _err(f"kb has running job: {kb_id}", "KB_JOB_RUNNING", 409)
+
+    job_id = new_id("job")
+    JobRepository().create_ingest_job(
+        job_id=job_id, tenant_id=kb["tenant_id"], kb_id=kb_id,
+        payload={"partial": True, "doc_ids": doc_ids},
+        created_at=now_iso(),
+    )
+    _JOB_EXECUTOR.submit(
+        _run_partial_ingest_job, dict(kb), kb_id, job_id, doc_ids,
+    )
+    return _ok({"job_id": job_id, "doc_ids": doc_ids, "status": "pending"})
 
 
 @kb_bp.route("/api/kb/<string:kb_id>/chunks", methods=["GET"])

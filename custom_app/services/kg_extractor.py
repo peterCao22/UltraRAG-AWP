@@ -203,9 +203,13 @@ def _upsert_entity(store: KgStore, kb_id: str, entity: dict, chunk_id: str) -> s
 
 
 def _add_relation_if_not_exists(
-    store: KgStore, kb_id: str, source_id: str, target_id: str, relation: dict
+    store: KgStore, kb_id: str, source_id: str, target_id: str, relation: dict,
+    *, doc_id: str = "",
 ) -> bool:
-    """添加关系，若已存在则跳过。返回是否新增。"""
+    """添加关系，若已存在则跳过。返回是否新增。
+
+    Phase 6.2: 关系写入时记录 doc_id，让后续单文档删除可以精准定位。
+    """
     if store.find_relation(
         kb_id=kb_id, source_id=source_id, target_id=target_id,
         relation_type=relation["relation_type"],
@@ -218,16 +222,19 @@ def _add_relation_if_not_exists(
         description=relation["description"],
         strength=relation["strength"],
         created_at=now_iso(),
+        doc_id=doc_id,
     )
     return True
 
 
 def extract_and_store_chunk(
-    kb_id: str, chunk: dict, *, store: Optional[KgStore] = None
+    kb_id: str, chunk: dict, *, store: Optional[KgStore] = None,
+    doc_id: str = "",
 ) -> Tuple[int, int]:
     """对单个 chunk 进行实体和关系抽取，并存入 KgStore。
 
     Phase 5.2：store 默认按 ULTRARAG_KG_BACKEND 决定（sqlite / neo4j）。
+    Phase 6.2：doc_id 标记关系来源文档；调用方可显式传入，否则保持空字符串。
     返回: (entity_count, relation_count)
     """
     chunk_id = chunk.get("id", "")
@@ -258,19 +265,32 @@ def extract_and_store_chunk(
         source_id = entity_id_map.get(r["source"])
         target_id = entity_id_map.get(r["target"])
         if source_id and target_id and source_id != target_id:
-            if _add_relation_if_not_exists(kg_store, kb_id, source_id, target_id, r):
+            if _add_relation_if_not_exists(
+                kg_store, kb_id, source_id, target_id, r, doc_id=doc_id,
+            ):
                 rel_count += 1
 
     return len(entities), rel_count
 
 
-def extract_kb(kb_id: str, chunks_path: str, batch_size: int = 20) -> dict:
+def extract_kb(
+    kb_id: str, chunks_path: str, batch_size: int = 20,
+    *,
+    doc_id_for_stem: Optional[Dict[str, str]] = None,
+    target_doc_stems: Optional[set] = None,
+) -> dict:
     """对整个知识库进行图谱抽取。
 
     参数:
         kb_id: 知识库 ID
         chunks_path: chunks.jsonl 文件路径
         batch_size: 每批处理的 chunk 数（用于限流）
+        doc_id_for_stem: Phase 6.2 增量场景：把 chunk.doc (stem) 映射到完整 doc_id
+            (kb_id:file_name)，作为 relation.doc_id 写入。未传时关系 doc_id 为空字符串
+            （仍保持 6.0 行为）。
+        target_doc_stems: Phase 6.2 增量场景：只处理 chunk.doc ∈ 此集合的 chunks。
+            None = 全量；非空时本函数**不**调 delete_all_for_kb（调用方应已用
+            delete_by_doc 清旧数据）。
 
     返回: {"entity_count": int, "relation_count": int, "chunk_count": int, "errors": int}
     """
@@ -286,10 +306,15 @@ def extract_kb(kb_id: str, chunks_path: str, batch_size: int = 20) -> dict:
     # Phase 5.2：单 store 实例复用整批，避免每 chunk 重新建 Neo4j driver
     store = build_kg_store()
 
-    # 清除旧图谱数据
-    store.delete_all_for_kb(kb_id)
+    # 全量重建：清除旧图谱数据；增量场景由调用方负责清旧
+    if target_doc_stems is None:
+        store.delete_all_for_kb(kb_id)
 
-    logger.info("Starting KG extraction for kb_id=%s from %s", kb_id, chunks_path)
+    logger.info(
+        "Starting KG extraction kb_id=%s from %s; target_doc_stems=%s",
+        kb_id, chunks_path,
+        "ALL" if target_doc_stems is None else sorted(target_doc_stems),
+    )
 
     with open(chunks_path_obj, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
@@ -297,7 +322,15 @@ def extract_kb(kb_id: str, chunks_path: str, batch_size: int = 20) -> dict:
                 continue
             try:
                 chunk = json.loads(line)
-                e_count, r_count = extract_and_store_chunk(kb_id, chunk, store=store)
+                doc_stem = chunk.get("doc", "")
+                if target_doc_stems is not None and doc_stem not in target_doc_stems:
+                    continue
+                doc_id = ""
+                if doc_id_for_stem and doc_stem in doc_id_for_stem:
+                    doc_id = doc_id_for_stem[doc_stem]
+                e_count, r_count = extract_and_store_chunk(
+                    kb_id, chunk, store=store, doc_id=doc_id,
+                )
                 total_entities += e_count
                 total_relations += r_count
                 chunk_count += 1

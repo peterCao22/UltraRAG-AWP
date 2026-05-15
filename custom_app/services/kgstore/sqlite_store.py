@@ -106,8 +106,13 @@ class SqliteKgStore:
         return self._repo.delete_all_for_kb(kb_id)
 
     def delete_by_doc(self, kb_id: str, doc_id: str) -> tuple[int, int]:
-        """Phase 6.2: 委托给 KgRepository.delete_by_doc。"""
-        return self._repo.delete_by_doc(kb_id, doc_id)
+        """Phase 6.2: 委托给 KgRepository.delete_by_doc。
+
+        KgRepository 需要 doc_stem 来匹配实体的 chunk_ids 前缀；这里从 doc_id 推导。
+        """
+        from custom_app.utils.chunks_io import doc_id_to_stem
+
+        return self._repo.delete_by_doc(kb_id, doc_id, doc_id_to_stem(doc_id))
 
     def count_entities_and_relations(
         self, kb_id: Optional[str] = None
