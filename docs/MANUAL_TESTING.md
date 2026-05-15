@@ -408,6 +408,115 @@ curl -s -X POST "http://localhost:8080/api/kb/$KB/documents/batch-status" \
 
 ---
 
+## G. Phase 6.2 单文件增量重建 + 删除即时清理（约 15 分钟）
+
+> 目标：上传或修改单个文件不再重建整库；删除某文件后向量库 / 知识图谱 / chunks.jsonl
+> 不留残留召回。
+
+**前置**：
+
+- F.1–F.4 已通过（Phase 6.1 落地）
+- Postgres 老库执行迁移：
+  ```bash
+  python -m custom_app.scripts.apply_phase6_2_migration   # 见 §G.0 一次性脚本
+  ```
+  或直接：
+  ```bash
+  psql "$ULTRARAG_POSTGRES_URI" -f migrations/postgres/002_phase6_2_kg_doc_id.sql
+  ```
+  （SQLite 后端无需手工迁移，`init_db()` 会自动 ALTER）
+
+### G.1 上传 1 个新 docx → 单文件重建（必过）
+
+1. 在已有 KB 中上传 1 个新 docx（其它文档保持 `已完成`）
+2. 该行应是「**待处理**」+ 旁边按钮多一个「**重建该文件**」
+3. 点击「重建该文件」
+4. **只该行**进入 `parsing → embedding → indexing → completed`；其它已完成行徽章**不动**
+
+**通过判据**：
+
+- [ ] 进度卡顶部显示「索引任务: running」但只这 1 行变蓝
+- [ ] 完成时 `chunk_count` 正确（与文档段落数一致）
+- [ ] 其它行 `processed_at` 时间不变（不是"被悄悄重做了"）
+
+### G.2 重建期间其它老文档查询不阻塞（必过）
+
+1. G.1 单文件重建过程中（看到该行 `embedding`/`indexing`），切到对话页问其它老文档相关问题
+2. 应能正常返回答案
+
+**通过判据**：
+
+- [ ] 不会因为重建在跑就返回「正在维护」或超时
+
+### G.3 删除某文件 + 残留检查（必过）
+
+1. 在 G.1 已完成的文件上点「删除」
+2. 二次确认后该行从列表消失，且**汇总条 `已完成` 计数减 1**
+3. 切到对话页问该文件特有内容（例如标题中的关键词）
+4. 答案应是「文档中未找到」或不再引用该文档
+
+**通过判据**：
+
+- [ ] 没有从已删文档召回任何 chunk
+- [ ] 该文档的图片资源（`/images/{doc_stem}/...`）可选删除（本期未做磁盘清理，只清 DB+raw）
+
+### G.4 KG 残留检查（可选，5 分钟）
+
+1. 删除前用 Neo4j Browser 跑：
+   ```cypher
+   MATCH ()-[r:RELATES_TO {kb_id: $kb_id, doc_id: $doc_id}]-() RETURN count(r)
+   ```
+   记下数字 N
+2. 删除该文档
+3. 重跑同条 Cypher → 应返回 0
+
+**通过判据**：
+
+- [ ] KG 关系数从 N → 0
+- [ ] 仅该文档独有的实体也被删除；与其它文档共享的实体保留（只裁剪 chunk_ids）
+
+### G.5 批量勾选「重建所选」（必过）
+
+1. 文档列表顶部勾「全选」，或手工勾 2-3 个
+2. 工具栏显示「已选 N」+ 「重建所选」按钮可点
+3. 点击 → 二次确认 → 提交
+4. 这几行同时进入 `parsing`；其它行不动
+
+**通过判据**：
+
+- [ ] 选中的行同步流转；未选中的行不动
+- [ ] 完成后选中行的 `processed_at` 都刷新
+
+### G.6 「全量重建」按钮仍可用（必过）
+
+1. 点「重建索引」按钮（非「重建该文件」）
+2. 全部文档进入流转，最终全部 `已完成`
+
+**通过判据**：
+
+- [ ] 所有文档的 `processed_at` 都刷新
+- [ ] 这条路径与 Phase 6.1 验收一致
+
+### G.7 Phase 6.2 自动化测试
+
+```powershell
+& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" -m pytest tests/test_phase6_2_chunks_io.py tests/test_phase6_2_kgstore_delete_by_doc.py -q
+```
+
+**期望**：17 个用例全过。
+
+### G.0 一次性迁移脚本
+
+为 G 段方便起见，建议执行一次：
+
+```powershell
+python -m custom_app.scripts.apply_phase6_2_migration
+```
+
+幂等可重跑。
+
+---
+
 ## 最终结论
 
 ```
