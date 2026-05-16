@@ -13,6 +13,9 @@ import { buildSourcesPanel } from './components/sourcePanel.js'
 import { Toast } from './components/toast.js'
 import { openConfirmModal } from './components/confirmModal.js'
 import { sendChatMessage } from './services/chatApi.js'
+import { listChatModels } from './services/kbApi.js'
+
+const MODEL_STORAGE_KEY = 'ULTRARAG_SELECTED_MODEL_ID'
 import { listKnowledgeBases } from './services/kbApi.js'
 import * as defaultSessionApi from './services/sessionApi.js'
 
@@ -253,6 +256,8 @@ export function initChatApp({
     sidebar: root.querySelector('.chat-sidebar'),
     sidebarBackdrop: root.querySelector('[data-role="sidebar-backdrop"]'),
     sessionList: root.querySelector('[data-role="session-list"]'),
+    modelChip: root.querySelector('[data-role="model-chip"]'),
+    modelChipName: root.querySelector('[data-role="model-chip-name"]'),
   }
 
   const state = {
@@ -262,10 +267,14 @@ export function initChatApp({
     isStreaming: false,
     pendingSend: Promise.resolve(),
     streamAbort: null,
+    // Phase 7: 对话模型 chip
+    chatModels: [],
+    selectedModelId: '',
   }
 
   mountAgentSelect(elements.agentSelect)
   bindChatImageLightbox(elements.messageList)
+  initModelChip()
 
   function scrollMessageListToBottom() {
     const list = elements.messageList
@@ -295,6 +304,121 @@ export function initChatApp({
     sourcePlaceholder.textContent = '引用来源将在回答完成后展示。'
     article.append(sourcePlaceholder)
     elements.messageList.append(article)
+  }
+
+  // ── Phase 7: 对话模型 chip ──────────────────────────────────────────────
+
+  function updateModelChipLabel() {
+    if (!elements.modelChipName) return
+    if (!state.chatModels.length) {
+      elements.modelChipName.textContent = '默认模型'
+      return
+    }
+    const sel = state.chatModels.find((m) => m.model_id === state.selectedModelId)
+        || state.chatModels.find((m) => m.is_default)
+        || state.chatModels[0]
+    elements.modelChipName.textContent = sel ? sel.name : '默认模型'
+  }
+
+  async function initModelChip() {
+    if (!elements.modelChip) return
+    let stored = ''
+    try {
+      stored = storage?.getItem(MODEL_STORAGE_KEY) || ''
+    } catch {
+      stored = ''
+    }
+    state.selectedModelId = stored
+    try {
+      const models = await listChatModels()
+      state.chatModels = models
+      // 校验 stored 是否还在 enabled 列表里；不在就清掉
+      if (stored && !models.some((m) => m.model_id === stored)) {
+        state.selectedModelId = ''
+        try {
+          storage?.removeItem(MODEL_STORAGE_KEY)
+        } catch {
+          /* noop */
+        }
+      }
+      // 没选过 → 用 default
+      if (!state.selectedModelId) {
+        const def = models.find((m) => m.is_default)
+        if (def) state.selectedModelId = def.model_id
+      }
+    } catch (err) {
+      // 列表拉取失败不影响发消息（缺省走 .env）
+      state.chatModels = []
+      if (typeof console !== 'undefined') {
+        console.warn('[UltraRAG] listChatModels failed', err)
+      }
+    }
+    updateModelChipLabel()
+
+    elements.modelChip.addEventListener('click', (e) => {
+      e.stopPropagation()
+      openModelPicker()
+    })
+  }
+
+  function openModelPicker() {
+    closeModelPicker()
+    if (!elements.modelChip) return
+
+    const overlay = document.createElement('div')
+    overlay.className = 'model-picker-overlay'
+    overlay.dataset.role = 'model-picker-overlay'
+
+    const dropdown = document.createElement('div')
+    dropdown.className = 'model-picker-dropdown'
+
+    // 定位到 chip 上方（避免被发送按钮遮挡）
+    const rect = elements.modelChip.getBoundingClientRect()
+    dropdown.style.left = `${Math.max(8, rect.left)}px`
+    dropdown.style.bottom = `${Math.max(8, window.innerHeight - rect.top + 6)}px`
+
+    if (!state.chatModels.length) {
+      const empty = document.createElement('div')
+      empty.className = 'model-picker-empty'
+      empty.textContent = '尚未配置任何模型；前往 /admin → 模型管理 添加。'
+      dropdown.append(empty)
+    } else {
+      for (const m of state.chatModels) {
+        const item = document.createElement('div')
+        item.className = 'model-picker-item'
+        if (m.model_id === state.selectedModelId) item.classList.add('is-active')
+        const name = document.createElement('div')
+        name.className = 'model-picker-item__name'
+        name.textContent = m.name + (m.is_default ? ' · 默认' : '')
+        const meta = document.createElement('div')
+        meta.className = 'model-picker-item__meta'
+        meta.textContent = `${m.provider} · ${m.model_name}`
+        item.append(name, meta)
+        item.addEventListener('click', () => {
+          state.selectedModelId = m.model_id
+          try {
+            storage?.setItem(MODEL_STORAGE_KEY, m.model_id)
+          } catch {
+            /* noop */
+          }
+          updateModelChipLabel()
+          closeModelPicker()
+        })
+        dropdown.append(item)
+      }
+    }
+
+    overlay.append(dropdown)
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay) closeModelPicker()
+    })
+    document.body.append(overlay)
+  }
+
+  function closeModelPicker() {
+    document
+      .querySelectorAll('[data-role="model-picker-overlay"]')
+      .forEach((node) => node.remove())
   }
 
   function addMessage(role, content, options = {}) {
@@ -675,6 +799,7 @@ export function initChatApp({
         kbId: state.selectedKbId,
         question,
         agentMode: elements.agentSelect.value || 'quick',
+        modelId: state.selectedModelId || '',
         sessionId: state.currentSessionId || '',
         profile: profileRequest,
         signal: ac.signal,

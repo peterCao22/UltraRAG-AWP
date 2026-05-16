@@ -42,33 +42,51 @@ from custom_app.services.session_store import (
 chat_bp = Blueprint("chat_api", __name__)
 logger = logging.getLogger(__name__)
 
-# 每个 kb_id 维护独立的 RagRunner 实例，用锁保护并发写
-_runners: dict[str, RagRunner] = {}
+# Phase 7: 按 (kb_id, model_id) 缓存 Runner。model_id="" 表示走 Gemini 默认（兼容老 .env 路径）。
+_runners: dict[tuple[str, str], RagRunner] = {}
 _runners_lock = threading.Lock()
 
 # AgentRunner 实例池（agent_mode=agent 时使用）
-_agent_runners: dict[str, "AgentRunner"] = {}  # type: ignore[name-defined]
+_agent_runners: dict[tuple[str, str], "AgentRunner"] = {}  # type: ignore[name-defined]
 _agent_runners_lock = threading.Lock()
 
 
-def _get_runner(kb_id: str) -> RagRunner:
+def _runner_key(kb_id: str, model_id: str | None) -> tuple[str, str]:
+    return (kb_id, model_id or "")
+
+
+def _load_chat_model_row(model_id: str | None) -> dict | None:
+    """Phase 7.1: 从 ChatModelRepository 查模型 row；找不到返回 None（runner 走老 .env 路径）。"""
+    if not model_id:
+        return None
+    try:
+        from custom_app.repositories import ChatModelRepository
+        return ChatModelRepository().get(model_id)
+    except Exception:
+        logger.exception("load chat_model row failed model_id=%s", model_id)
+        return None
+
+
+def _get_runner(kb_id: str, model_id: str | None = None) -> RagRunner:
+    key = _runner_key(kb_id, model_id)
     with _runners_lock:
-        if kb_id not in _runners:
-            r = RagRunner(kb_id=kb_id)
+        if key not in _runners:
+            r = RagRunner(kb_id=kb_id, chat_model=_load_chat_model_row(model_id))
             r.init()
-            _runners[kb_id] = r
-        return _runners[kb_id]
+            _runners[key] = r
+        return _runners[key]
 
 
-def _get_agent_runner(kb_id: str):
-    """返回与 kb_id 绑定的 AgentRunner，首次调用时复用 RagRunner 的向量存储与语料。"""
+def _get_agent_runner(kb_id: str, model_id: str | None = None):
+    """返回与 (kb_id, model_id) 绑定的 AgentRunner，首次调用时复用 RagRunner 的向量存储与语料。"""
     from custom_app.services.agent_runner import AgentRunner
 
+    key = _runner_key(kb_id, model_id)
     with _agent_runners_lock:
-        if kb_id not in _agent_runners:
+        if key not in _agent_runners:
             # 复用 RagRunner 已加载的 rows / vector_store，避免二次磁盘读取
-            rag = _get_runner(kb_id)
-            ar = AgentRunner(kb_id=kb_id)
+            rag = _get_runner(kb_id, model_id)
+            ar = AgentRunner(kb_id=kb_id, chat_model=_load_chat_model_row(model_id))
             ar.init(
                 rows=rag._rows,
                 index=rag._index,
@@ -78,20 +96,22 @@ def _get_agent_runner(kb_id: str):
                 # agent 模式的最终答案才能挂图（否则 SSE 只发文本）。
                 source_builder=rag._build_sources,
             )
-            _agent_runners[kb_id] = ar
-        return _agent_runners[kb_id]
+            _agent_runners[key] = ar
+        return _agent_runners[key]
 
 
 def invalidate_runner_cache(kb_id: str) -> None:
     """重建索引后必须调用，否则 RagRunner / AgentRunner 仍持有旧的 rows / FAISS 引用，
     新上传的文档查不到、被删除的文档可能仍在召回。
 
-    线程安全：分别拿两把锁，避免与 _get_runner / _get_agent_runner 竞争。
+    Phase 7: 失效该 kb_id 下所有 model_id 的缓存（迭代复制后修改集合）。
     """
     with _runners_lock:
-        _runners.pop(kb_id, None)
+        for key in [k for k in _runners if k[0] == kb_id]:
+            _runners.pop(key, None)
     with _agent_runners_lock:
-        _agent_runners.pop(kb_id, None)
+        for key in [k for k in _agent_runners if k[0] == kb_id]:
+            _agent_runners.pop(key, None)
     logger.info("invalidate_runner_cache kb_id=%s: runners evicted", kb_id)
 
 
@@ -196,14 +216,52 @@ def chat():
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
 
+    # Phase 7: 可选 model_id；仅作 Runner cache key，底层 LLM 仍按 .env 走（待 7.1 真切换）
+    model_id = _resolve_request_model_id(data)
     try:
-        runner = _get_runner(kb_id)
+        runner = _get_runner(kb_id, model_id)
         result = runner.chat(question=question, top_k=top_k, agent_mode=agent_mode)
         return jsonify(result)
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+def _resolve_request_model_id(data: dict) -> str | None:
+    """Phase 7: 从请求 body 取 model_id；缺省时取默认模型的 model_id；都没有时返回 None。
+
+    返回 None 表示"未配置任何对话模型"——降级走 .env 路径，与老行为一致。
+    """
+    explicit = str(data.get("model_id", "")).strip()
+    if explicit:
+        return explicit
+    try:
+        from custom_app.repositories import ChatModelRepository
+        default = ChatModelRepository().get_default()
+        if default:
+            return default["model_id"]
+    except Exception:
+        logger.exception("resolve default model_id failed; fallback to env")
+    return None
+
+
+@chat_bp.route("/api/chat/models", methods=["GET"])
+def get_chat_models():
+    """Phase 7: 对话页 chip 下拉用；仅返回 enabled=true 的模型，不返回 api_key/base_url。"""
+    from custom_app.repositories import ChatModelRepository
+    rows = ChatModelRepository().list_active(include_disabled=False)
+    out = []
+    for r in rows:
+        out.append({
+            "model_id": r["model_id"],
+            "name": r["name"],
+            "provider": r["provider"],
+            "model_name": r["model_name"],
+            "is_default": r["is_default"],
+            "description": r.get("description", ""),
+        })
+    return jsonify({"data": out})
 
 
 @chat_bp.route("/api/chat/stream", methods=["POST"])
@@ -253,9 +311,14 @@ def chat_stream():
                 )
                 + "\n\n"
             )
+            # Phase 7: 取 model_id 作 cache key（LLM 真切换待 7.1）
+            model_id = _resolve_request_model_id(data)
             if agent_mode == "agent":
-                logger.info("chat_stream routing → AgentRunner kb_id=%s session_id=%s", kb_id, session_id_opt)
-                runner = _get_agent_runner(kb_id)
+                logger.info(
+                    "chat_stream routing → AgentRunner kb_id=%s session_id=%s model_id=%s",
+                    kb_id, session_id_opt, model_id,
+                )
+                runner = _get_agent_runner(kb_id, model_id)
                 # 按 KB 配置动态调整启用工具，让 admin 调整后立即生效（不必重建 runner）
                 from custom_app.services.agent_config_store import get_enabled_tools
                 runner.enabled_tools = get_enabled_tools(kb_id)
@@ -269,8 +332,11 @@ def chat_stream():
                     question=question, top_k=top_k, profile=profile, history=history
                 )
             else:
-                logger.info("chat_stream routing → RagRunner kb_id=%s agent_mode=%s", kb_id, agent_mode)
-                runner = _get_runner(kb_id)
+                logger.info(
+                    "chat_stream routing → RagRunner kb_id=%s agent_mode=%s model_id=%s",
+                    kb_id, agent_mode, model_id,
+                )
+                runner = _get_runner(kb_id, model_id)
                 event_iter = runner.chat_stream(
                     question=question, top_k=top_k, agent_mode=agent_mode, profile=profile
                 )
@@ -341,8 +407,9 @@ def chat_markdown():
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
 
+    model_id = _resolve_request_model_id(data)
     try:
-        runner = _get_runner(kb_id)
+        runner = _get_runner(kb_id, model_id)
         result = runner.chat(question=question, top_k=top_k, agent_mode=agent_mode)
         md = _result_to_markdown(question, result)
         return Response(md, mimetype="text/markdown; charset=utf-8")

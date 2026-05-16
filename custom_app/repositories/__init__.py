@@ -26,6 +26,7 @@ from custom_app.repositories.base import (
     get_default_provider,
     set_default_provider,
 )
+from custom_app.repositories.chat_model_repository import ChatModelRepository
 from custom_app.repositories.document_repository import DocumentRepository
 from custom_app.repositories.job_repository import JobRepository
 from custom_app.repositories.kb_repository import KbRepository
@@ -41,6 +42,7 @@ __all__ = [
     "set_default_provider",
     # repositories
     "AgentConfigRepository",
+    "ChatModelRepository",
     "DocumentRepository",
     "JobRepository",
     "KbRepository",

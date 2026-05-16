@@ -125,6 +125,7 @@ class RagRunner:
         prompt_dir: str = "prompt",
         retriever_param_path: str = "servers/retriever/parameter.yaml", # 用来读取检索侧配置（比如 top_k）
         generation_param_path: str = "servers/generation/parameter.yaml", # 用来读取生成侧配置（比如模型名、base_url、采样参数等）
+        chat_model: Optional[Dict[str, Any]] = None,  # Phase 7.1: chat_models 表的一行
     ) -> None:
         """
         初始化运行器基础路径与运行时状态。
@@ -153,6 +154,11 @@ class RagRunner:
         # final_top_k<=0：不截断召回结果，保证 SOP 全步骤可见
         self._final_top_k = 0
         self._chat_cfg: Dict[str, Any] = {}
+        # Phase 7.1: chat_models 表的一行（user 在 admin 配置的模型）；非空时由
+        # _build_chat_cfg_from_model 接管 backend / base_url / api_key 等
+        self._chat_model: Optional[Dict[str, Any]] = chat_model
+        # 直接挂上 LLMAdapter（quick 模式用），None 表示走老 .env 路径
+        self._llm_adapter = None
         self._rerank_cfg: Dict[str, Any] = {}
         self._rerank_model = None
         self._rerank_load_error: Optional[str] = None
@@ -873,6 +879,9 @@ class RagRunner:
         """
         生成答案：按 ``_chat_cfg['backend']`` 选择 OpenAI 兼容端或 Gemini。
 
+        Phase 7.1: 若有 _llm_adapter（admin 配置了 chat_model），优先走 adapter；
+        否则保留老的 .env / yaml 路径（向后兼容，无 chat_models 表行的部署仍能用）。
+
         参数:
             prompt_text: 渲染后的 prompt 文本。
         返回:
@@ -880,10 +889,37 @@ class RagRunner:
         异常:
             RuntimeError: 远端错误或无正文。
         """
+        if getattr(self, "_llm_adapter", None) is not None:
+            return self._generate_via_adapter(prompt_text)
         backend = (self._chat_cfg.get("backend") or "openai").strip().lower()
         if backend == "gemini":
             return self._generate_gemini(prompt_text)
         return self._generate_openai(prompt_text)
+
+    def _generate_via_adapter(self, prompt_text: str) -> str:
+        """Phase 7.1: 通过 LLMAdapter（OpenAICompat / Anthropic）生成。"""
+        system_prompt = (self._chat_cfg.get("system_prompt") or "").strip()
+        max_tokens = int(self._chat_cfg.get("max_tokens") or 1024)
+        # temperature 仅在 _chat_cfg 显式有值时传；Anthropic 新模型已弃用
+        backend = (self._chat_cfg.get("backend") or "openai").strip().lower()
+        kwargs: Dict[str, Any] = {
+            "system_prompt": system_prompt,
+            "max_tokens": max_tokens,
+        }
+        if backend != "anthropic":
+            t = self._chat_cfg.get("temperature")
+            if t is not None:
+                kwargs["temperature"] = float(t)
+        resp = self._llm_adapter.call(
+            [{"role": "user", "content": prompt_text}],
+            **kwargs,
+        )
+        text = (resp.text or "").strip()
+        if not text:
+            raise RuntimeError(
+                f"adapter generation empty text: model={self._llm_adapter.model_name()}"
+            )
+        return text
 
     def _generate_stream_openai(self, prompt_text: str) -> Iterator[str]:
         """OpenAI 兼容流式 ``/chat/completions``。"""
@@ -1018,11 +1054,36 @@ class RagRunner:
         返回:
             Iterator[str]: 文本增量。
         """
+        if getattr(self, "_llm_adapter", None) is not None:
+            yield from self._generate_stream_via_adapter(prompt_text)
+            return
         backend = (self._chat_cfg.get("backend") or "openai").strip().lower()
         if backend == "gemini":
             yield from self._generate_stream_gemini(prompt_text)
         else:
             yield from self._generate_stream_openai(prompt_text)
+
+    def _generate_stream_via_adapter(self, prompt_text: str) -> Iterator[str]:
+        """Phase 7.1: 通过 LLMAdapter 流式生成（仅产出文本增量）。"""
+        system_prompt = (self._chat_cfg.get("system_prompt") or "").strip()
+        max_tokens = int(self._chat_cfg.get("max_tokens") or 1024)
+        backend = (self._chat_cfg.get("backend") or "openai").strip().lower()
+        kwargs: Dict[str, Any] = {
+            "system_prompt": system_prompt,
+            "max_tokens": max_tokens,
+        }
+        if backend != "anthropic":
+            t = self._chat_cfg.get("temperature")
+            if t is not None:
+                kwargs["temperature"] = float(t)
+        for ev in self._llm_adapter.stream(
+            [{"role": "user", "content": prompt_text}],
+            **kwargs,
+        ):
+            if ev.type == "text" and ev.text:
+                yield ev.text
+            elif ev.type == "error":
+                raise RuntimeError(f"adapter stream error: {ev.error_message}")
 
     def _rewrite_query(self, question: str) -> str:
         """
@@ -1285,6 +1346,8 @@ class RagRunner:
             "request_timeout_sec": _to,
         }
         self._apply_ultrarag_generation_env_overrides()
+        # Phase 7.1: chat_model 行覆盖 yaml + env（admin 选的模型权威）
+        self._apply_chat_model_override()
         if (self._chat_cfg.get("backend") or "").strip().lower() == "gemini":
             logger.info(
                 "RagRunner generation: backend=gemini model=%s",
@@ -1296,6 +1359,46 @@ class RagRunner:
                 self._chat_cfg.get("model_name"),
                 self._chat_cfg.get("base_url"),
             )
+
+    def _apply_chat_model_override(self) -> None:
+        """Phase 7.1：若调用方传入了 chat_model（admin 配置的行），用它覆盖
+        _chat_cfg 的 backend/model_name/base_url/api_key，并构造 LLMAdapter。
+
+        策略：
+            - provider=gemini / openai / openai_compatible → backend="openai"，
+              走 OpenAI 兼容协议（gemini 由 effective_base_url 路由到 Google 兼容端点）
+            - provider=anthropic → backend="anthropic"，由 _generate / _generate_stream
+              分支到 Anthropic adapter
+        """
+        if not self._chat_model:
+            return
+        from custom_app.services.chat_adapter_factory import resolve_chat_adapter
+        from custom_app.services.providers import effective_base_url
+
+        row = self._chat_model
+        provider = (row.get("provider") or "").strip()
+
+        try:
+            self._llm_adapter = resolve_chat_adapter(row)
+        except Exception:
+            logger.exception("resolve_chat_adapter failed; falling back to env path")
+            self._llm_adapter = None
+            return
+
+        if provider == "anthropic":
+            self._chat_cfg["backend"] = "anthropic"
+        else:
+            self._chat_cfg["backend"] = "openai"
+
+        self._chat_cfg["model_name"] = row.get("model_name") or self._chat_cfg.get("model_name")
+        self._chat_cfg["base_url"] = effective_base_url(provider, row.get("base_url") or "")
+        if row.get("api_key"):
+            self._chat_cfg["api_key"] = row["api_key"]
+
+        logger.info(
+            "RagRunner chat_model override: provider=%s model=%s base_url=%s",
+            provider, self._chat_cfg["model_name"], self._chat_cfg["base_url"],
+        )
 
     def _apply_ultrarag_generation_env_overrides(self) -> None:
         """

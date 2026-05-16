@@ -435,9 +435,9 @@ curl -s -X POST "http://localhost:8080/api/kb/$KB/documents/batch-status" \
 
 **通过判据**：
 
-- [ ] 进度卡顶部显示「索引任务: running」但只这 1 行变蓝
-- [ ] 完成时 `chunk_count` 正确（与文档段落数一致）
-- [ ] 其它行 `processed_at` 时间不变（不是"被悄悄重做了"）
+- [ x] 进度卡顶部显示「索引任务: running」但只这 1 行变蓝
+- [ x] 完成时 `chunk_count` 正确（与文档段落数一致）
+- [ x] 其它行 `processed_at` 时间不变（不是"被悄悄重做了"）
 
 ### G.2 重建期间其它老文档查询不阻塞（必过）
 
@@ -446,7 +446,7 @@ curl -s -X POST "http://localhost:8080/api/kb/$KB/documents/batch-status" \
 
 **通过判据**：
 
-- [ ] 不会因为重建在跑就返回「正在维护」或超时
+- [x ] 不会因为重建在跑就返回「正在维护」或超时
 
 ### G.3 删除某文件 + 残留检查（必过）
 
@@ -484,8 +484,8 @@ curl -s -X POST "http://localhost:8080/api/kb/$KB/documents/batch-status" \
 
 **通过判据**：
 
-- [ ] 选中的行同步流转；未选中的行不动
-- [ ] 完成后选中行的 `processed_at` 都刷新
+- [ x] 选中的行同步流转；未选中的行不动
+- [ x] 完成后选中行的 `processed_at` 都刷新
 
 ### G.6 「全量重建」按钮仍可用（必过）
 
@@ -494,8 +494,8 @@ curl -s -X POST "http://localhost:8080/api/kb/$KB/documents/batch-status" \
 
 **通过判据**：
 
-- [ ] 所有文档的 `processed_at` 都刷新
-- [ ] 这条路径与 Phase 6.1 验收一致
+- [ x] 所有文档的 `processed_at` 都刷新
+- [x ] 这条路径与 Phase 6.1 验收一致
 
 ### G.7 Phase 6.2 自动化测试
 
@@ -514,6 +514,193 @@ python -m custom_app.scripts.apply_phase6_2_migration
 ```
 
 幂等可重跑。
+
+---
+
+## H. Phase 7 对话模型管理 + 前端切换（约 15 分钟）
+
+> 目标：admin 可注册/管理 Gemini / OpenAI / Anthropic / OpenAI 兼容（vLLM）4 类
+> 模型；对话页可在 chip 切换；切换不会让 Runner 缓存串台。
+
+**前置**：
+
+- F + G 已通过
+- Postgres 迁移：
+  ```powershell
+  python -m custom_app.scripts.apply_phase7_migration
+  ```
+  （SQLite 后端 init_db 自动建表，不用手工跑）
+- 可选：`pip install openai anthropic`（仅在你要测试 OpenAI / Anthropic 模型时）
+
+### H.1 Admin 模型管理列表（必过）
+
+1. 启动 Flask；打开 `/admin`
+2. 侧栏出现「模型管理」入口；点击进入
+3. 空状态：显示「还没有对话模型」+ 「新增模型」按钮
+
+**通过判据**：
+
+- [x ] 导航 active 态正确
+- [x ] 路由 `#/models` 工作
+
+### H.2 新增 Gemini 模型并测试连接（必过）
+
+1. 点「+ 新增模型」→ 弹窗：Provider 选 `Google Gemini` / 显示名 `Gemini Pro 主力` / Model Name `gemini-2.5-pro` / Base URL 留空 / API Key 填 `.env` 里 `GOOGLE_API_KEY` 的值 / 启用 ✓
+2. 保存 → 列表出现该模型
+3. 点该卡片的「测试」按钮 → 提示 ✓ 连接成功（含延迟 ms）
+
+**通过判据**：
+
+- [ x] 卡片显示 provider 标签 + model_name
+- [x ] 「测试」真实发出请求（看 Flask 日志 / Gemini quota）
+- [ x] api_key 在 GET 返回中是 `***`
+
+### H.3 「设为默认」+ 切换（必过）
+
+1. 再新增第 2 个模型：例如 OpenAI 兼容（vLLM）—— `Qwen 2.5 7B` / `Qwen2.5-7B-Instruct` / `http://192.168.8.40:8000/v1`
+2. 在 Qwen 卡片上点「设为默认」→ Gemini 的「默认」徽章消失，Qwen 出现
+3. 回到对话页 `/` → 输入框区的 chip 显示 `Qwen 2.5 7B`
+
+**通过判据**：
+
+- [x ] 默认徽章只出现在一个模型上
+- [x ] 对话页 chip 自动反映新默认
+
+### H.4 对话页 chip 切换（必过）
+
+1. 点击 chip → 弹出 dropdown，列出所有 enabled 模型 + provider/model_name 子文本
+2. 选 `Gemini Pro 主力` → chip 标签更新为 `Gemini Pro 主力`
+3. 刷新页面 → chip 仍是 `Gemini Pro 主力`（localStorage 记忆）
+4. 输入问题发送 → Flask 日志看到 `model_id=model_xxx`（与所选一致）
+
+**通过判据**：
+
+- [x ] 选过后刷新仍保留
+- [ ] 后端日志 `chat_stream routing model_id=` 出现并匹配
+
+### H.5 编辑 + 删除模型（必过）
+
+1. 在某模型卡片点「编辑」→ 修改显示名 / 描述 → 保存 → 列表反映
+2. 在 api_key 字段**留空**保存 → 后端 api_key **不变**（不会被覆盖成空）
+3. 点「删除」→ 二次确认 → 卡片消失；列表 GET 不再返回
+4. 切到对话页 chip → 已删的模型从 dropdown 消失
+
+**通过判据**：
+
+- [ x] 留空 api_key 不覆盖原值（用 Postgres 直查可确认）
+- [x ] 删除是软删（`deleted_at` 非 NULL）
+
+### H.6 SSRF 校验（可选，2 分钟）
+
+1. 编辑模型，Base URL 填 `ftp://example.com` → 保存应被拒（提示 SSRF rejected）
+2. 填 `http://192.168.8.40:8000/v1` → 应通过（默认允许私网）
+
+**通过判据**：
+
+- [ x] 非 http/https scheme 被拒
+- [x ] 私网 IP 默认放行（与项目实际部署一致）
+
+### H.7 Phase 7 自动化测试
+
+```powershell
+& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" -m pytest tests/test_phase7_chat_model_repository.py tests/test_phase7_providers_and_ssrf.py tests/test_phase7_admin_models_api.py -q
+```
+
+**期望**：38 个用例全过。
+
+---
+
+### 已知偏离（写明给下次接手）
+
+Phase 7 接入是**渐进式**：
+
+| 项 | 状态 |
+|---|---|
+| Gemini 走 .env 的真链路（RagRunner/AgentRunner 不变） | 当前 |
+| OpenAI / Anthropic / OpenAI 兼容 可创建 + 管理 + 测试连接 | ✓ |
+| OpenAI / Anthropic 真正接入对话链路（RagRunner 内部读 chat_models 表） | **Phase 7.1**（下次 PR） |
+| `(kb_id, model_id)` 作 Runner cache key 不串台 | ✓（model_id 仅作 key，未改 LLM 调用） |
+
+如果用户在 chip 选了 OpenAI / Anthropic 的模型，**当前会按 .env 的 Gemini 配置发请求**——
+chip 只更换 Runner 缓存键 + UI 显示。LLM 真切换待 Phase 7.1。
+
+> **Phase 7.1 已完成 ⭐**：见下方 §H'。LLM 真切换、agent 跨 provider tool calling 已支持。
+
+---
+
+## H'. Phase 7.1 多 provider 真切换（约 10 分钟）
+
+> 目标：chip 选哪个模型后端就真用哪个 LLM；agent 模式 tool calling 全 provider 通跑。
+
+**架构折中（参考 WeKnora）**：
+- **Gemini**：走 Google 官方 OpenAI 兼容端点 `https://generativelanguage.googleapis.com/v1beta/openai`
+- **OpenAI / vLLM / 兼容**：直接 OpenAI 协议
+- **Anthropic**：用专用 SDK（独立 messages/tools 协议）
+
+代价：Gemini 经兼容端点丢失 `thoughtSignature`（multi-turn 思维链回传），其它能力完整保留。
+
+### H'.1 vLLM（OpenAI 兼容）quick 模式真切换
+
+1. admin 新建模型：provider `openai_compatible` / model_name 与 vLLM `--served-model-name` 一致 / base_url `http://192.168.8.40:8000/v1` / api_key 任意
+2. 对话页 chip 选该模型，发问题
+3. Flask 日志看 `RagRunner chat_model override: provider=openai_compatible model=... base_url=http://192.168.8.40:8000/v1`
+
+**通过判据**：
+
+- [ ] 日志显示 vLLM URL，不是 `.env` 里的 Gemini URL
+- [ ] 答案来自 vLLM（看 Qdrant 命中 + 风格）
+
+### H'.2 Gemini quick 模式（经 OpenAI 兼容端点）
+
+1. 切到已配置的 Gemini 模型
+2. 发问题
+3. 日志看 `RagRunner chat_model override: provider=gemini model=gemini-2.5-pro base_url=https://generativelanguage.googleapis.com/v1beta/openai`
+
+**通过判据**：
+
+- [ ] base_url 自动改写成 `/v1beta/openai`
+- [ ] 答案正常返回
+
+### H'.3 Anthropic quick 模式
+
+1. 切到已配置的 Claude 模型
+2. 发问题
+3. 日志看 `RagRunner chat_model override: provider=anthropic model=claude-opus-4-7 base_url=https://api.anthropic.com`
+
+**通过判据**：
+
+- [ ] base_url 是 Anthropic 官方
+- [ ] 答案正常返回
+- [ ] 不传 `temperature`（新模型已弃用）
+
+### H'.4 智能推理（agent）跨 provider tool calling
+
+1. 切到 vLLM 模型 → 智能体改成「智能推理」→ 问需要检索的问题
+2. 日志看到 `chat_stream routing → AgentRunner ... model_id=...` + 多轮 tool_call/tool_result 事件
+3. 同样测试 Gemini 和 Anthropic（Anthropic 推荐用 Sonnet 或 Opus，支持 tool_use）
+
+**通过判据**：
+
+- [ ] 每个 provider 都能在 agent 模式下成功调用 `knowledge_search` 等工具
+- [ ] 最终 `final_answer` 给出答案
+
+### H'.5 自动化测试
+
+```powershell
+& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" -m pytest tests/test_phase7_1_adapters.py -q
+```
+
+**期望**：18 个用例全过。
+
+### 已知差异
+
+| 项 | 状态 |
+|---|---|
+| Gemini 原生 `:generateContent` 路径 | **仍保留**（无 chat_models 行时回退用） |
+| `thoughtSignature` 透传 | 走 OpenAI 兼容端点时**丢失**（与 WeKnora 同取舍） |
+| Anthropic streaming text | ✓ |
+| Anthropic streaming tool_use args | ✓（input_json_delta） |
+| `extra_config.temperature` 在 Anthropic 调用时不传 | ✓（新模型弃用） |
 
 ---
 

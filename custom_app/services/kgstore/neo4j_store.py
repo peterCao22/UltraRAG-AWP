@@ -243,17 +243,12 @@ class Neo4jKgStore:
         doc_stem = doc_id_to_stem(doc_id)
 
         with self._session() as session:
-            # 1) 删关系并统计
+            # 1) 删关系并统计：一条语句 DELETE + RETURN count
             rel_rec = session.run(
                 """
                 MATCH ()-[r:RELATES_TO {kb_id: $kb_id, doc_id: $doc_id}]->()
-                WITH count(r) AS cnt
-                CALL {
-                  MATCH ()-[r2:RELATES_TO {kb_id: $kb_id, doc_id: $doc_id}]->()
-                  DELETE r2
-                  RETURN count(*) AS deleted
-                }
-                RETURN cnt
+                DELETE r
+                RETURN count(r) AS cnt
                 """,
                 kb_id=kb_id, doc_id=doc_id,
             ).single()

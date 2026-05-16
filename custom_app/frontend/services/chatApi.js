@@ -98,6 +98,8 @@ export async function sendChatMessage({
   kbId,
   question,
   agentMode = 'quick',
+  /** Phase 7: 可选 model_id；缺省时服务端取 ChatModelRepository 默认 */
+  modelId = '',
   /** 与 Phase 1 会话落库对应；有值时写入 kb_session_messages */
   sessionId = '',
   /** 为 true 时请求体带 profile，服务端在 meta SSE 中返回 phase_timings_ms（Phase P 排障） */
@@ -159,6 +161,9 @@ export async function sendChatMessage({
     }
     if (sessionId) {
       bodyPayload.session_id = sessionId
+    }
+    if (modelId) {
+      bodyPayload.model_id = modelId
     }
     const response = await fetch(endpoint, {
       method: 'POST',

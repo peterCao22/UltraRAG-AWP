@@ -71,6 +71,7 @@ class AgentRunner:
         kb_id: str,
         max_iterations: int = 12,
         enabled_tools: Optional[List[str]] = None,
+        chat_model: Optional[Dict[str, Any]] = None,  # Phase 7.1: chat_models 表的一行
     ) -> None:
         self.kb_id = kb_id
         self.max_iterations = max_iterations
@@ -81,6 +82,7 @@ class AgentRunner:
         self._registry: Any = None
         self._adapter: Any = None
         self._gemini_tools: Any = None
+        self._chat_model: Optional[Dict[str, Any]] = chat_model
         # KG 是否可用（init() 时查 kg 表行数），False 时不向 LLM 暴露 query_knowledge_graph，
         # 避免出现「开关开了但表是空的，LLM 反复尝试 KG 浪费轮次」的情况。
         self._kg_available: bool = True
@@ -148,15 +150,27 @@ class AgentRunner:
         self._registry.register(FinalAnswerTool())
         self._registry.register(QueryKnowledgeGraphTool(kb_id=self.kb_id))
 
-        api_key = (
-            os.environ.get("GOOGLE_API_KEY")
-            or os.environ.get("ULTRARAG_GEMINI_API_KEY")
-            or ""
-        )
-        model = os.environ.get("ULTRARAG_GEMINI_MODEL", "gemini-2.0-flash")
-
-        from custom_app.services.llm_adapter import GeminiLLMAdapter, openai_tools_to_gemini
-        self._adapter = GeminiLLMAdapter(api_key=api_key, model=model)
+        # Phase 7.1: 若调用方传入 chat_model（admin 配置），用 adapter 工厂；
+        # 否则保留老路径 GeminiLLMAdapter（兼容无 chat_models 表的部署）
+        if self._chat_model:
+            from custom_app.services.chat_adapter_factory import resolve_chat_adapter
+            self._adapter = resolve_chat_adapter(self._chat_model)
+            self._adapter_canonical = True
+            logger.info(
+                "AgentRunner using canonical adapter: provider=%s model=%s",
+                self._chat_model.get("provider"),
+                self._chat_model.get("model_name"),
+            )
+        else:
+            api_key = (
+                os.environ.get("GOOGLE_API_KEY")
+                or os.environ.get("ULTRARAG_GEMINI_API_KEY")
+                or ""
+            )
+            model = os.environ.get("ULTRARAG_GEMINI_MODEL", "gemini-2.0-flash")
+            from custom_app.services.llm_adapter import GeminiLLMAdapter
+            self._adapter = GeminiLLMAdapter(api_key=api_key, model=model)
+            self._adapter_canonical = False
 
         # 检测当前 KB 的 KG 是否真的有数据；空表则把 query_knowledge_graph 从生效集合
         # 中临时剔除，并在 system prompt 里告诉 LLM 不要尝试图谱查询。
@@ -167,9 +181,15 @@ class AgentRunner:
                 self.kb_id,
             )
 
-        self._gemini_tools = openai_tools_to_gemini(
-            self._registry.get_schemas(self._effective_enabled_tools())
-        )
+        # 老 Gemini 路径需要把 OpenAI 工具 schema 转 Gemini 格式；canonical 路径直接传 OpenAI 标准
+        if not self._adapter_canonical:
+            from custom_app.services.llm_adapter import openai_tools_to_gemini
+            self._gemini_tools = openai_tools_to_gemini(
+                self._registry.get_schemas(self._effective_enabled_tools())
+            )
+        else:
+            # canonical 模式：直接拿 OpenAI 风格 schema，Adapter 内部转 provider 原生
+            self._gemini_tools = self._registry.get_schemas(self._effective_enabled_tools())
 
     def _detect_kg_available(self) -> bool:
         """检查当前 KB 在 KG 后端里是否真的有实体/关系。
@@ -398,12 +418,37 @@ class AgentRunner:
         system_prompt: str,
         tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """调用 Gemini API，返回 {text: str, tool_calls: list}。"""
+        """调用 LLM，返回 {text: str, tool_calls: list}。
+
+        - canonical adapter（Phase 7.1）：直接返回 CanonicalChatResponse 转 dict
+        - 老 Gemini adapter（向后兼容）：用 gemini_response_to_tool_calls 解析
+        """
+        if getattr(self, "_adapter_canonical", False):
+            resp = self._adapter.call(
+                messages,
+                tools=tools,
+                system_prompt=system_prompt,
+            )
+            # CanonicalToolCall → AgentRunner 内部使用的 dict 格式
+            # 字段对齐老路径：{name, args}；额外保留 id 供 OpenAI/Anthropic 多轮 tool_call_id 关联
+            tool_calls = []
+            for tc in resp.tool_calls:
+                try:
+                    args = json.loads(tc.arguments_json or "{}")
+                except Exception:
+                    args = {}
+                tool_calls.append({
+                    "id": tc.id,
+                    "name": tc.name,
+                    "args": args if isinstance(args, dict) else {},
+                })
+            return {"text": resp.text or "", "tool_calls": tool_calls}
+
+        # 老路径：Gemini 原生 adapter
         from custom_app.services.llm_adapter import (
             gemini_response_to_tool_calls,
             gemini_response_extract_text,
         )
-
         response = self._adapter.call(
             messages=messages,
             tools=tools,

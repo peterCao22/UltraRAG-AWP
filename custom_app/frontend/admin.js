@@ -10,19 +10,26 @@ import { isAllowedKbUploadFile, getAcceptAttr, getUploadHint } from './utils/upl
 import {
   batchDocumentStatus,
   batchReindexDocuments,
+  createAdminModel,
   createIngestJob,
   createKnowledgeBase,
+  deleteAdminModel,
   deleteDocument,
   deleteKnowledgeBase,
   getAgentConfig,
   getJobProgress,
   getKnowledgeBase,
+  listAdminModels,
   listDocumentChunks,
   listDocuments,
   listJobs,
   listKnowledgeBases,
+  listProviders,
   reindexDocument,
   retryDocument,
+  setDefaultAdminModel,
+  testAdminModel,
+  updateAdminModel,
   updateAgentConfig,
   uploadKbDocuments,
 } from './services/kbApi.js'
@@ -30,19 +37,26 @@ import {
 const defaultKbApi = {
   batchDocumentStatus,
   batchReindexDocuments,
+  createAdminModel,
   listKnowledgeBases,
   createKnowledgeBase,
   createIngestJob,
+  deleteAdminModel,
   deleteDocument,
   deleteKnowledgeBase,
   getAgentConfig,
   getJobProgress,
   getKnowledgeBase,
+  listAdminModels,
   listDocumentChunks,
   listDocuments,
   listJobs,
+  listProviders,
   reindexDocument,
   retryDocument,
+  setDefaultAdminModel,
+  testAdminModel,
+  updateAdminModel,
   updateAgentConfig,
   uploadKbDocuments,
 }
@@ -96,6 +110,7 @@ function parseRoute() {
   const raw = (window.location.hash || '#/').replace(/^#/, '')
   if (raw === '/' || raw === '') return { view: 'list' }
   if (raw === '/status') return { view: 'status' }
+  if (raw === '/models') return { view: 'models' }
   const m = raw.match(/^\/kb\/([^/]+)\/?$/)
   if (m) return { view: 'detail', kbId: decodeURIComponent(m[1]) }
   return { view: 'list' }
@@ -688,6 +703,376 @@ export function initAdminApp({
     }
   }
 
+  async function renderModels() {
+    clearPoll()
+    clearDocPoll()
+    activeKbId = null
+    setNavActive(root, 'models')
+    if (titleEl) titleEl.textContent = '模型管理'
+
+    outlet.replaceChildren(buildAdminListSkeleton())
+    try {
+      const [models, providers] = await Promise.all([
+        api.listAdminModels(),
+        api.listProviders(),
+      ])
+      const wrap = document.createElement('div')
+      wrap.className = 'admin-list-view'
+
+      const toolbar = document.createElement('div')
+      toolbar.className = 'admin-toolbar'
+      const btnNew = document.createElement('button')
+      btnNew.type = 'button'
+      btnNew.className = 'primary-action'
+      btnNew.textContent = '+ 新增模型'
+      btnNew.addEventListener('click', () => openModelEditor(null, providers))
+      toolbar.append(btnNew)
+      wrap.append(toolbar)
+
+      if (!models.length) {
+        const empty = document.createElement('div')
+        empty.className = 'admin-empty'
+        const icon = document.createElement('div')
+        icon.className = 'admin-empty-icon'
+        icon.textContent = '🤖'
+        const h2 = document.createElement('h2')
+        h2.className = 'admin-empty-title'
+        h2.textContent = '还没有对话模型'
+        const p = document.createElement('p')
+        p.className = 'muted'
+        p.textContent = '添加 Gemini / OpenAI / Anthropic / OpenAI 兼容（vLLM）模型，供对话页选用。'
+        empty.append(icon, h2, p)
+        wrap.append(empty)
+        outlet.replaceChildren(wrap)
+        return
+      }
+
+      const grid = document.createElement('section')
+      grid.className = 'card-grid'
+
+      for (const m of models) {
+        const card = document.createElement('article')
+        card.className = 'card admin-kb-card admin-model-card'
+
+        const h2 = document.createElement('h2')
+        h2.textContent = m.name
+        if (m.is_default) {
+          const badge = document.createElement('span')
+          badge.className = 'status-badge status-badge--ok'
+          badge.textContent = '默认'
+          h2.append(' ', badge)
+        }
+        card.append(h2)
+
+        const meta = document.createElement('p')
+        meta.className = 'muted admin-kb-meta'
+        const provLabel = (providers.find((p) => p.name === m.provider) || {}).label || m.provider
+        meta.textContent = `${provLabel} · ${m.model_name} · ${m.enabled ? '启用' : '已禁用'}`
+        card.append(meta)
+
+        if (m.description) {
+          const desc = document.createElement('p')
+          desc.className = 'muted'
+          desc.style.fontSize = '12px'
+          desc.textContent = m.description
+          card.append(desc)
+        }
+
+        const row = document.createElement('div')
+        row.className = 'admin-card-actions'
+
+        const btnEdit = document.createElement('button')
+        btnEdit.type = 'button'
+        btnEdit.className = 'button-secondary button-small'
+        btnEdit.textContent = '编辑'
+        btnEdit.addEventListener('click', () => openModelEditor(m, providers))
+
+        const btnTest = document.createElement('button')
+        btnTest.type = 'button'
+        btnTest.className = 'button-secondary button-small'
+        btnTest.textContent = '测试'
+        btnTest.addEventListener('click', async () => {
+          btnTest.disabled = true
+          btnTest.textContent = '测试中…'
+          try {
+            const result = await api.testAdminModel(m.model_id)
+            if (result.ok) {
+              showFlash(`✓ ${m.name} 连接成功（${result.latency_ms}ms）`, 'success')
+            } else {
+              showFlash(`✗ ${m.name} 连接失败：${result.error || '未知错误'}`)
+            }
+          } catch (e) {
+            showFlash(e.message || String(e))
+          } finally {
+            btnTest.disabled = false
+            btnTest.textContent = '测试'
+          }
+        })
+
+        const btnDefault = document.createElement('button')
+        btnDefault.type = 'button'
+        btnDefault.className = 'button-secondary button-small'
+        btnDefault.textContent = m.is_default ? '已是默认' : '设为默认'
+        btnDefault.disabled = m.is_default
+        btnDefault.addEventListener('click', async () => {
+          try {
+            await api.setDefaultAdminModel(m.model_id)
+            showFlash('已设为默认', 'success')
+            await renderModels()
+          } catch (e) {
+            showFlash(e.message || String(e))
+          }
+        })
+
+        const btnDel = document.createElement('button')
+        btnDel.type = 'button'
+        btnDel.className = 'button-danger button-small'
+        btnDel.textContent = '删除'
+        btnDel.addEventListener('click', async () => {
+          const ok = await openConfirmModal({
+            message: `确定删除模型「${m.name}」？（软删除，可后续恢复）`,
+            confirmLabel: '删除',
+          })
+          if (!ok) return
+          try {
+            await api.deleteAdminModel(m.model_id)
+            await renderModels()
+          } catch (e) {
+            showFlash(e.message || String(e))
+          }
+        })
+
+        row.append(btnEdit, btnTest, btnDefault, btnDel)
+        card.append(row)
+        grid.append(card)
+      }
+
+      wrap.append(grid)
+      outlet.replaceChildren(wrap)
+    } catch (e) {
+      Toast.show(`加载失败：${e.message || String(e)}`, 'error')
+      outlet.innerHTML = sanitizeHtml(`<p class="admin-error">加载失败：${escapeHtml(e.message || String(e))}</p>`)
+    }
+  }
+
+  function openModelEditor(existing, providers) {
+    // DOM 构建（不走 sanitizeHtml；DOMPurify 3.x 在某些表单场景会丢 name 属性）
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+
+    const card = document.createElement('div')
+    card.className = 'modal-card modal-card--wide'
+
+    const isEdit = !!existing
+
+    const title = document.createElement('h2')
+    title.className = 'modal-title'
+    title.textContent = isEdit ? '编辑模型' : '新增模型'
+
+    const form = document.createElement('form')
+    form.className = 'admin-form'
+    form.dataset.role = 'model-form'
+
+    function makeField(labelText, control, requiredMark = false, hint = '') {
+      const lbl = document.createElement('label')
+      lbl.append(document.createTextNode(labelText))
+      if (requiredMark) {
+        const star = document.createElement('span')
+        star.className = 'required'
+        star.textContent = ' *'
+        lbl.append(star)
+      }
+      if (hint) {
+        const small = document.createElement('small')
+        small.className = 'muted'
+        small.style.display = 'block'
+        small.textContent = hint
+        lbl.append(small)
+      }
+      lbl.append(control)
+      return lbl
+    }
+
+    // 显示名
+    const inputName = document.createElement('input')
+    inputName.name = 'name'
+    inputName.className = 'field'
+    inputName.required = true
+    inputName.maxLength = 120
+    form.append(makeField('显示名', inputName, true))
+
+    // Provider
+    const selectProvider = document.createElement('select')
+    selectProvider.name = 'provider'
+    selectProvider.className = 'field'
+    selectProvider.required = true
+    if (isEdit) selectProvider.disabled = true
+    for (const p of providers) {
+      const opt = document.createElement('option')
+      opt.value = p.name
+      opt.textContent = p.label
+      selectProvider.append(opt)
+    }
+    form.append(makeField('Provider', selectProvider, true))
+
+    // Model Name
+    const inputModelName = document.createElement('input')
+    inputModelName.name = 'model_name'
+    inputModelName.className = 'field'
+    inputModelName.required = true
+    inputModelName.maxLength = 200
+    inputModelName.placeholder = '例如 gemini-2.5-pro / gpt-4o / claude-haiku-4-5-20251001'
+    form.append(makeField('Model Name', inputModelName, true))
+
+    // Base URL
+    const inputBaseUrl = document.createElement('input')
+    inputBaseUrl.name = 'base_url'
+    inputBaseUrl.className = 'field'
+    inputBaseUrl.maxLength = 500
+    inputBaseUrl.placeholder = '例如 http://192.168.8.40:8000/v1（vLLM）'
+    form.append(makeField('Base URL（可空，使用 provider 默认值）', inputBaseUrl))
+
+    // API Key
+    const inputApiKey = document.createElement('input')
+    inputApiKey.name = 'api_key'
+    inputApiKey.type = 'password'
+    inputApiKey.className = 'field'
+    inputApiKey.maxLength = 500
+    const apiKeyHint = isEdit ? '留空表示不变' : 'auth provider 必填'
+    form.append(makeField('API Key', inputApiKey, !isEdit, apiKeyHint))
+
+    // 描述
+    const textareaDesc = document.createElement('textarea')
+    textareaDesc.name = 'description'
+    textareaDesc.className = 'field'
+    textareaDesc.rows = 2
+    textareaDesc.maxLength = 500
+    form.append(makeField('描述（可选）', textareaDesc))
+
+    // 启用
+    const enabledLabel = document.createElement('label')
+    enabledLabel.style.display = 'flex'
+    enabledLabel.style.alignItems = 'center'
+    enabledLabel.style.gap = '8px'
+    const enabledCb = document.createElement('input')
+    enabledCb.type = 'checkbox'
+    enabledCb.name = 'enabled'
+    enabledCb.checked = true
+    enabledLabel.append(enabledCb)
+    const enabledTxt = document.createElement('span')
+    enabledTxt.textContent = '启用'
+    enabledLabel.append(enabledTxt)
+    form.append(enabledLabel)
+
+    // 测试连接区（仅编辑现有模型时显示；新建模型保存后再测试）
+    if (isEdit) {
+      const testSection = document.createElement('div')
+      testSection.className = 'admin-form'
+      const testTitle = document.createElement('p')
+      testTitle.textContent = '连接测试'
+      testTitle.style.margin = '12px 0 4px'
+      testSection.append(testTitle)
+      const testBtn = document.createElement('button')
+      testBtn.type = 'button'
+      testBtn.className = 'button-secondary'
+      testBtn.textContent = '测试连接'
+      const testResult = document.createElement('p')
+      testResult.className = 'muted'
+      testResult.style.fontSize = '12px'
+      testResult.style.margin = '6px 0 0'
+      testSection.append(testBtn, testResult)
+      form.append(testSection)
+
+      testBtn.addEventListener('click', async () => {
+        testBtn.disabled = true
+        testResult.textContent = '测试中…'
+        testResult.style.color = ''
+        try {
+          const result = await api.testAdminModel(existing.model_id)
+          if (result && result.ok) {
+            testResult.textContent =
+              `✓ 连接成功（${result.latency_ms}ms）`
+              + (result.sample ? ' · ' + result.sample : '')
+            testResult.style.color = '#237804'
+          } else {
+            testResult.textContent =
+              `✗ 连接失败：${(result && result.error) || '未知错误'}`
+            testResult.style.color = '#a8071a'
+          }
+        } catch (e) {
+          testResult.textContent = `✗ ${e.message || String(e)}`
+          testResult.style.color = '#a8071a'
+        } finally {
+          testBtn.disabled = false
+        }
+      })
+    } else {
+      // 新建时给一行说明
+      const hint = document.createElement('p')
+      hint.className = 'muted'
+      hint.style.fontSize = '12px'
+      hint.style.margin = '8px 0 0'
+      hint.textContent = '保存后可在卡片列表或重新打开"编辑"中测试连接。'
+      form.append(hint)
+    }
+
+    // 按钮区
+    const actions = document.createElement('div')
+    actions.className = 'modal-actions'
+    const btnCancel = document.createElement('button')
+    btnCancel.type = 'button'
+    btnCancel.className = 'button-secondary'
+    btnCancel.textContent = '取消'
+    btnCancel.addEventListener('click', () => overlay.remove())
+    const btnSubmit = document.createElement('button')
+    btnSubmit.type = 'submit'
+    btnSubmit.className = 'button-primary'
+    btnSubmit.textContent = '保存'
+    actions.append(btnCancel, btnSubmit)
+    form.append(actions)
+
+    card.append(title, form)
+    overlay.append(card)
+    document.body.append(overlay)
+
+    if (isEdit) {
+      inputName.value = existing.name || ''
+      selectProvider.value = existing.provider || 'gemini'
+      inputModelName.value = existing.model_name || ''
+      inputBaseUrl.value = existing.base_url === '***' ? '' : (existing.base_url || '')
+      inputApiKey.value = '' // 留空表示不变
+      inputApiKey.placeholder = '留空表示不变'
+      textareaDesc.value = existing.description || ''
+      enabledCb.checked = !!existing.enabled
+    } else {
+      selectProvider.value = 'gemini'
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const payload = {
+        name: inputName.value.trim(),
+        provider: selectProvider.value,
+        model_name: inputModelName.value.trim(),
+        base_url: inputBaseUrl.value.trim(),
+        api_key: inputApiKey.value,
+        description: textareaDesc.value.trim(),
+        enabled: enabledCb.checked,
+      }
+      try {
+        if (isEdit) {
+          await api.updateAdminModel(existing.model_id, payload)
+        } else {
+          await api.createAdminModel(payload)
+        }
+        overlay.remove()
+        await renderModels()
+      } catch (err) {
+        showFlash(err.message || String(err))
+      }
+    })
+  }
+
   function renderStatus() {
     clearPoll()
     clearDocPoll()
@@ -706,6 +1091,7 @@ export function initAdminApp({
     const route = parseRoute()
     if (route.view === 'list') await renderList()
     else if (route.view === 'status') renderStatus()
+    else if (route.view === 'models') await renderModels()
     else if (route.view === 'detail' && route.kbId) await renderDetail(route.kbId)
     else await renderList()
   }

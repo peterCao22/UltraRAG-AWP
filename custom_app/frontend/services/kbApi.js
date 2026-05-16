@@ -429,3 +429,73 @@ export async function updateAgentConfig(kbId, enabledTools, { adminToken } = {})
   const body = await response.json()
   return body.data
 }
+
+// ── Phase 7: 对话模型管理 ─────────────────────────────────────────────
+
+const ADMIN_MODELS_ENDPOINT = '/api/admin/models'
+const CHAT_MODELS_ENDPOINT = '/api/chat/models'
+
+export async function listProviders({ adminToken } = {}) {
+  const r = await fetch(`${ADMIN_MODELS_ENDPOINT}/providers`, { headers: adminHeaders(adminToken) })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data || []
+}
+
+export async function listAdminModels({ adminToken } = {}) {
+  const r = await fetch(ADMIN_MODELS_ENDPOINT, { headers: adminHeaders(adminToken) })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data || []
+}
+
+export async function createAdminModel(payload, { adminToken } = {}) {
+  const r = await fetch(ADMIN_MODELS_ENDPOINT, {
+    method: 'POST', headers: jsonHeaders(adminToken),
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+export async function updateAdminModel(modelId, payload, { adminToken } = {}) {
+  const r = await fetch(`${ADMIN_MODELS_ENDPOINT}/${encodeURIComponent(modelId)}`, {
+    method: 'PUT', headers: jsonHeaders(adminToken),
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+export async function deleteAdminModel(modelId, { adminToken } = {}) {
+  const r = await fetch(`${ADMIN_MODELS_ENDPOINT}/${encodeURIComponent(modelId)}`, {
+    method: 'DELETE', headers: adminHeaders(adminToken),
+  })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+export async function setDefaultAdminModel(modelId, { adminToken } = {}) {
+  const r = await fetch(
+    `${ADMIN_MODELS_ENDPOINT}/${encodeURIComponent(modelId)}/set-default`,
+    { method: 'POST', headers: jsonHeaders(adminToken) },
+  )
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+export async function testAdminModel(modelId, { adminToken } = {}) {
+  const r = await fetch(
+    `${ADMIN_MODELS_ENDPOINT}/${encodeURIComponent(modelId)}/test`,
+    { method: 'POST', headers: jsonHeaders(adminToken) },
+  )
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+/**
+ * 对话页 chip 用：返回 enabled 模型列表（不含 api_key/base_url）。
+ */
+export async function listChatModels() {
+  const r = await fetch(CHAT_MODELS_ENDPOINT, { headers: { Accept: 'application/json' } })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data || []
+}

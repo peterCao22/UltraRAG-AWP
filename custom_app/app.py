@@ -15,7 +15,13 @@ from pathlib import Path
 
 from flask import Flask, jsonify, make_response, redirect, request, send_from_directory
 
-from custom_app.api import chat_bp, kb_bp, roles_bp, sessions_bp
+from custom_app.api import (
+    admin_models_bp,
+    chat_bp,
+    kb_bp,
+    roles_bp,
+    sessions_bp,
+)
 from custom_app.db import init_db
 from custom_app.logging_setup import setup_logging
 
@@ -73,6 +79,7 @@ def _is_admin_request(path: str) -> bool:
         or path.startswith("/api/kb/")
         or path == "/api/roles"
         or path.startswith("/api/roles/")
+        or path.startswith("/api/admin/")
     )
 
 
@@ -128,6 +135,7 @@ def create_app() -> Flask:
     app.register_blueprint(kb_bp)
     app.register_blueprint(roles_bp)
     app.register_blueprint(sessions_bp)
+    app.register_blueprint(admin_models_bp)
 
     @app.before_request
     def require_admin_token():

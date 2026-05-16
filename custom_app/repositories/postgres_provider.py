@@ -234,6 +234,31 @@ CREATE TABLE IF NOT EXISTS kg_entities (
 CREATE INDEX IF NOT EXISTS idx_kg_entity_kb ON kg_entities(kb_id);
 CREATE INDEX IF NOT EXISTS idx_kg_entity_name ON kg_entities(entity_name);
 
+-- Phase 7: 对话模型注册表
+CREATE TABLE IF NOT EXISTS chat_models (
+  id            SERIAL PRIMARY KEY,
+  model_id      TEXT NOT NULL UNIQUE,
+  tenant_id     INTEGER NOT NULL DEFAULT 1,
+  name          TEXT NOT NULL,
+  provider      TEXT NOT NULL,
+  model_name    TEXT NOT NULL,
+  base_url      TEXT DEFAULT '',
+  api_key       TEXT DEFAULT '',
+  is_default    BOOLEAN NOT NULL DEFAULT FALSE,
+  enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+  description   TEXT DEFAULT '',
+  extra_json    TEXT NOT NULL DEFAULT '{}',
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_models_tenant_enabled
+  ON chat_models (tenant_id, enabled);
+
+CREATE INDEX IF NOT EXISTS idx_chat_models_provider
+  ON chat_models (provider);
+
 CREATE TABLE IF NOT EXISTS kg_relations (
   id            SERIAL PRIMARY KEY,
   kb_id         TEXT NOT NULL,
