@@ -322,3 +322,105 @@ I. Phase 7.2.A Agent 配置（约 15 分钟）
 ---
 
 *Phase 7.2.A 让 system_prompt 从全局 yaml 移到 per-agent 数据库，解决"vLLM 排版差/AGV SOP prompt 一刀切"两个具体问题，为完整 agent 体系打底。*
+
+---
+
+## 十二、会话续接上下文（2026-05-16 压缩点）
+
+> 之前的会话已被压缩；新会话从这里开始读即可。下面是接着做 Phase 7.2.A 需要知道的全部状态。
+
+### 12.1 当前 git 状态
+
+- 分支：`main`，已 commit 到 `09b8c39 feat(phase7): 多 provider 对话模型管理 + 真切换（7.0 + 7.1）`
+- 工作树干净，未 push（用户要不要 push 自行决定）
+- 上游：`awp/main`
+
+### 12.2 Phase 7.0 + 7.1 已完成
+
+详见 [PHASE_7_1_COMPLETION.md](./PHASE_7_1_COMPLETION.md)。一句话总结：
+
+- `chat_models` 表（Postgres + SQLite）+ admin 模型管理 UI 已落地
+- 4 个 provider 真切换：Gemini（走 `/v1beta/openai` 兼容端点）/ OpenAI / vLLM / Anthropic（专用 SDK）
+- 对话页 chip 切换正确路由到对应 provider；Runner cache 按 `(kb_id, model_id)` 隔离
+- 221 单测全过；用户已实际验证 4 个 provider 都能正常对话
+
+**关键文件位置**：
+
+| 模块 | 文件 |
+|---|---|
+| Provider 注册表 + base_url 解析 | [custom_app/services/providers/registry.py](../../custom_app/services/providers/registry.py) |
+| OpenAI 兼容 adapter（OpenAI / vLLM / Gemini-compat） | [custom_app/services/providers/openai_compat_adapter.py](../../custom_app/services/providers/openai_compat_adapter.py) |
+| Anthropic 专用 adapter | [custom_app/services/providers/anthropic_adapter.py](../../custom_app/services/providers/anthropic_adapter.py) |
+| Adapter factory | [custom_app/services/chat_adapter_factory.py](../../custom_app/services/chat_adapter_factory.py) |
+| ChatModelRepository | [custom_app/repositories/chat_model_repository.py](../../custom_app/repositories/chat_model_repository.py) |
+| Admin models API | [custom_app/api/admin_models.py](../../custom_app/api/admin_models.py) |
+| RagRunner 接 chat_model | [custom_app/services/rag_runner.py:121](../../custom_app/services/rag_runner.py#L121)（ctor）+ `_apply_chat_model_override` |
+| AgentRunner 接 chat_model | [custom_app/services/agent_runner.py:69](../../custom_app/services/agent_runner.py#L69)（ctor）+ `init()` 里 `_adapter_canonical=True` 分支 |
+| chat.py 路由 | [custom_app/api/chat.py](../../custom_app/api/chat.py) `_load_chat_model_row()` |
+
+### 12.3 用户已 commit 的痛点（驱动 7.2.A）
+
+测试 Phase 7.1 时用户发现：
+
+> Claude 答案排版漂亮（粗体标题、嵌套 bullet、空行）；vLLM 答案内容一样但排版扁平。
+
+**根因**：
+1. **模型能力差异**（Claude 训练强势）
+2. **system_prompt 一刀切**：`servers/generation/parameter.yaml` 里的 system_prompt 是 AGV SOP 专用、要求"严肃汇报"风格，对所有模型生效
+
+用户提议参考 WeKnora 的 agent 管理界面（截图里有「基本信息 / 模型配置 / 知识库 / 工具配置 / 技能 / 检索策略 / 网络搜索 / 多模态 / IM 集成」9 个 tab，以及 `{{knowledge_bases}}` `{{web_search_status}}` `{{current_time}}` `{{language}}` 占位符）。我对 WeKnora 做了完整调研（见 §一），最终敲定**最小价值版 7.2.A** 方案。
+
+### 12.4 7.2.A 第一步该做什么
+
+按本文档 §五 顺序：
+
+1. **写 Postgres 迁移 + SQLite schema**：`agent_configs` 表（见 §4.1）
+2. **写迁移脚本**：`custom_app/scripts/apply_phase7_2_a_migration.py`（仿 [apply_phase7_migration.py](../../custom_app/scripts/apply_phase7_migration.py)）
+3. **种子数据**：init_db 末尾插入 `builtin-quick` / `builtin-agent` 两行（见 §4.2）
+4. **新建 `ChatAgentRepository`**：[custom_app/repositories/chat_agent_repository.py](../../custom_app/repositories/)，CRUD + 单测
+5. **PromptRenderer**：[custom_app/services/prompt_renderer.py](../../custom_app/services/)，placeholder 替换
+6. **RagRunner / AgentRunner 接 `agent_config`**：优先级 `agent_config > chat_model > yaml`
+7. **chat.py body 接 `agent_id`**：缺省时按 `agent_mode` 取 builtin
+8. **Admin API**：`/api/admin/agents` CRUD + 单测
+9. **`/api/chat/agents`**：前端 dropdown 用
+10. **前端**：admin 加「Agent 管理」tab + 对话页 `agent_select` 动态填充
+
+工作量 ~2 人日。
+
+### 12.5 注意事项
+
+- **不要**新建 `agent_config_repository.py`——已存在但用途不同（kb_agent_configs 表，管 `kb_id` 关联的工具启用）。**用 `chat_agent_repository.py`**
+- **不要**改 `servers/generation/parameter.yaml` 里的 system_prompt——保持作为兜底回退
+- **AGV SOP system_prompt 内容**要复制到 builtin-quick 种子数据，否则破坏现有 AGV 知识库的回答风格
+- **向后兼容**：无 agent_configs 行（init_db 未跑过）时 Runner 必须能回退到 yaml；老 .env 老 yaml 部署升级零配置仍可用
+- **agent_mode 字段值**：用 `'quick'` / `'agent'`（与现有前端 dropdown 字符串一致），**不要**抄 WeKnora 的 `'quick-answer'` / `'smart-reasoning'`
+- **chat_models 表 + agent_configs 表的关系**：`agent_configs.model_id` 引用 `chat_models.model_id`，但**不强外键**（chat_models 可能被软删）；查询时若 model_id 找不到对应 model 就退回 chip 选的 model_id
+
+### 12.6 测试环境
+
+- Conda env：`ultrarag`（**不**用 `.venv` / `uv`）
+- 跑测试：`& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" -m pytest tests/ -q --ignore=tests/test_chat_stream_profile.py`
+- 当前 baseline：221 通过；已知遗留 fails（与 7.2.A 无关）：
+  - `test_phase2_kb_api.py::TestChatRunnerThreadSafety::test_concurrent_kb_switch_no_race`
+  - `test_phase2_kb_api.py::TestChatStreamSse::test_stream_passes_agent_mode_to_runner`
+  - `test_rag_runner_agent_mode.py::test_*`（mock 风格不兼容 VectorStore 抽象）
+  - `test_hotfix_kg_search_incoming.py::*`（串跑时测试间状态污染，单跑通过）
+
+### 12.7 .env 当前
+
+- `ULTRARAG_CHAT_BACKEND=gemini`（无 chat_models 行时的回退）
+- `ULTRARAG_GEMINI_MODEL=gemini-3.1-pro-preview`
+- `ULTRARAG_VECTOR_BACKEND=qdrant`
+- `ULTRARAG_DB_BACKEND=postgres`
+- `ULTRARAG_KG_BACKEND=neo4j`
+- `ULTRARAG_POSTGRES_URI=postgresql://postgres:postgres123!%40%23@192.168.8.40:5432/awprag`
+
+### 12.8 用户当前在 admin 配置过的 chat_models（参考）
+
+- 一个 Gemini（`gemini-3.1-pro-preview`）
+- 一个 Claude（`claude-opus-4-7`）—— Anthropic 新模型已弃用 temperature；7.1 已处理
+- 一个 vLLM Qwen（`Qwen/Qwen3.6-27B-FP8` @ `http://192.168.8.44:8800/v1`）
+
+### 12.9 启动新会话的暗号
+
+新会话说 **"开始 7.2.A"** 即可。我会按 §五 + §12.4 执行，不再重新调研 WeKnora（已经在 [PHASE_7_1_COMPLETION.md §2.1](./PHASE_7_1_COMPLETION.md) 和本文档 §一-§三记录完整）。
