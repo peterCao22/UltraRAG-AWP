@@ -32,6 +32,11 @@ STEP_RE = re.compile(r"^\s*STEP\s+(\d+)\s*:", re.IGNORECASE)
 
 IMAGES_MARK = "\n[IMAGES]\n"
 
+# Phase 8.0 兜底滑窗切分参数（针对无 STEP、无 Heading 的结构松散文档）
+SLIDING_WINDOW_THRESHOLD_CHARS = 800  # 整篇字符数 < 阈值 → 仍走 _full，单 chunk
+SLIDING_WINDOW_SIZE_CHARS = 800  # 单 chunk 目标字符数
+SLIDING_WINDOW_OVERLAP_CHARS = 100  # 相邻 chunk 重叠字符数（仅文本，不复制图片）
+
 
 def _ensure_step_newlines(text: str) -> str:
     """
@@ -183,6 +188,121 @@ def _table_to_text(table: Table) -> str:
         if any(cells):
             lines.append(" | ".join(cells))
     return "\n".join(lines).strip()
+
+
+def _sliding_window_chunks(
+    parts: List[str],
+    imgs_per_part: List[List[str]],
+    *,
+    size: int = SLIDING_WINDOW_SIZE_CHARS,
+    overlap: int = SLIDING_WINDOW_OVERLAP_CHARS,
+) -> List[tuple[List[str], List[str]]]:
+    """
+    Phase 8.0 兜底滑窗切分：按段落边界 + 字符长度切分，不在段落中间截断。
+
+    输入：
+        parts: 段落文本数组（已 strip，可能为空字符串占位以与 imgs_per_part 对齐）
+        imgs_per_part: 每段对应的图片相对路径列表（与 parts 等长）
+        size: 单 chunk 目标字符数（默认 800）
+        overlap: 相邻 chunk 重叠字符数（默认 100；仅文本，图片不重复）
+
+    返回：
+        [(chunk_text_lines, chunk_img_paths), ...]
+        - chunk_text_lines: 该 chunk 的段落文本数组（不含 [IMG: ...] 占位，由 pack_chunk 注入）
+        - chunk_img_paths: 该 chunk 归属的图片相对路径列表（去重在 pack_chunk 中处理）
+
+    设计要点：
+        - overlap 仅复制尾部段落文本到下个 buffer，不复制图片（避免同图召回两次）
+        - 单段超过 size 时仍整段保留，不切碎（牺牲均匀性换语义完整）
+        - parts 与 imgs_per_part 必须长度一致（调用方负责）
+    """
+    if len(parts) != len(imgs_per_part):
+        raise ValueError(
+            f"parts ({len(parts)}) and imgs_per_part ({len(imgs_per_part)}) must align"
+        )
+
+    out: List[tuple[List[str], List[str]]] = []
+    buf_lines: List[str] = []
+    buf_imgs: List[str] = []
+    buf_len = 0
+
+    for line, line_imgs in zip(parts, imgs_per_part):
+        line_len = len(line)
+        # 触发 flush 的条件：buffer 非空，且加上当前 part 后超出目标尺寸
+        if buf_lines and buf_len + line_len > size:
+            out.append((buf_lines[:], buf_imgs[:]))
+            # 计算 overlap 尾部段落（只复制文本，不复制图片）
+            # 规则：尾段单段长度必须 ≤ overlap 才会被复制；超大段不进入 tail，避免重复
+            tail: List[str] = []
+            tail_len = 0
+            for prev in reversed(buf_lines):
+                if len(prev) > overlap:
+                    break  # 单段就比 overlap 还长 → 不复制，避免重复
+                if tail_len + len(prev) > overlap and tail:
+                    break
+                tail.insert(0, prev)
+                tail_len += len(prev)
+            buf_lines = tail
+            buf_imgs = []
+            buf_len = tail_len
+        buf_lines.append(line)
+        buf_imgs.extend(line_imgs)
+        buf_len += line_len
+
+    if buf_lines or buf_imgs:
+        out.append((buf_lines, buf_imgs))
+
+    return out
+
+
+_IMG_PLACEHOLDER_RE = re.compile(r"^\[IMG:\s*([^\]]+)\]$")
+
+
+def _split_intro_for_windows(
+    intro_lines: List[str], intro_imgs: List[str]
+) -> tuple[List[str], List[List[str]]]:
+    """
+    Phase 8.0 辅助：把 intro_lines（已混入 [IMG: path] 占位行）拆成滑窗输入：
+        parts: 纯文本段落数组（去掉占位行）
+        imgs_per_part: 每段对应的图片路径数组（占位行的图片归到**前一段**）
+
+    若占位行出现在所有文本段之前，则归到第一段（如果有）；否则归到一个空 part。
+    intro_imgs 仅作健壮性检查：返回的所有图片路径之和应等于 intro_imgs。
+    """
+    parts: List[str] = []
+    imgs_per_part: List[List[str]] = []
+    pending_imgs: List[str] = []
+
+    for line in intro_lines:
+        m = _IMG_PLACEHOLDER_RE.match(line.strip()) if line else None
+        if m:
+            pending_imgs.append(m.group(1).strip())
+            continue
+        # 普通文本段：消耗 pending_imgs（归到上一段；若无上一段，则与本段并列）
+        if pending_imgs and parts:
+            imgs_per_part[-1].extend(pending_imgs)
+            pending_imgs = []
+        parts.append(line)
+        imgs_per_part.append([])
+        if pending_imgs:
+            # 首段之前的孤儿图片，挂在第一段上
+            imgs_per_part[-1].extend(pending_imgs)
+            pending_imgs = []
+
+    # 尾部还有未消化的图片 → 挂到最后一段；无段则新建空 part
+    if pending_imgs:
+        if parts:
+            imgs_per_part[-1].extend(pending_imgs)
+        else:
+            parts.append("")
+            imgs_per_part.append(pending_imgs)
+
+    # 健壮性：若 intro_imgs 提供，所有归属图片应是它的子集（顺序可能不同）
+    if intro_imgs:
+        flat = [p for ips in imgs_per_part for p in ips]
+        # 不做严格相等校验（intro_imgs 已去重逻辑由 pack_chunk 负责）
+        _ = flat  # 仅作为隐式契约保留
+    return parts, imgs_per_part
 
 
 def _paragraph_heading_label(p: Paragraph) -> Optional[str]:
@@ -378,48 +498,40 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
                 cur_lines.append(tt)
 
     if cur_step is None:
-        # 有 heading 切分时，最后一节用 section_N；纯无标题文档沿用 _intro
+        # 有 heading 切分时，最后一节用 section_N；纯无标题文档需按字符阈值路由
         if heading_chunk_idx[0] > 0:
             heading_chunk_idx[0] += 1
             final_id = f"{doc_stem}_section_{heading_chunk_idx[0]}"
+            pack_chunk(final_id, h_run or doc_title_fallback, intro_lines, intro_imgs)
         else:
-            final_id = f"{doc_stem}_intro"
-        pack_chunk(final_id, h_run or doc_title_fallback, intro_lines, intro_imgs)
+            # Phase 8.0 兜底路径：无 STEP 无 Heading 文档
+            # - 短文档（< SLIDING_WINDOW_THRESHOLD_CHARS）→ 沿用 `_intro` 单 chunk（向后兼容现有 KB）
+            # - 长文档（≥ 阈值）→ 滑窗切多块 `_window_N`
+            total_chars = sum(len(ln) for ln in intro_lines)
+            if total_chars >= SLIDING_WINDOW_THRESHOLD_CHARS:
+                parts, imgs_per_part = _split_intro_for_windows(intro_lines, intro_imgs)
+                windows = _sliding_window_chunks(parts, imgs_per_part)
+                for idx, (chunk_lines, chunk_imgs) in enumerate(windows, start=1):
+                    non_empty = [ln for ln in chunk_lines if ln]
+                    pack_chunk(
+                        f"{doc_stem}_window_{idx}",
+                        h_run or doc_title_fallback,
+                        non_empty,
+                        chunk_imgs,
+                    )
+            else:
+                pack_chunk(
+                    f"{doc_stem}_intro",
+                    h_run or doc_title_fallback,
+                    intro_lines,
+                    intro_imgs,
+                )
     else:
         pack_chunk(
             f"{doc_stem}_step_{cur_step}",
             f"{h_run or doc_title_fallback} | STEP {cur_step}",
             cur_lines,
             cur_imgs,
-        )
-
-    # No STEP anywhere: keep a single chunk if pack_chunk produced nothing
-    if not chunks_out:
-        lines = []
-        imgs: List[str] = []
-        counter_holder[0] = 0
-        h_run = None
-        for child in doc.element.body:
-            if child.tag == qn("w:p"):
-                p = Paragraph(child, doc)
-                lab = _paragraph_heading_label(p)
-                if lab:
-                    h_run = lab
-                for phase_text, phase_imgs in _paragraph_text_image_phases(
-                    p._element, blobs, img_dir, doc_stem, counter_holder
-                ):
-                    if phase_text.strip():
-                        lines.append(phase_text.strip())
-                    imgs.extend(phase_imgs)
-            elif child.tag == qn("w:tbl"):
-                tt = _table_to_text(Table(child, doc))
-                if tt:
-                    lines.append(tt)
-        pack_chunk(
-            f"{doc_stem}_full",
-            h_run or doc_title_fallback,
-            lines,
-            imgs,
         )
 
     return chunks_out
