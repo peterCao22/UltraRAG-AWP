@@ -42,17 +42,21 @@ from custom_app.services.session_store import (
 chat_bp = Blueprint("chat_api", __name__)
 logger = logging.getLogger(__name__)
 
-# Phase 7: 按 (kb_id, model_id) 缓存 Runner。model_id="" 表示走 Gemini 默认（兼容老 .env 路径）。
-_runners: dict[tuple[str, str], RagRunner] = {}
+# Phase 7 / 7.2.A: 按 (kb_id, model_id, agent_id) 缓存 Runner。
+# - model_id="" 表示走 .env 默认（兼容老路径）
+# - agent_id="" 表示无 agent_config 行（兼容无 agent_configs 表的部署）
+_runners: dict[tuple[str, str, str], RagRunner] = {}
 _runners_lock = threading.Lock()
 
 # AgentRunner 实例池（agent_mode=agent 时使用）
-_agent_runners: dict[tuple[str, str], "AgentRunner"] = {}  # type: ignore[name-defined]
+_agent_runners: dict[tuple[str, str, str], "AgentRunner"] = {}  # type: ignore[name-defined]
 _agent_runners_lock = threading.Lock()
 
 
-def _runner_key(kb_id: str, model_id: str | None) -> tuple[str, str]:
-    return (kb_id, model_id or "")
+def _runner_key(
+    kb_id: str, model_id: str | None, agent_id: str | None = None
+) -> tuple[str, str, str]:
+    return (kb_id, model_id or "", agent_id or "")
 
 
 def _load_chat_model_row(model_id: str | None) -> dict | None:
@@ -67,26 +71,80 @@ def _load_chat_model_row(model_id: str | None) -> dict | None:
         return None
 
 
-def _get_runner(kb_id: str, model_id: str | None = None) -> RagRunner:
-    key = _runner_key(kb_id, model_id)
+def _load_agent_config_row(
+    agent_id: str | None, agent_mode: str
+) -> dict | None:
+    """Phase 7.2.A: 从 ChatAgentRepository 查 agent 行。
+
+    缺省 agent_id 时按 agent_mode 取 builtin-quick / builtin-agent；
+    查不到时返回 None（runner 走 yaml 兜底，向后兼容无 agent_configs 表的部署）。
+    """
+    try:
+        from custom_app.repositories import ChatAgentRepository
+        repo = ChatAgentRepository()
+        if agent_id:
+            row = repo.get(agent_id)
+            if row is not None:
+                return row
+            logger.info(
+                "agent_id=%s not found; fallback to builtin by agent_mode=%s",
+                agent_id, agent_mode,
+            )
+        if agent_mode == "agent":
+            return repo.get_builtin_agent()
+        return repo.get_builtin_quick()
+    except Exception:
+        logger.exception(
+            "load agent_config row failed agent_id=%s agent_mode=%s",
+            agent_id, agent_mode,
+        )
+        return None
+
+
+def _resolve_request_agent_id(data: dict) -> str | None:
+    """从请求 body 取 agent_id；返回空串视为缺省。"""
+    raw = str(data.get("agent_id", "") or "").strip()
+    return raw or None
+
+
+def _get_runner(
+    kb_id: str,
+    model_id: str | None = None,
+    agent_id: str | None = None,
+    agent_mode: str = "quick",
+) -> RagRunner:
+    key = _runner_key(kb_id, model_id, agent_id)
     with _runners_lock:
         if key not in _runners:
-            r = RagRunner(kb_id=kb_id, chat_model=_load_chat_model_row(model_id))
+            r = RagRunner(
+                kb_id=kb_id,
+                chat_model=_load_chat_model_row(model_id),
+                agent_config=_load_agent_config_row(agent_id, agent_mode),
+            )
             r.init()
             _runners[key] = r
         return _runners[key]
 
 
-def _get_agent_runner(kb_id: str, model_id: str | None = None):
-    """返回与 (kb_id, model_id) 绑定的 AgentRunner，首次调用时复用 RagRunner 的向量存储与语料。"""
+def _get_agent_runner(
+    kb_id: str,
+    model_id: str | None = None,
+    agent_id: str | None = None,
+    agent_mode: str = "agent",
+):
+    """返回与 (kb_id, model_id, agent_id) 绑定的 AgentRunner。"""
     from custom_app.services.agent_runner import AgentRunner
 
-    key = _runner_key(kb_id, model_id)
+    key = _runner_key(kb_id, model_id, agent_id)
     with _agent_runners_lock:
         if key not in _agent_runners:
             # 复用 RagRunner 已加载的 rows / vector_store，避免二次磁盘读取
-            rag = _get_runner(kb_id, model_id)
-            ar = AgentRunner(kb_id=kb_id, chat_model=_load_chat_model_row(model_id))
+            rag = _get_runner(kb_id, model_id, agent_id, agent_mode=agent_mode)
+            ar = AgentRunner(
+                kb_id=kb_id,
+                chat_model=_load_chat_model_row(model_id),
+                agent_config=_load_agent_config_row(agent_id, agent_mode),
+            )
             ar.init(
                 rows=rag._rows,
                 index=rag._index,
@@ -104,7 +162,7 @@ def invalidate_runner_cache(kb_id: str) -> None:
     """重建索引后必须调用，否则 RagRunner / AgentRunner 仍持有旧的 rows / FAISS 引用，
     新上传的文档查不到、被删除的文档可能仍在召回。
 
-    Phase 7: 失效该 kb_id 下所有 model_id 的缓存（迭代复制后修改集合）。
+    Phase 7 / 7.2.A: 失效该 kb_id 下所有 (model_id, agent_id) 组合的缓存。
     """
     with _runners_lock:
         for key in [k for k in _runners if k[0] == kb_id]:
@@ -216,10 +274,10 @@ def chat():
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
 
-    # Phase 7: 可选 model_id；仅作 Runner cache key，底层 LLM 仍按 .env 走（待 7.1 真切换）
-    model_id = _resolve_request_model_id(data)
+    agent_id = _resolve_request_agent_id(data)
+    model_id = _resolve_request_model_id(data, agent_id=agent_id, agent_mode=agent_mode)
     try:
-        runner = _get_runner(kb_id, model_id)
+        runner = _get_runner(kb_id, model_id, agent_id, agent_mode=agent_mode)
         result = runner.chat(question=question, top_k=top_k, agent_mode=agent_mode)
         return jsonify(result)
     except FileNotFoundError as exc:
@@ -228,14 +286,32 @@ def chat():
         return jsonify({"error": str(exc)}), 500
 
 
-def _resolve_request_model_id(data: dict) -> str | None:
-    """Phase 7: 从请求 body 取 model_id；缺省时取默认模型的 model_id；都没有时返回 None。
+def _resolve_request_model_id(
+    data: dict,
+    *,
+    agent_id: str | None = None,
+    agent_mode: str = "quick",
+) -> str | None:
+    """Phase 7 / 7.2.A: 从请求 body 取 model_id。
 
-    返回 None 表示"未配置任何对话模型"——降级走 .env 路径，与老行为一致。
+    优先级：
+        1. body.model_id（前端 chip 选的）
+        2. agent_config.model_id（agent 绑定了 model 时联动切换）
+        3. ChatModelRepository.get_default()（admin 设的默认模型）
+        4. None（走 .env 路径，与老行为一致）
     """
     explicit = str(data.get("model_id", "")).strip()
     if explicit:
         return explicit
+    if agent_id is not None or agent_mode:
+        try:
+            agent_row = _load_agent_config_row(agent_id, agent_mode)
+            if agent_row:
+                from_agent = str(agent_row.get("model_id") or "").strip()
+                if from_agent:
+                    return from_agent
+        except Exception:
+            logger.exception("resolve agent_config.model_id failed")
     try:
         from custom_app.repositories import ChatModelRepository
         default = ChatModelRepository().get_default()
@@ -244,6 +320,36 @@ def _resolve_request_model_id(data: dict) -> str | None:
     except Exception:
         logger.exception("resolve default model_id failed; fallback to env")
     return None
+
+
+@chat_bp.route("/api/chat/agents", methods=["GET"])
+def get_chat_agents():
+    """Phase 7.2.A: 对话页 agent_select dropdown 用。
+
+    仅返回 enabled=true 的 agent；字段最小（不含 prompt / api_key），
+    避免暴露管理员配置给普通用户。
+    """
+    try:
+        from custom_app.repositories import ChatAgentRepository
+        rows = ChatAgentRepository().list_active(include_disabled=False)
+    except Exception:
+        logger.exception("list chat agents failed; returning empty")
+        rows = []
+
+    out = []
+    for r in rows:
+        out.append(
+            {
+                "agent_id": r["agent_id"],
+                "name": r["name"],
+                "agent_mode": r["agent_mode"],
+                "avatar": r.get("avatar", ""),
+                "description": r.get("description", ""),
+                "is_builtin": bool(r.get("is_builtin", False)),
+                "model_id": r.get("model_id") or "",
+            }
+        )
+    return jsonify({"data": out})
 
 
 @chat_bp.route("/api/chat/models", methods=["GET"])
@@ -311,14 +417,18 @@ def chat_stream():
                 )
                 + "\n\n"
             )
-            # Phase 7: 取 model_id 作 cache key（LLM 真切换待 7.1）
-            model_id = _resolve_request_model_id(data)
+            agent_id = _resolve_request_agent_id(data)
+            model_id = _resolve_request_model_id(
+                data, agent_id=agent_id, agent_mode=agent_mode
+            )
             if agent_mode == "agent":
                 logger.info(
-                    "chat_stream routing → AgentRunner kb_id=%s session_id=%s model_id=%s",
-                    kb_id, session_id_opt, model_id,
+                    "chat_stream routing → AgentRunner kb_id=%s session_id=%s model_id=%s agent_id=%s",
+                    kb_id, session_id_opt, model_id, agent_id,
                 )
-                runner = _get_agent_runner(kb_id, model_id)
+                runner = _get_agent_runner(
+                    kb_id, model_id, agent_id, agent_mode=agent_mode
+                )
                 # 按 KB 配置动态调整启用工具，让 admin 调整后立即生效（不必重建 runner）
                 from custom_app.services.agent_config_store import get_enabled_tools
                 runner.enabled_tools = get_enabled_tools(kb_id)
@@ -333,10 +443,10 @@ def chat_stream():
                 )
             else:
                 logger.info(
-                    "chat_stream routing → RagRunner kb_id=%s agent_mode=%s model_id=%s",
-                    kb_id, agent_mode, model_id,
+                    "chat_stream routing → RagRunner kb_id=%s agent_mode=%s model_id=%s agent_id=%s",
+                    kb_id, agent_mode, model_id, agent_id,
                 )
-                runner = _get_runner(kb_id, model_id)
+                runner = _get_runner(kb_id, model_id, agent_id, agent_mode=agent_mode)
                 event_iter = runner.chat_stream(
                     question=question, top_k=top_k, agent_mode=agent_mode, profile=profile
                 )
@@ -407,9 +517,10 @@ def chat_markdown():
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
 
-    model_id = _resolve_request_model_id(data)
+    agent_id = _resolve_request_agent_id(data)
+    model_id = _resolve_request_model_id(data, agent_id=agent_id, agent_mode=agent_mode)
     try:
-        runner = _get_runner(kb_id, model_id)
+        runner = _get_runner(kb_id, model_id, agent_id, agent_mode=agent_mode)
         result = runner.chat(question=question, top_k=top_k, agent_mode=agent_mode)
         md = _result_to_markdown(question, result)
         return Response(md, mimetype="text/markdown; charset=utf-8")

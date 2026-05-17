@@ -179,6 +179,33 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_chat_models_provider
               ON chat_models (provider);
 
+            -- Phase 7.2.A: per-agent system_prompt 与对话风格管理
+            CREATE TABLE IF NOT EXISTS agent_configs (
+              id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+              agent_id              TEXT NOT NULL UNIQUE,
+              tenant_id             INTEGER NOT NULL DEFAULT 1,
+              name                  TEXT NOT NULL,
+              description           TEXT DEFAULT '',
+              avatar                TEXT DEFAULT '',
+              agent_mode            TEXT NOT NULL,
+              is_builtin            INTEGER NOT NULL DEFAULT 0,
+              system_prompt         TEXT DEFAULT '',
+              agent_system_prompt   TEXT DEFAULT '',
+              model_id              TEXT DEFAULT '',
+              temperature           REAL DEFAULT 0.7,
+              max_tokens            INTEGER NOT NULL DEFAULT 4096,
+              enabled               INTEGER NOT NULL DEFAULT 1,
+              created_at            TEXT NOT NULL,
+              updated_at            TEXT NOT NULL,
+              deleted_at            TEXT DEFAULT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_agent_configs_tenant_enabled
+              ON agent_configs (tenant_id, enabled);
+
+            CREATE INDEX IF NOT EXISTS idx_agent_configs_model_id
+              ON agent_configs (model_id);
+
             CREATE TABLE IF NOT EXISTS kg_relations (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               kb_id TEXT NOT NULL,
@@ -239,6 +266,94 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE kg_relations ADD COLUMN doc_id TEXT DEFAULT ''"
             )
+
+        # Phase 7.2.A 种子数据：插入两个内置 agent（已存在则跳过）。
+        # 与 Postgres 端 apply_phase7_2_a_migration.py 的种子逻辑保持一致。
+        _seed_builtin_agents(conn)
+
+
+_AGV_SOP_SYSTEM_PROMPT = (
+    "You are a professional AGV (Automated Guided Vehicle) operations assistant "
+    "for SOP-based Q&A.\n"
+    "Follow the user message instructions exactly: use only the provided excerpts.\n"
+    "Whenever the user's question contains any Chinese characters, you MUST answer "
+    "with Simplified Chinese for all narrative and procedural text "
+    "(translate English SOP excerpts faithfully). "
+    "Do not reply in English to Chinese questions.\n"
+    "Never omit procedural steps or safety items from those excerpts "
+    "(faithful translation / rephrasing only).\n"
+    "If information is missing from the excerpts, state clearly that the documentation "
+    "is insufficient — do not fabricate.\n"
+)
+
+
+def _seed_builtin_agents(conn: sqlite3.Connection) -> None:
+    """init_db 末尾插入 builtin-quick / builtin-agent；已存在则跳过。
+
+    用户后续可在 admin UI 编辑两条记录的 system_prompt / name 等字段。
+    """
+    now = now_iso()
+    for row in _builtin_agent_seed_rows(now):
+        cur = conn.execute(
+            "SELECT 1 FROM agent_configs WHERE agent_id = ?",
+            (row["agent_id"],),
+        )
+        if cur.fetchone() is not None:
+            continue
+        conn.execute(
+            "INSERT INTO agent_configs "
+            "(agent_id, tenant_id, name, description, avatar, agent_mode, "
+            " is_builtin, system_prompt, agent_system_prompt, model_id, "
+            " temperature, max_tokens, enabled, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                row["agent_id"], row["tenant_id"], row["name"], row["description"],
+                row["avatar"], row["agent_mode"], row["is_builtin"],
+                row["system_prompt"], row["agent_system_prompt"], row["model_id"],
+                row["temperature"], row["max_tokens"], row["enabled"],
+                row["created_at"], row["updated_at"],
+            ),
+        )
+
+
+def _builtin_agent_seed_rows(now: str) -> list[dict[str, Any]]:
+    """返回两个内置 agent 的字段；Postgres 迁移脚本与 SQLite init_db 共用。"""
+    return [
+        {
+            "agent_id": "builtin-quick",
+            "tenant_id": 1,
+            "name": "快速问答",
+            "description": "基于检索的单轮快速问答，沿用 AGV SOP 风格的 system_prompt。",
+            "avatar": "",
+            "agent_mode": "quick",
+            "is_builtin": 1,
+            "system_prompt": _AGV_SOP_SYSTEM_PROMPT,
+            "agent_system_prompt": "",
+            "model_id": "",
+            "temperature": 0.2,
+            "max_tokens": 4096,
+            "enabled": 1,
+            "created_at": now,
+            "updated_at": now,
+        },
+        {
+            "agent_id": "builtin-agent",
+            "tenant_id": 1,
+            "name": "智能推理",
+            "description": "ReAct 多轮推理 + 工具调用，使用项目内置 Agent system_prompt。",
+            "avatar": "",
+            "agent_mode": "agent",
+            "is_builtin": 1,
+            "system_prompt": "",
+            "agent_system_prompt": "",
+            "model_id": "",
+            "temperature": 0.7,
+            "max_tokens": 4096,
+            "enabled": 1,
+            "created_at": now,
+            "updated_at": now,
+        },
+    ]
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:

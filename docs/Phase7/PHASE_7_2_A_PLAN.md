@@ -1,6 +1,6 @@
 # Phase 7.2.A —— Agent 配置与 system_prompt 管理
 
-> **状态**：计划已确认（2026-05-15），待开工
+> **状态**：✅ 已完成 + 联调验收（2026-05-16）
 > **前置**：[Phase 7.1](./PHASE_7_1_COMPLETION.md)（多 provider 真切换）
 > **参考实现**：Tencent WeKnora `internal/types/custom_agent.go` / `config/builtin_agents.yaml` / `config/prompt_templates/`
 > **范围**：仅做最小价值版（7.2.A）；完整 agent 配置（推荐问题、检索策略 per-agent 覆盖、VLM、IM 集成等）推后 7.2.B
@@ -424,3 +424,94 @@ I. Phase 7.2.A Agent 配置（约 15 分钟）
 ### 12.9 启动新会话的暗号
 
 新会话说 **"开始 7.2.A"** 即可。我会按 §五 + §12.4 执行，不再重新调研 WeKnora（已经在 [PHASE_7_1_COMPLETION.md §2.1](./PHASE_7_1_COMPLETION.md) 和本文档 §一-§三记录完整）。
+
+---
+
+## 十三、实施回顾 + 踩坑记录（2026-05-16 完工）
+
+> 7.2.A 在 1 个会话内一次性完成（代码 + 单测 + 联调）。手工 I.1–I.6 全过。期间踩了 4 个坑，4 个都已修；后两个不是 7.2.A 引入的旧 bug，但用户验收时第一次暴露，记下来给 7.2.B 参考。
+
+### 13.1 落地清单（最终版）
+
+| 模块 | 状态 | 文件 |
+|---|---|---|
+| Postgres 迁移 | ✅ | [migrations/postgres/004_phase7_2_a_agent_configs.sql](../../migrations/postgres/004_phase7_2_a_agent_configs.sql) |
+| 迁移脚本 + 种子 | ✅ | [custom_app/scripts/apply_phase7_2_a_migration.py](../../custom_app/scripts/apply_phase7_2_a_migration.py) |
+| SQLite schema + init_db 种子 | ✅ | [custom_app/db.py](../../custom_app/db.py) `_seed_builtin_agents` |
+| ChatAgentRepository | ✅ | [custom_app/repositories/chat_agent_repository.py](../../custom_app/repositories/chat_agent_repository.py) |
+| PromptRenderer | ✅ | [custom_app/services/prompt_renderer.py](../../custom_app/services/prompt_renderer.py) |
+| RagRunner / AgentRunner 接 agent_config | ✅ | [rag_runner.py `_apply_agent_config_override`](../../custom_app/services/rag_runner.py) / [agent_runner.py `_build_system_prompt`](../../custom_app/services/agent_runner.py) |
+| chat.py body 接 agent_id + builtin fallback | ✅ | [custom_app/api/chat.py `_load_agent_config_row`](../../custom_app/api/chat.py) |
+| Admin API CRUD | ✅ | [custom_app/api/admin_agents.py](../../custom_app/api/admin_agents.py) |
+| `/api/chat/agents` | ✅ | [chat.py `get_chat_agents`](../../custom_app/api/chat.py) |
+| Admin 「Agent 管理」tab | ✅ | [custom_app/frontend/admin.js `renderAgents` / `openAgentEditor`](../../custom_app/frontend/admin.js) |
+| 对话页 dropdown 动态填充 + agent_id 入 payload | ✅ | [main.js `initAgentSelect`](../../custom_app/frontend/main.js) + [agentSelector.js `populateAgentSelect` / `getSelectedAgent`](../../custom_app/frontend/components/agentSelector.js) |
+| MANUAL_TESTING §I | ✅ | [docs/MANUAL_TESTING.md](../MANUAL_TESTING.md) I.0–I.7 |
+| 单测覆盖 | ✅ | 50 个新用例（repo 9 + prompt_renderer 14 + runner_agent_config 9 + admin_agents_api 16 + agent_tools_shape 2）|
+
+### 13.2 验收路径（用户走过的）
+
+1. ✅ I.0 Postgres 迁移 + 种子（幂等可重复跑）
+2. ✅ I.1 admin Agent 管理 tab 出现 + 2 个 builtin 卡片
+3. ✅ I.2 编辑 builtin-quick prompt → vLLM 排版变好
+4. ✅ I.3 创建第 3 个 agent「商业资料助手」→ dropdown 出现
+5. ✅ I.4 编辑 builtin-agent agent_system_prompt → ReAct 风格切换
+6. ✅ I.5 builtin agent 不可删（API 400 + UI 隐藏按钮）
+7. ✅ I.6 admin 不可改 builtin 的 agent_mode
+
+### 13.3 踩坑记录
+
+#### 坑 1：Max Tokens HTML5 step=64 拒收 4096（7.2.A 引入）
+
+`<input type="number" min="1" step="64">` → 浏览器只接受 1, 65, 129, … 4033, 4097，把常见的 4096 / 8192 都拒掉。
+
+**修**：[admin.js](../../custom_app/frontend/admin.js) `inputMaxTokens.step = '1'`。
+
+**给 7.2.B 留的 lesson**：number input 写 step 之前先想清楚常见值是不是 1 + step·k；2 的幂常用值（4096 / 8192）跟 step=64 不兼容。
+
+#### 坑 2：qa_rag.jinja 全文 dump（非 7.2.A 引入，但 7.2.A 暴露）
+
+`prompt/agv_qa_rag.jinja` 写死 SOP-style user prompt（"Output exactly N sections, translate English to Chinese, …"）；[servers/retriever/parameter.yaml](../../servers/retriever/parameter.yaml) `final_top_k=0`（不截断召回）→ 召回多少 chunk 全文进 prompt。商业资料助手即使 system_prompt 写了"销售视角"，也被 user prompt 压住，看起来"全文输出"。
+
+**临时缓解**：user 自己改 retriever yaml 把 `final_top_k` 改成 5 / 8；或在 agent system_prompt 末尾加"仅基于第 1-3 段回答"。
+
+**根治放 7.2.B**（见 §11）：per-agent 覆盖 retriever（`recall_top_k` / `final_top_k`）+ user prompt 模板选择（SOP / 通用文档 / FAQ）。
+
+#### 坑 3：自定义短 agent_system_prompt 不能省略工具说明（非 bug）
+
+如果替换 agent_system_prompt 后省略了工具名（`knowledge_search` / `list_knowledge_chunks` / `final_answer`），LLM 无法学到工具用法，会输出畸形 tool_call，引发坑 4。
+
+**修**：MANUAL_TESTING §I.4 给"安全的自定义模板"——必须列工具名 + 调用规则。
+
+#### 坑 4：chat_stream() tools shape 漏判 canonical 分支（Phase 7.1 旧 bug）
+
+[agent_runner.py:749](../../custom_app/services/agent_runner.py#L749) `chat_stream()` **无条件**调 `openai_tools_to_gemini()` 扁平化 tools schema → vLLM / OpenAI-compat / Anthropic 拿到 `{name, description, parameters}` 没有 `{type:function, function:{...}}` 外壳 → vLLM Pydantic 拒：`5 validation errors tools[i].function Field required`。
+
+`init()` 同位置（line 185-192）就有正确分支按 `_adapter_canonical` 选 shape，**`chat_stream()` 漏了**。这是 Phase 7.1 引入 canonical adapter 时的疏忽，7.2.A 让用户首次实际触发：编辑了 builtin-agent prompt → 缓存失效 → 重建 Runner → 第一次走 vLLM agent 模式 → 触发。
+
+**修**：[agent_runner.py:749-760](../../custom_app/services/agent_runner.py#L749) 加 `if self._adapter_canonical` 分支，回归测试 [tests/test_phase7_2_a_agent_tools_shape.py](../../tests/test_phase7_2_a_agent_tools_shape.py)（2 用例）。
+
+**给 7.2.B 留的 lesson**：
+- 同一份逻辑（"按 adapter 模式选 tools shape"）出现在 `init()` 和 `chat_stream()` 两处，**应抽函数**，避免分支漂移
+- 7.1 加 canonical adapter 时单测只覆盖了 `init()` 路径，没覆盖 `chat_stream()`——回归套件该加一组"按 adapter 模式发请求 body 形状正确"的契约测试
+
+### 13.4 测试矩阵（最终）
+
+| 套件 | 用例数 | 状态 |
+|---|---|---|
+| `tests/test_phase7_2_a_*.py` | 50 | ✅ 全过（含 2 个 tools shape 回归） |
+| Phase 7 全部（7.0 + 7.1 + 7.2.A） | 106 | ✅ 全过 |
+| Sprint 1/4/5/7/8/9/10 + function_calling_closed_loop | 154 | ✅ 全过（agent_runner 无回归） |
+| 前端 vitest 全套 | 162 | ✅ 全过 |
+| 用户手工 I.1–I.6 联调 | 6/6 | ✅ 全过 |
+
+### 13.5 已知遗留（沉到 7.2.B）
+
+1. **user prompt 模板可选**（坑 2 根治）：per-agent 选 SOP / 通用文档 / FAQ 模板，不再全局写死 `agv_qa_rag.jinja`
+2. **per-agent 检索策略**：`recall_top_k` / `final_top_k` / `enabled_tools` 落到 agent_configs 行
+3. **agent 配置完整 9 tab**（对齐 WeKnora）：推荐问题、网络搜索、VLM、IM 集成、prompt 模板库、i18n
+4. **抽 `tools_for_adapter(canonical, schemas)` 辅助函数**（坑 4 lesson）
+
+---
+
+*Phase 7.2.A 让 system_prompt 从全局 yaml 移到 per-agent 数据库，AGV SOP / 商业资料 / 智能推理 三类 agent 都能独立配置；联调中暴露并修了 Phase 7.1 留的一个 tools shape bug。下一站 7.2.B。*

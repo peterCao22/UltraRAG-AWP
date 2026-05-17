@@ -1,4 +1,10 @@
-import { AGENT_STORAGE_KEY, applyStoredAgentMode, mountAgentSelect } from './components/agentSelector.js'
+import {
+  AGENT_STORAGE_KEY,
+  applyStoredAgentMode,
+  getSelectedAgent,
+  mountAgentSelect,
+  populateAgentSelect,
+} from './components/agentSelector.js'
 import { bindChatImageLightbox } from './components/imageLightbox.js'
 import { attachMarkdownImageFallbacks } from './utils/brokenImagePlaceholder.js'
 import { KB_STORAGE_KEY, populateKbSelect } from './components/kbSelector.js'
@@ -13,7 +19,7 @@ import { buildSourcesPanel } from './components/sourcePanel.js'
 import { Toast } from './components/toast.js'
 import { openConfirmModal } from './components/confirmModal.js'
 import { sendChatMessage } from './services/chatApi.js'
-import { listChatModels } from './services/kbApi.js'
+import { listChatAgents, listChatModels } from './services/kbApi.js'
 
 const MODEL_STORAGE_KEY = 'ULTRARAG_SELECTED_MODEL_ID'
 import { listKnowledgeBases } from './services/kbApi.js'
@@ -747,11 +753,13 @@ export function initChatApp({
       return
     }
 
+    const { agentId, agentMode } = getSelectedAgent(elements.agentSelect)
+
     if (!fromResend) {
       if (!state.currentSessionId && elements.sessionList) {
         try {
           const row = await sessionApi.createSession(state.selectedKbId, {
-            agentMode: elements.agentSelect.value || 'quick',
+            agentMode,
           })
           state.currentSessionId = row.session_id
           setSessionHash(state.currentSessionId)
@@ -798,7 +806,8 @@ export function initChatApp({
       await chatApi.sendChatMessage({
         kbId: state.selectedKbId,
         question,
-        agentMode: elements.agentSelect.value || 'quick',
+        agentMode,
+        agentId,
         modelId: state.selectedModelId || '',
         sessionId: state.currentSessionId || '',
         profile: profileRequest,
@@ -929,8 +938,9 @@ export function initChatApp({
       return
     }
     try {
+      const { agentMode } = getSelectedAgent(elements.agentSelect)
       const row = await sessionApi.createSession(state.selectedKbId, {
-        agentMode: elements.agentSelect.value || 'quick',
+        agentMode,
       })
       state.currentSessionId = row.session_id
       setSessionHash(state.currentSessionId)
@@ -977,6 +987,33 @@ export function initChatApp({
   renderWelcome()
   updateCharCount()
   applyStoredAgentMode(elements.agentSelect, storage)
+
+  // Phase 7.2.A: 用后端 /api/chat/agents 替换静态 dropdown 选项
+  initAgentSelect()
+  // 选择变化时把 agent_id 写回 localStorage（沿用 AGENT_STORAGE_KEY，存的是 agent_id）
+  elements.agentSelect.addEventListener('change', () => {
+    try {
+      storage?.setItem(AGENT_STORAGE_KEY, elements.agentSelect.value || '')
+    } catch {
+      /* noop */
+    }
+  })
+
+  async function initAgentSelect() {
+    try {
+      const agents = await listChatAgents()
+      if (agents && agents.length) {
+        populateAgentSelect(elements.agentSelect, agents)
+        mountAgentSelect(elements.agentSelect)
+        applyStoredAgentMode(elements.agentSelect, storage)
+      }
+    } catch (err) {
+      // 列表拉不到 → 保留 index.html 里的 quick/agent 兜底，向后兼容
+      if (typeof console !== 'undefined') {
+        console.warn('[UltraRAG] listChatAgents failed', err)
+      }
+    }
+  }
 
   const controller = {
     ready: loadKnowledgeBases(),

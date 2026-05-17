@@ -116,6 +116,28 @@ describe('sendChatMessage', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).agent_mode).toBe('quick')
   })
 
+  it('includes agent_id in body when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createSseResponse(['data: {"type":"done"}\n\n']))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await sendChatMessage({
+      kbId: 'agv_demo',
+      question: 'test',
+      agentId: 'builtin-quick',
+    })
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).agent_id).toBe('builtin-quick')
+  })
+
+  it('omits agent_id when empty', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createSseResponse(['data: {"type":"done"}\n\n']))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await sendChatMessage({ kbId: 'agv_demo', question: 'test', agentId: '' })
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).agent_id).toBeUndefined()
+  })
+
   it('invokes onStatus for SSE status events', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       createSseResponse([

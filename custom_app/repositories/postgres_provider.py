@@ -259,6 +259,35 @@ CREATE INDEX IF NOT EXISTS idx_chat_models_tenant_enabled
 CREATE INDEX IF NOT EXISTS idx_chat_models_provider
   ON chat_models (provider);
 
+-- Phase 7.2.A: per-agent system_prompt 与对话风格管理
+CREATE TABLE IF NOT EXISTS agent_configs (
+  id                    SERIAL PRIMARY KEY,
+  agent_id              TEXT NOT NULL UNIQUE,
+  tenant_id             INTEGER NOT NULL DEFAULT 1,
+  name                  TEXT NOT NULL,
+  description           TEXT DEFAULT '',
+  avatar                TEXT DEFAULT '',
+  agent_mode            TEXT NOT NULL,
+  is_builtin            BOOLEAN NOT NULL DEFAULT FALSE,
+  system_prompt         TEXT DEFAULT '',
+  agent_system_prompt   TEXT DEFAULT '',
+  model_id              TEXT DEFAULT '',
+  temperature           REAL DEFAULT 0.7,
+  max_tokens            INTEGER NOT NULL DEFAULT 4096,
+  enabled               BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL,
+  deleted_at            TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_configs_tenant_enabled
+  ON agent_configs (tenant_id, enabled)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_agent_configs_model_id
+  ON agent_configs (model_id)
+  WHERE deleted_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS kg_relations (
   id            SERIAL PRIMARY KEY,
   kb_id         TEXT NOT NULL,

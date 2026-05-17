@@ -65,7 +65,7 @@ batch_size: 16
 top_k: 8
 # RAG 问答：先多召回，final_top_k=0 表示不把命中截断（全部送入生成，适合完整 SOP）
 recall_top_k: 20
-final_top_k: 0
+final_top_k: 5
 
 # custom_app RagRunner 本地 Reranker（Phase 4.0 起统一到 LocalReranker）
 # 模型加载：custom_app/utils/local_reranker.py（依赖 torch + transformers，已在 .venv 中）

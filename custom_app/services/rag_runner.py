@@ -126,6 +126,7 @@ class RagRunner:
         retriever_param_path: str = "servers/retriever/parameter.yaml", # 用来读取检索侧配置（比如 top_k）
         generation_param_path: str = "servers/generation/parameter.yaml", # 用来读取生成侧配置（比如模型名、base_url、采样参数等）
         chat_model: Optional[Dict[str, Any]] = None,  # Phase 7.1: chat_models 表的一行
+        agent_config: Optional[Dict[str, Any]] = None,  # Phase 7.2.A: agent_configs 表的一行
     ) -> None:
         """
         初始化运行器基础路径与运行时状态。
@@ -157,6 +158,8 @@ class RagRunner:
         # Phase 7.1: chat_models 表的一行（user 在 admin 配置的模型）；非空时由
         # _build_chat_cfg_from_model 接管 backend / base_url / api_key 等
         self._chat_model: Optional[Dict[str, Any]] = chat_model
+        # Phase 7.2.A: agent_configs 表的一行（admin 配置的 system_prompt + 温度等）
+        self._agent_config: Optional[Dict[str, Any]] = agent_config
         # 直接挂上 LLMAdapter（quick 模式用），None 表示走老 .env 路径
         self._llm_adapter = None
         self._rerank_cfg: Dict[str, Any] = {}
@@ -1348,6 +1351,8 @@ class RagRunner:
         self._apply_ultrarag_generation_env_overrides()
         # Phase 7.1: chat_model 行覆盖 yaml + env（admin 选的模型权威）
         self._apply_chat_model_override()
+        # Phase 7.2.A: agent_config 行（system_prompt / 采样参数）覆盖前面所有来源
+        self._apply_agent_config_override()
         if (self._chat_cfg.get("backend") or "").strip().lower() == "gemini":
             logger.info(
                 "RagRunner generation: backend=gemini model=%s",
@@ -1398,6 +1403,51 @@ class RagRunner:
         logger.info(
             "RagRunner chat_model override: provider=%s model=%s base_url=%s",
             provider, self._chat_cfg["model_name"], self._chat_cfg["base_url"],
+        )
+
+    def _apply_agent_config_override(self) -> None:
+        """Phase 7.2.A：用 agent_configs 行覆盖 system_prompt / temperature / max_tokens。
+
+        优先级：agent_config > chat_model.extra(若有) > .env > yaml 兜底。
+        agent_config.system_prompt 经 PromptRenderer 渲染 placeholder
+        （{{kb_name}} / {{language}} / {{current_time}} 等）后写回 _chat_cfg。
+
+        agent_config 为 None 时本方法 no-op，保留 7.1 之前的 yaml 行为
+        （向后兼容：无 agent_configs 表行的部署仍可用）。
+        """
+        if not self._agent_config:
+            return
+        from custom_app.services.prompt_renderer import render_prompt
+
+        cfg = self._agent_config
+        system_prompt_template = (cfg.get("system_prompt") or "").strip()
+        if system_prompt_template:
+            ctx = {
+                "kb_name": cfg.get("kb_name") or self.kb_id,
+                "kb_description": cfg.get("kb_description") or "",
+            }
+            self._chat_cfg["system_prompt"] = render_prompt(
+                system_prompt_template, ctx
+            )
+
+        temperature = cfg.get("temperature")
+        if temperature is not None:
+            try:
+                self._chat_cfg["temperature"] = float(temperature)
+            except (TypeError, ValueError):
+                pass
+        max_tokens = cfg.get("max_tokens")
+        if max_tokens is not None:
+            try:
+                self._chat_cfg["max_tokens"] = int(max_tokens)
+            except (TypeError, ValueError):
+                pass
+
+        logger.info(
+            "RagRunner agent_config override: agent_id=%s temperature=%s max_tokens=%s",
+            cfg.get("agent_id"),
+            self._chat_cfg.get("temperature"),
+            self._chat_cfg.get("max_tokens"),
         )
 
     def _apply_ultrarag_generation_env_overrides(self) -> None:

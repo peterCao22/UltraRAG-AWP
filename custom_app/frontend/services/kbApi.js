@@ -499,3 +499,49 @@ export async function listChatModels() {
   if (!r.ok) throw new Error(await readApiError(r))
   return (await r.json()).data || []
 }
+
+// ── Phase 7.2.A: Agent 配置管理 ─────────────────────────────────────────
+
+const ADMIN_AGENTS_ENDPOINT = '/api/admin/agents'
+const CHAT_AGENTS_ENDPOINT = '/api/chat/agents'
+
+export async function listAdminAgents({ adminToken } = {}) {
+  const r = await fetch(ADMIN_AGENTS_ENDPOINT, { headers: adminHeaders(adminToken) })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data || []
+}
+
+export async function createAdminAgent(payload, { adminToken } = {}) {
+  const r = await fetch(ADMIN_AGENTS_ENDPOINT, {
+    method: 'POST', headers: jsonHeaders(adminToken),
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+export async function updateAdminAgent(agentId, payload, { adminToken } = {}) {
+  const r = await fetch(`${ADMIN_AGENTS_ENDPOINT}/${encodeURIComponent(agentId)}`, {
+    method: 'PUT', headers: jsonHeaders(adminToken),
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+export async function deleteAdminAgent(agentId, { adminToken } = {}) {
+  const r = await fetch(`${ADMIN_AGENTS_ENDPOINT}/${encodeURIComponent(agentId)}`, {
+    method: 'DELETE', headers: adminHeaders(adminToken),
+  })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data
+}
+
+/**
+ * 对话页 dropdown 用：返回 enabled agent 列表（不含 prompt 等敏感字段）。
+ */
+export async function listChatAgents() {
+  const r = await fetch(CHAT_AGENTS_ENDPOINT, { headers: { Accept: 'application/json' } })
+  if (!r.ok) throw new Error(await readApiError(r))
+  return (await r.json()).data || []
+}

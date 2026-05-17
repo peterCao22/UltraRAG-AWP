@@ -72,6 +72,7 @@ class AgentRunner:
         max_iterations: int = 12,
         enabled_tools: Optional[List[str]] = None,
         chat_model: Optional[Dict[str, Any]] = None,  # Phase 7.1: chat_models 表的一行
+        agent_config: Optional[Dict[str, Any]] = None,  # Phase 7.2.A: agent_configs 表的一行
     ) -> None:
         self.kb_id = kb_id
         self.max_iterations = max_iterations
@@ -83,6 +84,8 @@ class AgentRunner:
         self._adapter: Any = None
         self._gemini_tools: Any = None
         self._chat_model: Optional[Dict[str, Any]] = chat_model
+        # Phase 7.2.A: agent_configs 行（agent_system_prompt 优先于 jinja 兜底）
+        self._agent_config: Optional[Dict[str, Any]] = agent_config
         # KG 是否可用（init() 时查 kg 表行数），False 时不向 LLM 暴露 query_knowledge_graph，
         # 避免出现「开关开了但表是空的，LLM 反复尝试 KG 浪费轮次」的情况。
         self._kg_available: bool = True
@@ -239,6 +242,25 @@ class AgentRunner:
                 "knowledge_search → list_knowledge_chunks 链路完成回答。"
             )
         )
+        # Phase 7.2.A：admin 配置的 agent_system_prompt 优先于 jinja 兜底
+        custom = ""
+        if self._agent_config:
+            custom = (self._agent_config.get("agent_system_prompt") or "").strip()
+        if custom:
+            from custom_app.services.prompt_renderer import render_prompt
+
+            base = render_prompt(
+                custom,
+                {
+                    "kb_name": kb_name or self._kb_name or self.kb_id,
+                    "kb_description": self._agent_config.get("kb_description") or "",
+                    "language": "Chinese (Simplified)",
+                    "current_time": datetime.now(timezone.utc)
+                    .strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "web_search_status": "未启用",
+                },
+            )
+            return base + kg_status_note
         try:
             env = Environment(loader=FileSystemLoader(str(_PROMPT_DIR)))
             tmpl = env.get_template("agv_agent_system.jinja")
@@ -726,12 +748,17 @@ class AgentRunner:
 
         tools = None
         if self._registry is not None:
-            from custom_app.services.llm_adapter import openai_tools_to_gemini
             # 注意：chat.py 每次请求会刷新 self.enabled_tools，因此这里要再算一次
             # 有效集合（剔除空 KG 时的 query_knowledge_graph）。
-            tools = openai_tools_to_gemini(
-                self._registry.get_schemas(self._effective_enabled_tools())
-            )
+            schemas = self._registry.get_schemas(self._effective_enabled_tools())
+            if getattr(self, "_adapter_canonical", False):
+                # Phase 7.1 canonical 路径（OpenAI / Anthropic）：直接传 OpenAI 标准
+                # 嵌套 schema；Anthropic adapter 内部再转 input_schema。
+                tools = schemas
+            else:
+                # 老 Gemini 原生路径：需扁平化成 Gemini functionDeclarations
+                from custom_app.services.llm_adapter import openai_tools_to_gemini
+                tools = openai_tools_to_gemini(schemas)
 
         final_answer_text = ""
         iteration = 0

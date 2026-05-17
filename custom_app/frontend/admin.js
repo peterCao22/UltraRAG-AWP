@@ -10,15 +10,18 @@ import { isAllowedKbUploadFile, getAcceptAttr, getUploadHint } from './utils/upl
 import {
   batchDocumentStatus,
   batchReindexDocuments,
+  createAdminAgent,
   createAdminModel,
   createIngestJob,
   createKnowledgeBase,
+  deleteAdminAgent,
   deleteAdminModel,
   deleteDocument,
   deleteKnowledgeBase,
   getAgentConfig,
   getJobProgress,
   getKnowledgeBase,
+  listAdminAgents,
   listAdminModels,
   listDocumentChunks,
   listDocuments,
@@ -29,6 +32,7 @@ import {
   retryDocument,
   setDefaultAdminModel,
   testAdminModel,
+  updateAdminAgent,
   updateAdminModel,
   updateAgentConfig,
   uploadKbDocuments,
@@ -37,16 +41,19 @@ import {
 const defaultKbApi = {
   batchDocumentStatus,
   batchReindexDocuments,
+  createAdminAgent,
   createAdminModel,
   listKnowledgeBases,
   createKnowledgeBase,
   createIngestJob,
+  deleteAdminAgent,
   deleteAdminModel,
   deleteDocument,
   deleteKnowledgeBase,
   getAgentConfig,
   getJobProgress,
   getKnowledgeBase,
+  listAdminAgents,
   listAdminModels,
   listDocumentChunks,
   listDocuments,
@@ -56,6 +63,7 @@ const defaultKbApi = {
   retryDocument,
   setDefaultAdminModel,
   testAdminModel,
+  updateAdminAgent,
   updateAdminModel,
   updateAgentConfig,
   uploadKbDocuments,
@@ -111,6 +119,7 @@ function parseRoute() {
   if (raw === '/' || raw === '') return { view: 'list' }
   if (raw === '/status') return { view: 'status' }
   if (raw === '/models') return { view: 'models' }
+  if (raw === '/agents') return { view: 'agents' }
   const m = raw.match(/^\/kb\/([^/]+)\/?$/)
   if (m) return { view: 'detail', kbId: decodeURIComponent(m[1]) }
   return { view: 'list' }
@@ -1073,6 +1082,339 @@ export function initAdminApp({
     })
   }
 
+  // ── Phase 7.2.A: Agent 管理 ───────────────────────────────────────────
+
+  async function renderAgents() {
+    clearPoll()
+    clearDocPoll()
+    activeKbId = null
+    setNavActive(root, 'agents')
+    if (titleEl) titleEl.textContent = 'Agent 管理'
+
+    outlet.replaceChildren(buildAdminListSkeleton())
+    try {
+      const [agents, models] = await Promise.all([
+        api.listAdminAgents(),
+        api.listAdminModels().catch(() => []),
+      ])
+      const wrap = document.createElement('div')
+      wrap.className = 'admin-list-view'
+
+      const toolbar = document.createElement('div')
+      toolbar.className = 'admin-toolbar'
+      const btnNew = document.createElement('button')
+      btnNew.type = 'button'
+      btnNew.className = 'primary-action'
+      btnNew.textContent = '+ 新增 Agent'
+      btnNew.addEventListener('click', () => openAgentEditor(null, models))
+      toolbar.append(btnNew)
+      wrap.append(toolbar)
+
+      if (!agents.length) {
+        const empty = document.createElement('div')
+        empty.className = 'admin-empty'
+        const icon = document.createElement('div')
+        icon.className = 'admin-empty-icon'
+        icon.textContent = '🤖'
+        const h2 = document.createElement('h2')
+        h2.className = 'admin-empty-title'
+        h2.textContent = '还没有 Agent'
+        empty.append(icon, h2)
+        wrap.append(empty)
+        outlet.replaceChildren(wrap)
+        return
+      }
+
+      const grid = document.createElement('section')
+      grid.className = 'card-grid'
+
+      for (const a of agents) {
+        const card = document.createElement('article')
+        card.className = 'card admin-kb-card admin-model-card'
+
+        const h2 = document.createElement('h2')
+        h2.textContent = a.name
+        if (a.is_builtin) {
+          const badge = document.createElement('span')
+          badge.className = 'status-badge status-badge--ok'
+          badge.textContent = '内置'
+          h2.append(' ', badge)
+        }
+        if (!a.enabled) {
+          const dis = document.createElement('span')
+          dis.className = 'status-badge'
+          dis.textContent = '已禁用'
+          h2.append(' ', dis)
+        }
+        card.append(h2)
+
+        const modeLabel = a.agent_mode === 'agent' ? '智能推理' : '快速问答'
+        const modelLabel = a.model_id
+          ? (models.find((m) => m.model_id === a.model_id) || {}).name
+            || a.model_id
+          : '未绑定（用对话页 chip）'
+        const meta = document.createElement('p')
+        meta.className = 'muted admin-kb-meta'
+        meta.textContent = `模式：${modeLabel} · 模型：${modelLabel}`
+        card.append(meta)
+
+        if (a.description) {
+          const desc = document.createElement('p')
+          desc.className = 'muted'
+          desc.style.fontSize = '12px'
+          desc.textContent = a.description
+          card.append(desc)
+        }
+
+        const row = document.createElement('div')
+        row.className = 'admin-card-actions'
+
+        const btnEdit = document.createElement('button')
+        btnEdit.type = 'button'
+        btnEdit.className = 'button-secondary button-small'
+        btnEdit.textContent = '编辑'
+        btnEdit.addEventListener('click', () => openAgentEditor(a, models))
+
+        row.append(btnEdit)
+
+        if (!a.is_builtin) {
+          const btnDel = document.createElement('button')
+          btnDel.type = 'button'
+          btnDel.className = 'button-danger button-small'
+          btnDel.textContent = '删除'
+          btnDel.addEventListener('click', async () => {
+            const ok = await openConfirmModal({
+              message: `确定删除 Agent「${a.name}」？（软删除，可后续恢复）`,
+              confirmLabel: '删除',
+            })
+            if (!ok) return
+            try {
+              await api.deleteAdminAgent(a.agent_id)
+              await renderAgents()
+            } catch (e) {
+              showFlash(e.message || String(e))
+            }
+          })
+          row.append(btnDel)
+        }
+
+        card.append(row)
+        grid.append(card)
+      }
+
+      wrap.append(grid)
+      outlet.replaceChildren(wrap)
+    } catch (e) {
+      Toast.show(`加载失败：${e.message || String(e)}`, 'error')
+      outlet.innerHTML = sanitizeHtml(
+        `<p class="admin-error">加载失败：${escapeHtml(e.message || String(e))}</p>`,
+      )
+    }
+  }
+
+  function openAgentEditor(existing, models) {
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+
+    const card = document.createElement('div')
+    card.className = 'modal-card modal-card--wide'
+
+    const isEdit = !!existing
+    const isBuiltin = !!(existing && existing.is_builtin)
+
+    const title = document.createElement('h2')
+    title.className = 'modal-title'
+    title.textContent = isEdit
+      ? (isBuiltin ? '编辑内置 Agent' : '编辑 Agent')
+      : '新增 Agent'
+
+    const form = document.createElement('form')
+    form.className = 'admin-form'
+    form.dataset.role = 'agent-form'
+
+    function makeField(labelText, control, requiredMark = false, hint = '') {
+      const lbl = document.createElement('label')
+      lbl.append(document.createTextNode(labelText))
+      if (requiredMark) {
+        const star = document.createElement('span')
+        star.className = 'required'
+        star.textContent = ' *'
+        lbl.append(star)
+      }
+      if (hint) {
+        const small = document.createElement('small')
+        small.className = 'muted'
+        small.style.display = 'block'
+        small.textContent = hint
+        lbl.append(small)
+      }
+      lbl.append(control)
+      return lbl
+    }
+
+    // 名称
+    const inputName = document.createElement('input')
+    inputName.name = 'name'
+    inputName.className = 'field'
+    inputName.required = true
+    inputName.maxLength = 120
+    form.append(makeField('名称', inputName, true))
+
+    // agent_mode（创建后不可改）
+    const selectMode = document.createElement('select')
+    selectMode.name = 'agent_mode'
+    selectMode.className = 'field'
+    selectMode.required = true
+    if (isEdit) selectMode.disabled = true
+    const optQuick = document.createElement('option')
+    optQuick.value = 'quick'
+    optQuick.textContent = '快速问答（quick）'
+    const optAgent = document.createElement('option')
+    optAgent.value = 'agent'
+    optAgent.textContent = '智能推理（agent）'
+    selectMode.append(optQuick, optAgent)
+    form.append(makeField('模式', selectMode, true,
+      isEdit ? '模式不可在创建后修改' : ''))
+
+    // 描述
+    const textareaDesc = document.createElement('textarea')
+    textareaDesc.name = 'description'
+    textareaDesc.className = 'field'
+    textareaDesc.rows = 2
+    textareaDesc.maxLength = 500
+    form.append(makeField('描述（可选）', textareaDesc))
+
+    // 关联模型
+    const selectModel = document.createElement('select')
+    selectModel.name = 'model_id'
+    selectModel.className = 'field'
+    const optEmpty = document.createElement('option')
+    optEmpty.value = ''
+    optEmpty.textContent = '（不绑定，沿用对话页 chip 选择）'
+    selectModel.append(optEmpty)
+    for (const m of models || []) {
+      const opt = document.createElement('option')
+      opt.value = m.model_id
+      opt.textContent = `${m.name}（${m.model_name}）`
+      selectModel.append(opt)
+    }
+    form.append(makeField('关联模型', selectModel, false,
+      '空表示不绑定；选定后切到该 Agent 时模型联动切换'))
+
+    // system_prompt（quick 用）
+    const textareaSystem = document.createElement('textarea')
+    textareaSystem.name = 'system_prompt'
+    textareaSystem.className = 'field'
+    textareaSystem.rows = 8
+    textareaSystem.maxLength = 8000
+    textareaSystem.placeholder =
+      '空表示沿用 yaml 兜底。可用变量：{{kb_name}} {{kb_description}} {{language}} {{current_time}}'
+    form.append(makeField('System Prompt（quick 模式生效）', textareaSystem))
+
+    // agent_system_prompt（agent 用）
+    const textareaAgentSystem = document.createElement('textarea')
+    textareaAgentSystem.name = 'agent_system_prompt'
+    textareaAgentSystem.className = 'field'
+    textareaAgentSystem.rows = 8
+    textareaAgentSystem.maxLength = 8000
+    textareaAgentSystem.placeholder =
+      '空表示沿用 prompt/agv_agent_system.jinja 兜底。同样支持上述占位符。'
+    form.append(makeField('Agent System Prompt（agent 模式生效）', textareaAgentSystem))
+
+    // 采样参数
+    const inputTemp = document.createElement('input')
+    inputTemp.name = 'temperature'
+    inputTemp.type = 'number'
+    inputTemp.className = 'field'
+    inputTemp.min = '0'
+    inputTemp.max = '2'
+    inputTemp.step = '0.05'
+    inputTemp.value = '0.7'
+    form.append(makeField('Temperature（0.0–2.0）', inputTemp))
+
+    const inputMaxTokens = document.createElement('input')
+    inputMaxTokens.name = 'max_tokens'
+    inputMaxTokens.type = 'number'
+    inputMaxTokens.className = 'field'
+    inputMaxTokens.min = '1'
+    inputMaxTokens.max = '200000'
+    inputMaxTokens.step = '1'
+    inputMaxTokens.value = '4096'
+    form.append(makeField('Max Tokens', inputMaxTokens))
+
+    // 启用
+    const enabledLabel = document.createElement('label')
+    enabledLabel.style.display = 'flex'
+    enabledLabel.style.alignItems = 'center'
+    enabledLabel.style.gap = '8px'
+    const enabledCb = document.createElement('input')
+    enabledCb.type = 'checkbox'
+    enabledCb.name = 'enabled'
+    enabledCb.checked = true
+    enabledLabel.append(enabledCb)
+    const enabledTxt = document.createElement('span')
+    enabledTxt.textContent = '启用'
+    enabledLabel.append(enabledTxt)
+    form.append(enabledLabel)
+
+    // 按钮
+    const actions = document.createElement('div')
+    actions.className = 'modal-actions'
+    const btnCancel = document.createElement('button')
+    btnCancel.type = 'button'
+    btnCancel.className = 'button-secondary'
+    btnCancel.textContent = '取消'
+    btnCancel.addEventListener('click', () => overlay.remove())
+    const btnSubmit = document.createElement('button')
+    btnSubmit.type = 'submit'
+    btnSubmit.className = 'button-primary'
+    btnSubmit.textContent = '保存'
+    actions.append(btnCancel, btnSubmit)
+    form.append(actions)
+
+    card.append(title, form)
+    overlay.append(card)
+    document.body.append(overlay)
+
+    if (isEdit) {
+      inputName.value = existing.name || ''
+      selectMode.value = existing.agent_mode || 'quick'
+      textareaDesc.value = existing.description || ''
+      selectModel.value = existing.model_id || ''
+      textareaSystem.value = existing.system_prompt || ''
+      textareaAgentSystem.value = existing.agent_system_prompt || ''
+      inputTemp.value = String(existing.temperature ?? 0.7)
+      inputMaxTokens.value = String(existing.max_tokens ?? 4096)
+      enabledCb.checked = !!existing.enabled
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const payload = {
+        name: inputName.value.trim(),
+        agent_mode: selectMode.value,
+        description: textareaDesc.value.trim(),
+        model_id: selectModel.value,
+        system_prompt: textareaSystem.value,
+        agent_system_prompt: textareaAgentSystem.value,
+        temperature: Number(inputTemp.value),
+        max_tokens: Number(inputMaxTokens.value),
+        enabled: enabledCb.checked,
+      }
+      try {
+        if (isEdit) {
+          await api.updateAdminAgent(existing.agent_id, payload)
+        } else {
+          await api.createAdminAgent(payload)
+        }
+        overlay.remove()
+        await renderAgents()
+      } catch (err) {
+        showFlash(err.message || String(err))
+      }
+    })
+  }
+
   function renderStatus() {
     clearPoll()
     clearDocPoll()
@@ -1092,6 +1434,7 @@ export function initAdminApp({
     if (route.view === 'list') await renderList()
     else if (route.view === 'status') renderStatus()
     else if (route.view === 'models') await renderModels()
+    else if (route.view === 'agents') await renderAgents()
     else if (route.view === 'detail' && route.kbId) await renderDetail(route.kbId)
     else await renderList()
   }

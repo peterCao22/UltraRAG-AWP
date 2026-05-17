@@ -16,6 +16,7 @@ from pathlib import Path
 from flask import Flask, jsonify, make_response, redirect, request, send_from_directory
 
 from custom_app.api import (
+    admin_agents_bp,
     admin_models_bp,
     chat_bp,
     kb_bp,
@@ -136,6 +137,7 @@ def create_app() -> Flask:
     app.register_blueprint(roles_bp)
     app.register_blueprint(sessions_bp)
     app.register_blueprint(admin_models_bp)
+    app.register_blueprint(admin_agents_bp)
 
     @app.before_request
     def require_admin_token():

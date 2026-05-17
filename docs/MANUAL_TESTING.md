@@ -704,6 +704,133 @@ chip 只更换 Runner 缓存键 + UI 显示。LLM 真切换待 Phase 7.1。
 
 ---
 
+## I. Phase 7.2.A Agent 配置（约 15 分钟）
+
+> 目标：把 system_prompt 从 yaml 移到 per-agent 数据库；admin 可编辑、对话页可切换；
+> builtin agent 可改 prompt 不可删；用户可自定义 agent。
+
+### I.0 准备（一次性）
+
+如果你跑在 **Postgres** 后端，先跑一次迁移 + 种子：
+
+```powershell
+& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" custom_app\scripts\apply_phase7_2_a_migration.py
+```
+
+期望末尾输出 `Phase 7.2.A migration applied successfully.`。
+
+SQLite 后端无需手工跑：Flask 启动时 `init_db()` 会自动建表 + 种子两条 builtin agent。
+
+### I.1 admin 「Agent 管理」tab 出现且默认列出 2 个 builtin
+
+1. 启动 Flask；浏览器进 `/admin` → 左侧导航有 **Agent 管理**
+2. 点开后看到 2 张卡：「快速问答」「智能推理」，均带「内置」徽章
+
+**通过判据**：
+
+- [ ] 卡片名称为 `快速问答` / `智能推理`
+- [ ] 「删除」按钮**不显示**在内置卡片上
+- [ ] 「编辑」按钮可点开抽屉
+
+### I.2 编辑 builtin-quick 的 system_prompt → 对话立即生效（vLLM 排版变好）
+
+1. 把 chip 切到 vLLM Qwen 模型，发问题，记录排版（应该是朴素单层 bullet）
+2. admin 编辑「快速问答」→ system_prompt 改成下方文本 → 保存
+
+   ```
+   你是 AGV SOP 助手。请用 Markdown 嵌套结构回答：
+   - 一级标题用 **加粗**
+   - 步骤性内容用有序列表
+   - 关键警告用 > blockquote
+   - 段落之间留空行
+   {{language}} 答复；当前时间 {{current_time}}。
+   ```
+
+3. 重启 Flask（或等下次 `_get_runner` 失效；保险起见重启）
+4. 同一个问题再问，看排版
+
+**通过判据**：
+
+- [ ] 重启后日志看到 `RagRunner agent_config override: agent_id=builtin-quick ...`
+- [ ] 答案排版有粗体标题 + 嵌套 bullet（与 Claude 风格接近）
+- [ ] `{{language}}` 被替换成 `Chinese (Simplified)`，`{{current_time}}` 是 ISO 时间戳
+
+### I.3 创建第 3 个 agent「商业资料助手」→ dropdown 出现 → 切换可用
+
+1. admin 点「+ 新增 Agent」
+   - 名称：`商业资料助手`
+   - 模式：`快速问答（quick）`
+   - 关联模型：选 vLLM（或留空）
+   - System Prompt 自由发挥（"以销售视角回答……"）
+   - 保存
+2. 切到对话页，dropdown 应出现「智能体：商业资料助手」
+3. 选中它，问一个问题
+4. Flask 日志看 `chat_stream routing → RagRunner kb_id=... agent_id=agent_xxx`
+
+**通过判据**：
+
+- [ ] dropdown 第 3 项出现
+- [ ] 日志显示 `agent_id=agent_xxx`，**不是** `builtin-quick`
+- [ ] 答案风格与「商业资料助手」prompt 一致
+
+### I.4 切到「智能推理」用自定义 agent_system_prompt
+
+1. admin 编辑 builtin-agent → agent_system_prompt 设置一段简短 ReAct 风格
+   （比如：`你是诊断专家，可调用工具 knowledge_search/list_knowledge_chunks/final_answer。
+   每步用一句话陈述当前思考。{{kb_name}}`）
+2. 重启 Flask；对话页 dropdown 切到「智能体：智能推理」
+3. 发一个需要检索的问题
+4. 看 SSE 的 `thought` 事件文本是否符合新 prompt 风格
+
+**通过判据**：
+
+- [ ] thought 文本风格变化（不是 jinja 兜底里那套）
+- [ ] 仍能完成多轮 tool_call → tool_result → final_answer 闭环
+
+### I.5 builtin agent 不可删
+
+1. 在 admin Agent 管理里，注意 builtin 卡片**没有「删除」按钮**
+2. 直接调 API 验证：
+
+   ```powershell
+   curl -X DELETE http://localhost:8080/api/admin/agents/builtin-quick
+   ```
+
+**通过判据**：
+
+- [ ] 返回 HTTP 400 + `code: "BUILTIN_IMMUTABLE"`
+
+### I.6 admin 不能改 builtin 的 agent_mode / is_builtin
+
+```powershell
+curl -X PUT http://localhost:8080/api/admin/agents/builtin-quick `
+  -H "Content-Type: application/json" `
+  -d '{"agent_mode":"agent"}'
+```
+
+**通过判据**：
+
+- [ ] 返回 HTTP 400 + `agent_mode is immutable after creation`
+
+### I.7 自动化测试
+
+```powershell
+& "C:\Users\Peter\miniconda3\envs\ultrarag\python.exe" -m pytest tests/test_phase7_2_a_*.py -q
+```
+
+**期望**：48 个用例全过（repository 9 + prompt_renderer 14 + runner_agent_config 9 + admin_agents_api 16）。
+
+### 已知差异
+
+| 项 | 状态 |
+|---|---|
+| 旧 `.env` `ULTRARAG_CHAT_BACKEND=gemini` 兜底 | **仍保留**（无 agent_configs 行时回退） |
+| WeKnora 完整 9 tab agent 配置 | 推后 Phase 7.2.B |
+| Placeholder `{{contexts}}` / `{{query}}` | **不**实现（RagRunner 内部拼接，不该让用户写） |
+| 老对话页 `localStorage.ULTRARAG_AGENT_MODE='quick'/'agent'` | 自动升级为 `builtin-quick`/`builtin-agent` |
+
+---
+
 ## 最终结论
 
 ```
