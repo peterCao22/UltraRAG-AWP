@@ -37,3 +37,8 @@ src/*.egg-info/
 # Node frontend test tooling
 node_modules/
 coverage/
+
+# Phase 8.1 评测候选过程文件（仅终版 data/eval/<kb>.jsonl 与 baseline/ 进 git）
+data/eval/*_raw.jsonl
+data/eval/*_gen.jsonl
+data/eval/*_manual.jsonl
