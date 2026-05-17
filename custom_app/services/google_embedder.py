@@ -120,19 +120,28 @@ def compose_doc_embedding_text(row: dict) -> str:
 
     Phase 4.3：heading_path 增强
         当 chunk 含 structure.heading_path 时（Phase 4+ schema），将标题层级链
-        以 "A > B > C" 形式作为前缀拼接，强化父级标题语义。无 heading_path 时
-        退化到 Phase 3 行为（仅 title + contents），保证老库零回归。
+        以 "A > B > C" 形式作为前缀拼接，强化父级标题语义。
 
-    格式：
-        有 heading_path:  "A > B\n<title>\n<contents>"
-        无 heading_path:  "<title>\n<contents>"
+    Phase 8.2.1：Contextual chunking
+        当 chunk 含非空 `context` 字段时（由 services/chunking/contextual.py 生成），
+        在 heading_path 与 title 之前再加一行文档级上下文摘要，帮助 embedding 在
+        chunk 脱离原文档时仍能定位。缺失 context 时退化到 Phase 4.3 行为，零回归。
+
+    格式（按优先级从外到内）：
+        [context]
+        A > B > C   ← heading_path
+        <title>
+        <contents>
     """
     structure = row.get("structure") or {}
     heading_path = structure.get("heading_path") or []
     title = row.get("title", "") or ""
     body = strip_images_footer(row.get("contents", ""))
+    context = (row.get("context") or "").strip()
 
     parts: list[str] = []
+    if context:
+        parts.append(context)
     if heading_path:
         # heading_path 可能是 list 或 tuple；过滤空串
         cleaned = [str(h).strip() for h in heading_path if str(h).strip()]

@@ -237,6 +237,44 @@ def _parse_stage(kb: dict, raw_dir: Path, kb_root: Path, chunks_path: Path) -> N
     write_chunks_jsonl(chunk_dicts, chunks_path)
 
 
+def _context_stage(chunks_path: Path) -> dict[str, int]:
+    """Phase 8.2.1：parse 之后、embed 之前给每个 chunk 生成「文档级上下文摘要」。
+
+    设计原则（与 [[project-phase8-12-roadmap]] 共识 §五.5）：
+        - 失败降级：单 chunk 失败 → context="" 仍可索引，不阻塞 ingest
+        - 幂等：已有非空 context 的 chunk 默认跳过；重建索引不重新调 Gemini
+        - 可关闭：env ULTRARAG_DISABLE_CONTEXTUAL=1 时跳过整 stage（dev 排障用）
+
+    返回：{"generated": N, "skipped": N, "failed": N}；stage 自身永不抛错。
+    """
+    if os.environ.get("ULTRARAG_DISABLE_CONTEXTUAL", "").strip().lower() in (
+        "1", "true", "yes"
+    ):
+        logger.info("context stage skipped via ULTRARAG_DISABLE_CONTEXTUAL")
+        return {"generated": 0, "skipped": 0, "failed": 0, "disabled": 1}
+
+    try:
+        from custom_app.services.chunking.contextual import ContextEnricher
+    except ImportError as e:
+        logger.warning("context stage skipped: cannot import ContextEnricher (%s)", e)
+        return {"generated": 0, "skipped": 0, "failed": 0, "disabled": 1}
+
+    try:
+        enricher = ContextEnricher()
+    except RuntimeError as e:
+        # 没配 GOOGLE_API_KEY 之类的启动错误 → 降级跳过整 stage（与共识一致）
+        logger.warning("context stage skipped (init failed): %s", e)
+        return {"generated": 0, "skipped": 0, "failed": 0, "disabled": 1}
+
+    try:
+        n_gen, n_skip, n_fail = enricher.enrich_chunks_jsonl(chunks_path)
+    except Exception as e:  # noqa: BLE001 — stage 级降级
+        logger.warning("context stage failed unexpectedly: %s", e)
+        return {"generated": 0, "skipped": 0, "failed": -1, "error": str(e)}
+
+    return {"generated": n_gen, "skipped": n_skip, "failed": n_fail}
+
+
 def _embed_stage(chunks_path: Path, embedding_path: Path) -> None:
     """阶段2：chunks.jsonl → embedding.npy。"""
     build_embedding_npy(str(chunks_path), str(embedding_path))
@@ -730,6 +768,12 @@ def _run_ingest_job(kb: dict, kb_id: str, job_id: str, force_reindex: bool) -> d
         _broadcast_doc_status(kb_id, "parsing")
         _parse_stage(kb, raw_dir, kb_root, chunks_path)
         _update_job_stage(job_id, "parse", {"file_count": file_count})
+
+        # Phase 8.2.1：parse 之后、embed 之前给每个 chunk 生成「文档级上下文摘要」
+        # 失败不阻塞 ingest（共识 §五.5：降级 + 日志告警）
+        _broadcast_doc_status(kb_id, "context")
+        ctx_stats = _context_stage(chunks_path)
+        _update_job_stage(job_id, "context", ctx_stats)
 
         _broadcast_doc_status(kb_id, "embedding")
         _embed_stage(chunks_path, embedding_path)

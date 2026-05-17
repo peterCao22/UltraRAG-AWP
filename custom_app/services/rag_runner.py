@@ -166,6 +166,61 @@ class RagRunner:
         self._rerank_model = None
         self._rerank_load_error: Optional[str] = None
         self._rerank_resolved_device: Optional[str] = None
+        # Phase 8.2.2：BM25 双路 + RRF 融合
+        # _bm25_store None 时降级为纯向量；构建失败也 None；env ULTRARAG_RETRIEVAL_MODE
+        # 控制开关（默认 hybrid）。失败降级是 PLAN §五.5 共识。
+        self._bm25_store = None
+        self._bm25_load_error: Optional[str] = None
+        self._retrieval_cfg: Dict[str, Any] = {}
+
+    # ──────────────────────────────────────────────────────────────
+    # Phase 8.2.2：双路检索（vector + BM25 + RRF）
+    # ──────────────────────────────────────────────────────────────
+
+    def _resolve_retrieval_mode(self) -> str:
+        """解析检索模式。优先级：env > yaml > 默认 hybrid。
+
+        返回 "vector"（纯向量，保持 Phase 8.2 之前行为）或 "hybrid"（向量 + BM25 + RRF）。
+        """
+        env_val = (os.environ.get("ULTRARAG_RETRIEVAL_MODE", "") or "").strip().lower()
+        yaml_val = (self._retrieval_cfg.get("mode") or "").strip().lower()
+        mode = env_val or yaml_val or "hybrid"
+        if mode not in ("vector", "hybrid"):
+            logger.warning("invalid retrieval mode %r, fallback to hybrid", mode)
+            return "hybrid"
+        return mode
+
+    def _rrf_params(self) -> tuple[float, float, int]:
+        """返回 (vector_weight, keyword_weight, k)。yaml retrieval.* 可覆盖默认值。"""
+        try:
+            vw = float(self._retrieval_cfg.get("vector_weight", 0.7))
+            kw = float(self._retrieval_cfg.get("keyword_weight", 0.3))
+            kc = int(self._retrieval_cfg.get("rrf_k", 60))
+        except (TypeError, ValueError):
+            vw, kw, kc = 0.7, 0.3, 60
+        return vw, kw, kc
+
+    def _load_bm25_if_enabled(self) -> None:
+        """按 mode 决定是否构建 BM25Store。失败降级（共识 §五.5）。"""
+        mode = self._resolve_retrieval_mode()
+        if mode != "hybrid":
+            logger.info("retrieval mode=vector; skip BM25 load")
+            return
+        try:
+            from custom_app.services.retrieval.bm25 import BM25Store
+
+            self._bm25_store = BM25Store.from_rows(self._rows)
+            logger.info(
+                "BM25 loaded kb=%s size=%d", self.kb_id, self._bm25_store.size()
+            )
+        except Exception as e:  # noqa: BLE001 — 共识：BM25 加载失败降级到纯向量
+            self._bm25_load_error = f"{type(e).__name__}: {e}"
+            self._bm25_store = None
+            logger.warning(
+                "BM25 load failed kb=%s err=%s; falling back to vector-only",
+                self.kb_id,
+                self._bm25_load_error,
+            )
 
     def _kb_dir(self) -> Path:
         """
@@ -1318,6 +1373,11 @@ class RagRunner:
         else:
             raise ValueError(f"unsupported vector_backend: {backend!r}")
 
+        # Phase 8.2.2：双路检索（向量 + BM25）配置 + BM25 索引加载
+        # 共识：env ULTRARAG_RETRIEVAL_MODE 全局开关；BM25 加载失败降级到纯向量
+        self._retrieval_cfg = dict(retr_cfg.get("retrieval") or {})
+        self._load_bm25_if_enabled()
+
         openai_cfg = (gen_cfg.get("backend_configs") or {}).get("openai") or {}
         sampling = gen_cfg.get("sampling_params") or {}
 
@@ -1549,14 +1609,45 @@ class RagRunner:
         # 暂时回写为行号 hit_ids 以保留下游（rerank/SOP 扩展/prompt 构建）的现有签名；
         # Phase 5 切 Qdrant 时下游统一改用 chunk_id 检索
         # 兼容性：旧 mock 测试可能直接 patch self._index；_vector_store 为 None 时 fallback
+        id_to_row = {str(self._rows[i].get("id", "")): i for i in range(len(self._rows))}
+        vector_hits: list = []  # list[Hit]，Phase 8.2.2 给 RRF 用
         if getattr(self, "_vector_store", None) is not None:
-            hits = self._vector_store.search(q_vec, recall_k)
-            id_to_row = {str(self._rows[i].get("id", "")): i for i in range(len(self._rows))}
-            hit_ids = [id_to_row[h.chunk_id] for h in hits if h.chunk_id in id_to_row]
+            vector_hits = list(self._vector_store.search(q_vec, recall_k))
+            hit_ids = [id_to_row[h.chunk_id] for h in vector_hits if h.chunk_id in id_to_row]
         else:
             # 旧风格：直接调 self._index.search（mock 测试常用此模式）
             _, indices = self._index.search(q_vec, recall_k)
             hit_ids = [int(x) for x in indices[0].tolist() if int(x) >= 0]
+
+        # Phase 8.2.2：双路检索 + RRF 融合
+        # 触发条件：BM25 加载成功（mode=hybrid 且无降级）且向量结果非空
+        # 行为：用 RRF 重排向量+BM25 共同候选 → 替换 hit_ids 顺序；后续 keyword_match /
+        # rerank / SOP 扩展 链路不变。
+        if self._bm25_store is not None and vector_hits:
+            from custom_app.services.retrieval.rrf import fuse_with_rrf
+
+            try:
+                bm25_hits = self._bm25_store.search(rewritten_q, recall_k)
+            except Exception as e:  # noqa: BLE001 — 单次 BM25 失败不阻塞主流程
+                logger.warning("BM25 query failed kb=%s: %s; skip fusion", self.kb_id, e)
+                bm25_hits = []
+            if bm25_hits:
+                vw, kw, kc = self._rrf_params()
+                fused = fuse_with_rrf(
+                    vector_hits, bm25_hits,
+                    k=kc, vector_weight=vw, keyword_weight=kw,
+                    top_k=recall_k,
+                )
+                new_hit_ids = [
+                    id_to_row[h.chunk_id] for h in fused if h.chunk_id in id_to_row
+                ]
+                if new_hit_ids:
+                    hit_ids = new_hit_ids
+                    logger.info(
+                        "RRF kb=%s vec=%d bm25=%d fused=%d (vw=%.2f kw=%.2f)",
+                        self.kb_id, len(vector_hits), len(bm25_hits), len(fused), vw, kw,
+                    )
+
         keyword_hit_ids = self._keyword_match_hit_ids(q)
         hit_ids = self._merge_preferred_hit_ids(keyword_hit_ids, hit_ids)
         hit_ids, rerank_meta = self._rerank_hit_ids(rewritten_q, hit_ids)

@@ -1,6 +1,7 @@
 # Phase 8.2 —— Contextual Chunking + BM25 双路检索
 
-> **状态**：草案待讨论（2026-05-16）
+> **状态**：🟡 8.2.1 + 8.2.2 工程落地（2026-05-17）；8.2.3 评测对比等 Phase 8.1 人工标注完成
+> **草案讨论**：2026-05-16
 > **前置**：[Phase 8.1](./PHASE_8_1_PLAN.md) 完成（基线已建立）
 > **借用**：❌ 不借 UltraRAG，全部 custom_app 内部实现
 > **参考**：Anthropic 2024 [Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval)、WeKnora [fuseWithRRF](../../../WeKnora/internal/application/service/knowledgebase_search_fusion.go)
@@ -268,3 +269,94 @@ def fuse_with_rrf(
 ---
 
 > 实施前所有「待讨论问题」必须先达成共识。
+
+---
+
+## 十、实施记录（2026-05-17，8.2.1 + 8.2.2 工程阶段）
+
+### 共识确认（PLAN §七.待讨论问题）
+
+| 议题 | 决议 |
+|---|---|
+| Context 范围 | **整篇文档**（SOP 多为 5-20k tokens，一次输入 Gemini 即可；未来出现 >32k 长文档再改 ±N 段窗口） |
+| 现有 KB context 回填 | **两个评测 KB 全量回填**（ifs_docs / agv_demo）；新 KB 走 ingest 自然生成 |
+| 双路开关粒度 | **env 全局开关** `ULTRARAG_RETRIEVAL_MODE=vector\|hybrid`（默认 hybrid）；per-KB 配置推到 Phase 9 |
+| BM25 / context 失败 | **降级 + 日志告警**（BM25 加载失败→纯向量；context 单 chunk 失败→`context=""` 仍可索引） |
+
+### 8.2.1 Contextual Chunking 落地
+
+- [`custom_app/services/chunking/__init__.py`](../../custom_app/services/chunking/__init__.py)
+- [`custom_app/services/chunking/contextual.py`](../../custom_app/services/chunking/contextual.py)：`ContextEnricher` 类
+  - 并发：默认 4 路 ThreadPoolExecutor
+  - 幂等：已有非空 `context` 字段的 chunk 默认跳过，`force=True` 时全部重生
+  - 失败降级：单 chunk 失败 → `context=""` 不抛错；全 stage 失败 → 跳过 stage 不阻塞 ingest
+  - 文档过长保护：单文档拼接超过 `max_doc_chars=60000` 时自动截断
+- [`custom_app/services/google_embedder.py`](../../custom_app/services/google_embedder.py)：`compose_doc_embedding_text` 在 heading_path 之前再加一行 context
+- [`custom_app/api/kb.py`](../../custom_app/api/kb.py)：`_run_ingest_job` parse 之后、embed 之前插入 `_context_stage`
+- [`custom_app/scripts/backfill_context.py`](../../custom_app/scripts/backfill_context.py)：一次性回填脚本
+- env 开关：
+  - `ULTRARAG_DISABLE_CONTEXTUAL=1` 整 stage 跳过（dev 排障）
+  - `ULTRARAG_CONTEXTUAL_MODEL`（默认 `gemini-2.0-flash`）独立于对话 model，**不要复用** `ULTRARAG_GEMINI_MODEL`：如果对话用 thinking 模型（如 gemini-3.x-preview），thinking token 会把摘要的 maxOutputTokens 吃掉，导致 context 被截断成 4-14 字（已踩坑修复）
+
+**回填结果**（2026-05-17）：
+
+| KB | chunks | 生成 | 跳过 | 失败 | 耗时 | 平均 context 长度 |
+|---|---|---|---|---|---|---|
+| ifs_docs | 16 | 16 | 0 | 0 | ~17s | 98-153 字 |
+| agv_demo | 56 | 56 | 0 | 0 | ~50s | 100-150 字 |
+
+> ⚠️ context 已写入 chunks.jsonl，但要让向量检索看到它，**还需重建 embedding + Qdrant**——
+> 这一步留给 8.2.3 评测阶段统一做（避免现在白吃 Gemini embedding 配额）。
+
+### 8.2.2 BM25 双路 + RRF 落地
+
+- [`custom_app/services/retrieval/__init__.py`](../../custom_app/services/retrieval/__init__.py)
+- [`custom_app/services/retrieval/bm25.py`](../../custom_app/services/retrieval/bm25.py)：`BM25Store`
+  - 中英混合分词：`jieba.cut(cut_all=False)` + 额外抽小写英文/数字 token（弥补 jieba 对英文短语切得偏粗）
+  - 索引文本：`context > heading_path > title > contents`（与 embedder 对齐）
+  - 失败降级：单次 search 异常返回空列表，不阻塞主流程
+- [`custom_app/services/retrieval/rrf.py`](../../custom_app/services/retrieval/rrf.py)：`fuse_with_rrf`
+  - 默认 vector_weight=0.7 / keyword_weight=0.3 / k=60（WeKnora + 论文默认）
+  - 同 chunk 在某一路出现多次时仅采用首次（最高）rank
+  - top_k 截断 + 任一路为空时仍可工作
+- [`custom_app/services/rag_runner.py`](../../custom_app/services/rag_runner.py)：
+  - 新增 `_resolve_retrieval_mode` / `_rrf_params` / `_load_bm25_if_enabled` 三个辅助方法
+  - `init()` 末尾按 mode 加载 BM25Store（构建失败降级到 None）
+  - `_prepare_chat_context()` 拿到 vector hits 后，若 BM25Store 可用 → 跑 BM25 → RRF 融合 → 替换 hit_ids 顺序；下游 keyword_match / rerank / SOP 扩展 完全不动
+- [`servers/retriever/parameter.yaml`](../../servers/retriever/parameter.yaml)：新增 `retrieval:` 段（mode / weight / rrf_k）
+
+### 测试（新增 67 case，全过）
+
+| 测试文件 | case 数 | 覆盖 |
+|---|---|---|
+| `tests/test_chunking_contextual.py` | 16 | strip placeholders / embedder context 拼接 / Enricher 幂等 / 失败降级 / doc 聚合 |
+| `tests/test_ingest_context_stage.py` | 4 | _context_stage env 关 / API key 缺失 / 异常降级 / 正常路径 |
+| `tests/test_retrieval_bm25.py` | 16 | tokenize / from_rows / search 中英混合 / top_k / 空 query / 分数有序 |
+| `tests/test_retrieval_rrf.py` | 7 | 两路命中 / 单路命中 / 权重影响 / 重复处理 / k 平滑 |
+| `tests/test_rag_runner_hybrid.py` | 11 | mode 解析（env>yaml>默认） / RRF 参数 / BM25 加载 + 降级 |
+| **合计** | **54** | 100% 通过 |
+
+加上既有 97 个 Phase 8.0/8.1 + 现有套件测试，**151 个测试全过**。
+
+### 与计划的落地差异
+
+| PLAN 点 | 实际实施 | 原因 |
+|---|---|---|
+| Gemini context 模型 | 独立 env `ULTRARAG_CONTEXTUAL_MODEL`（默认 flash）而非复用对话 `ULTRARAG_GEMINI_MODEL` | 对话模型可能是 thinking 类（gemini-3.x-preview），thinking token 会吃掉摘要 maxOutputTokens 导致截断到 4-14 字。摘要不需要 reasoning，flash 更快更便宜 |
+| `_context_stage` 触发位置 | `_run_ingest_job` parse 之后、embed 之前；统一作为 stage，可经 `ULTRARAG_DISABLE_CONTEXTUAL=1` 关掉 | 与 PLAN §三.4 一致 |
+| BM25 加载位置 | `init()` 末尾，按 mode 决定；构建失败降级到 None | 与 PLAN §四.6 一致 |
+| RRF 注入位置 | `_prepare_chat_context` 向量检索后、`_keyword_match_hit_ids` 之前 | 让现有的 keyword_match / rerank / SOP 扩展链路完全保持不动，最小风险 |
+| 行号 vs chunk_id 转换 | RRF 在 chunk_id 空间运行，最后才 `id_to_row` 映射回行号 | 内部不引入新的 ID 空间 |
+
+### 接下来要做的 8.2.3 评测对比
+
+依赖 Phase 8.1 标注完成的评测集。准备好后跑 4 组矩阵 × 2 KB：
+
+| 组 | retrieval mode | context 字段 | 操作 |
+|---|---|---|---|
+| 基线 | vector | 无 | `ULTRARAG_RETRIEVAL_MODE=vector`，把 chunks.jsonl 临时去掉 context |
+| +context | vector | 有 | `ULTRARAG_RETRIEVAL_MODE=vector`，重建 embedding（context 进 embedding 输入） |
+| +bm25 | hybrid | 无 | `ULTRARAG_RETRIEVAL_MODE=hybrid`，去掉 context |
+| +context+bm25 | hybrid | 有 | `ULTRARAG_RETRIEVAL_MODE=hybrid`，含 context |
+
+退出条件（PLAN §八）：四组分数对比 → 全胜/半胜/失败 → 决定 Phase 8.3 是否启动。
