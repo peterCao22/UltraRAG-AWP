@@ -1,0 +1,732 @@
+{
+  "kb_id": "agv_demo",
+  "n_items": 58,
+  "retrieval_metrics": {
+    "recall@1": 0.5201149425287356,
+    "hit@1": 0.5689655172413793,
+    "ndcg@1": 0.5689655172413793,
+    "recall@5": 0.675287356321839,
+    "hit@5": 0.7241379310344828,
+    "ndcg@5": 0.6125188171276874,
+    "recall@10": 0.7270114942528735,
+    "hit@10": 0.7758620689655172,
+    "ndcg@10": 0.6286888694800487,
+    "mrr": 0.6311856247201074
+  },
+  "generation_metrics": {},
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.0,
+      "hit@1": 0.0,
+      "ndcg@1": 0.0,
+      "recall@5": 0.375,
+      "hit@5": 0.375,
+      "ndcg@5": 0.1897228201007499,
+      "recall@10": 0.75,
+      "hit@10": 0.75,
+      "ndcg@10": 0.3069556996553686,
+      "mrr": 0.1751488095238095
+    },
+    "alarm_id": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Right_Arm_FTC_SOP": {
+      "recall@1": 0.6,
+      "hit@1": 0.7,
+      "ndcg@1": 0.7,
+      "recall@5": 0.65,
+      "hit@5": 0.8,
+      "ndcg@5": 0.6490362508103508,
+      "recall@10": 0.65,
+      "hit@10": 0.8,
+      "ndcg@10": 0.6490362508103508,
+      "mrr": 0.725
+    },
+    "resolution": {
+      "recall@1": 0.28888888888888886,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 0.5222222222222223,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.42720669020037705,
+      "recall@10": 0.5222222222222223,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.42720669020037705,
+      "mrr": 0.48000000000000004
+    },
+    "button_sequence": {
+      "recall@1": 0.06666666666666667,
+      "hit@1": 0.2,
+      "ndcg@1": 0.2,
+      "recall@5": 0.16666666666666666,
+      "hit@5": 0.4,
+      "ndcg@5": 0.14666936971906946,
+      "recall@10": 0.16666666666666666,
+      "hit@10": 0.4,
+      "ndcg@10": 0.14666936971906946,
+      "mrr": 0.25
+    },
+    "automatic_mode": {
+      "recall@1": 0.06666666666666667,
+      "hit@1": 0.2,
+      "ndcg@1": 0.2,
+      "recall@5": 0.06666666666666667,
+      "hit@5": 0.2,
+      "ndcg@5": 0.09385574520455128,
+      "recall@10": 0.06666666666666667,
+      "hit@10": 0.2,
+      "ndcg@10": 0.09385574520455128,
+      "mrr": 0.2
+    },
+    "alarm_cause": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_name": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Error_UDC_Presence_SOP": {
+      "recall@1": 0.3,
+      "hit@1": 0.3,
+      "ndcg@1": 0.3,
+      "recall@5": 0.8,
+      "hit@5": 0.8,
+      "ndcg@5": 0.557938887245085,
+      "recall@10": 0.8,
+      "hit@10": 0.8,
+      "ndcg@10": 0.557938887245085,
+      "mrr": 0.47833333333333333
+    },
+    "no_button_sequence": {
+      "recall@1": 0.0,
+      "hit@1": 0.0,
+      "ndcg@1": 0.0,
+      "recall@5": 0.0,
+      "hit@5": 0.0,
+      "ndcg@5": 0.0,
+      "recall@10": 0.0,
+      "hit@10": 0.0,
+      "ndcg@10": 0.0,
+      "mrr": 0.0
+    },
+    "doc:Inserting_SOP": {
+      "recall@1": 0.75,
+      "hit@1": 0.8,
+      "ndcg@1": 0.8,
+      "recall@5": 0.8,
+      "hit@5": 0.8,
+      "ndcg@5": 0.8,
+      "recall@10": 0.8,
+      "hit@10": 0.8,
+      "ndcg@10": 0.8,
+      "mrr": 0.8
+    },
+    "manual_insert": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "automatic_insert": {
+      "recall@1": 0.625,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.75,
+      "hit@5": 0.75,
+      "ndcg@5": 0.75,
+      "recall@10": 0.75,
+      "hit@10": 0.75,
+      "ndcg@10": 0.75,
+      "mrr": 0.75
+    },
+    "remote": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "override": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:PH_Box_Presence_UDC_SOP": {
+      "recall@1": 0.5666666666666667,
+      "hit@1": 0.7,
+      "ndcg@1": 0.7,
+      "recall@5": 0.5666666666666667,
+      "hit@5": 0.7,
+      "ndcg@5": 0.5938557452045513,
+      "recall@10": 0.5666666666666667,
+      "hit@10": 0.7,
+      "ndcg@10": 0.5938557452045513,
+      "mrr": 0.7
+    },
+    "doc:Loop_Emergency_SOP": {
+      "recall@1": 0.8,
+      "hit@1": 0.8,
+      "ndcg@1": 0.8,
+      "recall@5": 0.8,
+      "hit@5": 0.8,
+      "ndcg@5": 0.8,
+      "recall@10": 0.8,
+      "hit@10": 0.8,
+      "ndcg@10": 0.8,
+      "mrr": 0.8
+    },
+    "technician_required": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "battery": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    }
+  },
+  "per_tag_generation": {},
+  "failures": [
+    {
+      "id": "eval_agv_demo_004",
+      "query": "What should you do once the AGV is aligned with the correct charged battery bay?",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_6"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Power off the AGV and swap the connectors to the fully charged battery.",
+      "predicted_answer": "",
+      "retrieve_ms": 7569,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_005",
+      "query": "AGV换电的第十一步是什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_11"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "按下蓝色按钮，再按下绿色按钮。等待自动导引车（AGV）重新接入系统，主链路断开状态需消除。",
+      "predicted_answer": "",
+      "retrieve_ms": 8208,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_006",
+      "query": "那上面一步呢？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_10"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将自动导引车切换至自动模式，随后执行以下操作：1.先按下蓝色按钮，再按下绿色按钮,2.点击电池组升降按键，升起电池组",
+      "predicted_answer": "",
+      "retrieve_ms": 9166,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_007",
+      "query": "连接新电池后，应如何处理电池线缆，并完成安装？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_7"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将电池线缆整齐地排列在AGV顶部，以防止线缆卷入夹点，然后小心地将新电池滑入AGV中。",
+      "predicted_answer": "",
+      "retrieve_ms": 8522,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_008",
+      "query": "AGV启动后第九步需要确认什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "确认电池没有压在电池块上方，且位置对齐，能够正常进行垂直移动。",
+      "predicted_answer": "",
+      "retrieve_ms": 9355,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_right_arm_ftc_003",
+      "query": "清除右臂障碍物后，需要按哪两个按钮来恢复AGV运行？",
+      "tags": [
+        "button_sequence",
+        "automatic_mode",
+        "doc:Right_Arm_FTC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Right Arm FTC SOP_section_2",
+        "Cannot Enter System SOP_section_2",
+        "Left Arm FTC SOP_section_1",
+        "Navigation SOP_section_2",
+        "Flexi MOC SOP_section_2"
+      ],
+      "gold_answer": "清除障碍物后，切换到自动模式，依次按蓝色按钮和绿色按钮。",
+      "predicted_answer": "",
+      "retrieve_ms": 7877,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_right_arm_ftc_010",
+      "query": "What mode must the AGV be in before pressing the Blue and Green buttons for the Right FTC fix?",
+      "tags": [
+        "automatic_mode",
+        "prerequisite",
+        "doc:Right_Arm_FTC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "The AGV must be in Automatic Mode before pressing the Blue and Green buttons.",
+      "predicted_answer": "",
+      "retrieve_ms": 8771,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_error_udc_008",
+      "query": "What are the three steps listed to resolve the Error UDC Presence alarm?",
+      "tags": [
+        "resolution",
+        "steps",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Master Link Down SOP_section_2",
+        "Error Position Lift Table SOP_section_1"
+      ],
+      "gold_answer": "1. Ensure the platform is correctly placed on the AGV's back table. 2. If no platform is present, cancel the mission. 3. Hold 2 on the AGV keypad to unload the AGV.",
+      "predicted_answer": "",
+      "retrieve_ms": 6978,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_error_udc_010",
+      "query": "Does the Error UDC Presence alarm require a button sequence like Blue/Green to reset?",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "PH Box Presence UDC SOP_section_3",
+        "Flexi Double PH SOP_section_3",
+        "Flexi Case SOP_section_3"
+      ],
+      "gold_answer": "No, this alarm does not require a Blue/Green button sequence. The resolution involves repositioning the platform, cancelling the mission, or holding 2 on the keypad to unload.",
+      "predicted_answer": "",
+      "retrieve_ms": 6706,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_inserting_009",
+      "query": "In the automatic insert method, what does the AGV do after the speed stick is held toward the slow side?",
+      "tags": [
+        "automatic_insert",
+        "behavior",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "The AGV will automatically drive and align itself into the drive path.",
+      "predicted_answer": "",
+      "retrieve_ms": 8528,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_inserting_010",
+      "query": "Does the Inserting Alarm require the Blue/Green button sequence to resolve?",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_2",
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_3",
+        "Navigation SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "Error Position Lift Table SOP_section_3",
+        "Right Arm FTC SOP_section_3"
+      ],
+      "gold_answer": "No. The Inserting Alarm is resolved by either manually positioning the AGV at the center of the drive path, or using the remote in Automatic/Forward Mode with the speed stick held to the slow side.",
+      "predicted_answer": "",
+      "retrieve_ms": 7335,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ph_box_006",
+      "query": "AGV清除障碍物后，按哪些按钮可以重新启动自动序列？",
+      "tags": [
+        "button_sequence",
+        "automatic_mode",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_2",
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "按蓝色按钮，再按绿色按钮，即可重新进入自动模式并启动自动序列。",
+      "predicted_answer": "",
+      "retrieve_ms": 8004,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ph_box_007",
+      "query": "PH Box Presence UDC报警处理中，按下蓝色和绿色按钮的作用是什么？",
+      "tags": [
+        "button_function",
+        "automatic_mode",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Navigation SOP_section_3",
+        "Error Position Lift Table SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "Right Arm FTC SOP_section_3"
+      ],
+      "gold_answer": "按下蓝色和绿色按钮可以让AGV重新进入自动模式，重新启动自动序列。",
+      "predicted_answer": "",
+      "retrieve_ms": 7893,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ph_box_008",
+      "query": "What is the purpose of pressing Blue then Green after resolving the PH Box Presence UDC alarm?",
+      "tags": [
+        "button_sequence",
+        "purpose",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Double PH SOP_section_3",
+        "Error Position Lift Table SOP_section_3",
+        "Navigation SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "Right Arm FTC SOP_section_3"
+      ],
+      "gold_answer": "Pressing Blue then Green re-initiates the automatic sequence and returns the AGV to Automatic Mode.",
+      "predicted_answer": "",
+      "retrieve_ms": 8322,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_loop_emergency_006",
+      "query": "Loop Emergency Not Online报警需要按蓝色绿色按钮来解除吗？",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "不需要。该报警涉及电池故障，必须由专业AGV技术人员处理，不是标准自动序列能解决的。",
+      "predicted_answer": "",
+      "retrieve_ms": 7972,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_loop_emergency_008",
+      "query": "Is the Loop Emergency Not Online alarm something an operator can resolve using the standard Blue/Green button sequence?",
+      "tags": [
+        "resolution",
+        "operator_limitation",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "No. This alarm requires a qualified AGV Technician and cannot be resolved with the standard button sequence.",
+      "predicted_answer": "",
+      "retrieve_ms": 7955,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-18T20:28:34+00:00",
+    "git_sha": "fcac185",
+    "kb_id": "agv_demo",
+    "top_k": 10,
+    "with_generation": false,
+    "n_items": 58
+  }
+}

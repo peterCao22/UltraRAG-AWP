@@ -69,12 +69,17 @@ recall_top_k: 20
 final_top_k: 5
 
 # Phase 8.2.2：双路检索（vector + BM25 + RRF 融合）
-# mode：vector（纯向量，回退到 Phase 8.2 之前） / hybrid（向量 + BM25 + RRF）
-# 优先级：env ULTRARAG_RETRIEVAL_MODE > yaml > 默认 hybrid
+# mode：vector（纯向量） / hybrid（向量 + BM25 + RRF）
+# 优先级：env ULTRARAG_RETRIEVAL_MODE > yaml > 默认 vector
 # BM25 加载失败会自动降级到纯向量（不阻塞服务）
 # 权重 0.7/0.3 是 WeKnora 默认；k=60 是 RRF 论文默认
+#
+# Phase 8.2.3 评测结论（见 data/eval/phase8_2_comparison.md）：
+# - agv_demo 上 BM25 双路对所有指标 +0.00pp（jieba 中文分词 IDF 偏低 + vector 已强）
+# - hybrid+context 反而 比 vector+context 低 1.29pp MRR
+# - 决策：生产默认 vector；hybrid 留作可选（未来评测改进后再启用）
 retrieval:
-  mode: hybrid
+  mode: vector
   vector_weight: 0.7
   keyword_weight: 0.3
   rrf_k: 60
