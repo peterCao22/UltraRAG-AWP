@@ -25,7 +25,13 @@ import logging
 import sys
 from pathlib import Path
 
-from custom_app.repositories.base import adapt_sql, get_default_provider
+from dotenv import load_dotenv
+
+# 必须先 load_dotenv 再 import provider：repository backend 由 ULTRARAG_DB_BACKEND 决定，
+# 该 env 不读到时会回退 sqlite，导致从 postgres 写入的 session 抽不到。
+load_dotenv()
+
+from custom_app.repositories.base import adapt_sql, get_default_provider  # noqa: E402
 
 _logger = logging.getLogger(__name__)
 
