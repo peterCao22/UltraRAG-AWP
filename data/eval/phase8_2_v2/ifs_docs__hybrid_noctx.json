@@ -1,0 +1,132 @@
+{
+  "kb_id": "ifs_docs",
+  "n_items": 61,
+  "retrieval_metrics": {
+    "recall@1": 0.8852459016393442,
+    "hit@1": 0.8852459016393442,
+    "ndcg@1": 0.8852459016393442,
+    "recall@5": 0.9803278688524589,
+    "hit@5": 0.9836065573770492,
+    "ndcg@5": 0.9475876608370737,
+    "recall@10": 0.9803278688524589,
+    "hit@10": 0.9836065573770492,
+    "ndcg@10": 0.9475876608370737,
+    "mrr": 0.9316939890710383
+  },
+  "generation_metrics": {},
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.8852459016393442,
+      "hit@1": 0.8852459016393442,
+      "ndcg@1": 0.8852459016393442,
+      "recall@5": 0.9803278688524589,
+      "hit@5": 0.9836065573770492,
+      "ndcg@5": 0.9475876608370737,
+      "recall@10": 0.9803278688524589,
+      "hit@10": 0.9836065573770492,
+      "ndcg@10": 0.9475876608370737,
+      "mrr": 0.9316939890710383
+    },
+    "doc:IFSSOP": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 0.6666666666666666,
+      "ndcg@1": 0.6666666666666666,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.6666666666666666,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.6666666666666666,
+      "mrr": 0.6666666666666666
+    },
+    "zh_query": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.3333333333333333,
+      "ndcg@1": 0.3333333333333333,
+      "recall@5": 0.8333333333333334,
+      "hit@5": 0.8333333333333334,
+      "ndcg@5": 0.6466913348653657,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 0.8333333333333334,
+      "ndcg@10": 0.6466913348653657,
+      "mrr": 0.5555555555555556
+    },
+    "description_query": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.3333333333333333,
+      "ndcg@1": 0.3333333333333333,
+      "recall@5": 0.8333333333333334,
+      "hit@5": 0.8333333333333334,
+      "ndcg@5": 0.6466913348653657,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 0.8333333333333334,
+      "ndcg@10": 0.6466913348653657,
+      "mrr": 0.5555555555555556
+    },
+    "passing": {
+      "recall@1": 0.4,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 0.8,
+      "hit@5": 0.8,
+      "ndcg@5": 0.6523719014285831,
+      "recall@10": 0.8,
+      "hit@10": 0.8,
+      "ndcg@10": 0.6523719014285831,
+      "mrr": 0.6
+    },
+    "doc:IFS 系统培训手册--库存管理和客户订单操作": {
+      "recall@1": 0.0,
+      "hit@1": 0.0,
+      "ndcg@1": 0.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6267160030640645,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6267160030640645,
+      "mrr": 0.4444444444444444
+    }
+  },
+  "per_tag_generation": {},
+  "failures": [
+    {
+      "id": "eval_ifs_docs_new_003",
+      "query": "如何启动ifs数据库服务？",
+      "tags": [
+        "from_session",
+        "doc:IFSSOP",
+        "zh_query",
+        "description_query",
+        "oracle_startup",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "IFSSOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "IFSSOP_section_3",
+        "IFS 系统培训手册--公司人员基础数据_section_3",
+        "IFS 系统培训手册--公司人员基础数据_section_2",
+        "IFS 系统培训手册--库存销售基础数据_section_1",
+        "IFS 系统培训手册--库存管理和客户订单操作_section_1"
+      ],
+      "gold_answer": "启动 oracle 数据库：cmd 执行 set ORACLE_SID=TEST → sqlplus sys/oracle as sysdba → Startup → Show pdbs → 如未 read write 则 ALTER PLUGGABLE DATABASE TEST OPEN → exit",
+      "predicted_answer": "",
+      "retrieve_ms": 5617,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-21T22:39:22+00:00",
+    "git_sha": "95caa0d",
+    "kb_id": "ifs_docs",
+    "top_k": 10,
+    "with_generation": false,
+    "n_items": 61
+  }
+}
