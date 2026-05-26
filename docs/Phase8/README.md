@@ -20,9 +20,9 @@
 | 子阶段 | 目标 | 借用 UltraRAG | 工作量（开发 + 剥离） | 验收门槛 | 状态 |
 |--------|------|---------------|---------------------|---------|------|
 | [8.0](./PHASE_8_0_PLAN.md) | 兜底滑窗切分（结构松散文档保底） | ❌ 纯 custom_app 小改 | 0.5 天 | 长文档可切多块；现有 KB chunks.jsonl 不变 | ✅ 2026-05-17 |
-| [8.1](./PHASE_8_1_PLAN.md) | 离线评测体系 | ✅ 借 evaluation + benchmark server | 2-3 天 + 0.5 天 | 50 条评测集 + 基线 baseline.json | 🟡 工程脚手架就绪（2026-05-17）；待业务侧标注 + 跑 baseline |
-| [8.2](./PHASE_8_2_PLAN.md) | Contextual chunking + BM25 双路 | ❌ 完全 custom_app 内部 | 1 周 | 评测分数较 8.1 基线显著提升 | 🟡 8.2.1 + 8.2.2 工程落地（2026-05-17）；8.2.3 评测对比待 8.1 标注 |
-| [8.3](./PHASE_8_3_PLAN.md) | IRCoT 移植 | ✅ 借 UltraRAG 验证 → 剥离移植 | 1 周 + 1-2 周 | 评测分数较 8.2 进一步提升；否则不上线 | ⏳ 待启动 |
+| [8.1](./PHASE_8_1_PLAN.md) | 离线评测体系 | ✅ 借 evaluation + benchmark server | 2-3 天 + 0.5 天 | 50 条评测集 + 基线 baseline.json | ✅ 2026-05-21（评测集扩到 130+61，含 21 multi_step） |
+| [8.2](./PHASE_8_2_PLAN.md) | Contextual chunking + BM25 双路 | ❌ 完全 custom_app 内部 | 1 周 | 评测分数较 8.1 基线显著提升 | ✅ 2026-05-21（v2 矩阵：hybrid+ctx 综合最佳 +3.08pp r@5） |
+| [8.3](./PHASE_8_3_PLAN.md) → [FINAL](./PHASE_8_3_FINAL.md) | IRCoT 多轮检索（自写 + 双轨） | ❌ 评估后跳过借用直接自写（[KICKOFF](./PHASE_8_3_KICKOFF.md)） | Week 1 + Week 2 | 评测分数较 8.2 进一步提升；否则不上线 | ✅ 2026-05-26（multi_step F1 +0.40 / R@10 +20.83pp；上线"深度思考"开关默认关） |
 
 **累计工作量约 4 周**，按顺序串行执行。每个子阶段都有「评测分数不达标 → 停止」的退出条件。
 
