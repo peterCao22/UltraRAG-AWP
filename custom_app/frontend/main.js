@@ -258,12 +258,14 @@ export function initChatApp({
     input: getRequiredElement(root, '[data-role="composer-input"]'),
     sendButton: getRequiredElement(root, '[data-role="send-button"]'),
     newChatButton: getRequiredElement(root, '[data-role="new-chat"]'),
+    searchChatButton: root.querySelector('[data-role="search-chat"]'),
     sidebarToggle: root.querySelector('[data-role="sidebar-toggle"]'),
     sidebar: root.querySelector('.chat-sidebar'),
     sidebarBackdrop: root.querySelector('[data-role="sidebar-backdrop"]'),
     sessionList: root.querySelector('[data-role="session-list"]'),
     modelChip: root.querySelector('[data-role="model-chip"]'),
     modelChipName: root.querySelector('[data-role="model-chip-name"]'),
+    deepReasoningToggle: root.querySelector('[data-role="deep-reasoning-toggle"]'),
   }
 
   const state = {
@@ -276,6 +278,7 @@ export function initChatApp({
     // Phase 7: 对话模型 chip
     chatModels: [],
     selectedModelId: '',
+    sessions: [],
   }
 
   mountAgentSelect(elements.agentSelect)
@@ -441,6 +444,7 @@ export function initChatApp({
     elements.input.disabled = nextValue
     elements.kbSelect.disabled = nextValue
     elements.newChatButton.disabled = nextValue
+    if (elements.searchChatButton) elements.searchChatButton.disabled = nextValue
     elements.agentSelect.disabled = nextValue
     if (nextValue) {
       elements.sendButton.disabled = false
@@ -570,6 +574,115 @@ export function initChatApp({
     })
   }
 
+  function positionSessionDropdown(button, dropdown) {
+    const rect = button.getBoundingClientRect()
+    const width = Math.max(128, dropdown.offsetWidth || 128)
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+    const left = Math.max(8, Math.min(rect.right - width, viewportWidth - width - 8))
+    let top = rect.bottom + 4
+    if (top + 108 > viewportHeight) {
+      top = Math.max(8, rect.top - 108)
+    }
+    dropdown.style.left = `${left}px`
+    dropdown.style.top = `${top}px`
+  }
+
+  function compactSessionTitle(session) {
+    const raw = String(session?.title || session?.session_id || '').trim()
+    if (!raw) return '新对话'
+    if (raw === '新对话') return raw
+    const text = raw.replace(/\s+/g, ' ')
+    const hasCjk = /[\u4e00-\u9fff]/.test(text)
+    if (hasCjk) return text.length > 24 ? `${text.slice(0, 24)}…` : text
+    const words = text.split(' ')
+    if (words.length > 6) return `${words.slice(0, 6).join(' ')}…`
+    return text.length > 42 ? `${text.slice(0, 42)}…` : text
+  }
+
+  function updateSessionListScrollEdge() {
+    const host = elements.sessionList
+    if (!host) return
+    host.classList.toggle('is-scrolled', host.scrollTop > 4)
+  }
+
+  function sessionTimeValue(session) {
+    const raw = session?.updated_at || session?.created_at || ''
+    const time = Date.parse(raw)
+    return Number.isFinite(time) ? time : 0
+  }
+
+  function sessionSearchGroup(session) {
+    const time = sessionTimeValue(session)
+    if (!time) return '更早'
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    if (time >= startOfToday) return '今天'
+    if (time >= startOfToday - 7 * 24 * 60 * 60 * 1000) return '前 7 天'
+    return '更早'
+  }
+
+  function createLineIcon(name, className = '') {
+    const span = document.createElement('span')
+    span.className = className
+    span.setAttribute('aria-hidden', 'true')
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('focusable', 'false')
+
+    function addPath(d) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path.setAttribute('d', d)
+      svg.append(path)
+    }
+    function addCircle(cx, cy, r) {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+      circle.setAttribute('cx', cx)
+      circle.setAttribute('cy', cy)
+      circle.setAttribute('r', r)
+      svg.append(circle)
+    }
+
+    if (name === 'search') {
+      addCircle('11', '11', '8')
+      addPath('m21 21-4.3-4.3')
+    } else if (name === 'message') {
+      addPath('M21 15a4 4 0 0 1-4 4H7l-4 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z')
+    } else {
+      addPath('M12 20h9')
+      addPath('M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z')
+    }
+
+    span.append(svg)
+    return span
+  }
+
+  async function createNewChat() {
+    if (state.isStreaming) return
+    if (!state.selectedKbId) {
+      Toast.show('请先选择知识库', 'info')
+      return
+    }
+    if (!elements.sessionList) {
+      resetChat()
+      return
+    }
+    try {
+      const { agentMode } = getSelectedAgent(elements.agentSelect)
+      const row = await sessionApi.createSession(state.selectedKbId, {
+        agentMode,
+      })
+      state.currentSessionId = row.session_id
+      setSessionHash(state.currentSessionId)
+      resetChat()
+      await refreshSessionList()
+      setChatSidebarOpen(false)
+    } catch (e) {
+      const msg = e?.message || String(e)
+      Toast.show(`新建会话失败：${msg}`, 'error')
+    }
+  }
+
   async function handleRenameSession(sessionId, currentTitle) {
     const newTitle = await openRenameModal(currentTitle)
     if (!newTitle) return
@@ -603,6 +716,262 @@ export function initChatApp({
     }
   }
 
+  async function handleBulkDeleteSessions(sessionIds) {
+    const ids = [...new Set(sessionIds.filter(Boolean))]
+    if (!ids.length) return
+    const confirmed = await openConfirmModal({
+      message: `确定要删除选中的 ${ids.length} 个会话吗？删除后无法恢复。`,
+      confirmLabel: '删除',
+      cancelLabel: '取消',
+    })
+    if (!confirmed) return
+    try {
+      if (typeof sessionApi.deleteSessions === 'function') {
+        await sessionApi.deleteSessions(ids)
+      } else {
+        await Promise.all(ids.map((id) => sessionApi.deleteSession(id)))
+      }
+      if (ids.includes(state.currentSessionId)) {
+        state.currentSessionId = null
+        setSessionHash('')
+        resetChat()
+      }
+      await refreshSessionList()
+      Toast.show(`已删除 ${ids.length} 个会话`, 'success')
+    } catch (e) {
+      Toast.show(`批量删除失败：${e?.message || e}`, 'error')
+    }
+  }
+
+  function openBulkManageModal() {
+    const sessions = state.sessions || []
+    if (!sessions.length) {
+      Toast.show('暂无可管理的历史会话', 'info')
+      return
+    }
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay'
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-modal', 'true')
+
+    const card = document.createElement('div')
+    card.className = 'modal-card modal-card--wide session-bulk-modal'
+
+    const title = document.createElement('h2')
+    title.className = 'modal-title'
+    title.textContent = '批量管理'
+
+    const tools = document.createElement('div')
+    tools.className = 'session-bulk-toolbar'
+
+    const selectAllLabel = document.createElement('label')
+    selectAllLabel.className = 'session-bulk-select-all'
+    const selectAll = document.createElement('input')
+    selectAll.type = 'checkbox'
+    selectAllLabel.append(selectAll, document.createTextNode('全选'))
+
+    const count = document.createElement('span')
+    count.className = 'muted'
+    count.textContent = '已选择 0 个'
+
+    tools.append(selectAllLabel, count)
+
+    const list = document.createElement('div')
+    list.className = 'session-bulk-list'
+
+    const checks = []
+    for (const s of sessions) {
+      const label = document.createElement('label')
+      label.className = 'session-bulk-row'
+      const cb = document.createElement('input')
+      cb.type = 'checkbox'
+      cb.value = s.session_id
+      checks.push(cb)
+      const span = document.createElement('span')
+      span.textContent = compactSessionTitle(s)
+      span.title = s.title || s.session_id || ''
+      label.append(cb, span)
+      list.append(label)
+    }
+
+    const actions = document.createElement('div')
+    actions.className = 'modal-actions'
+    const cancel = document.createElement('button')
+    cancel.type = 'button'
+    cancel.className = 'button-secondary'
+    cancel.textContent = '取消'
+    const deleteBtn = document.createElement('button')
+    deleteBtn.type = 'button'
+    deleteBtn.className = 'button-danger'
+    deleteBtn.textContent = '删除所选'
+    deleteBtn.disabled = true
+    actions.append(cancel, deleteBtn)
+
+    function selectedIds() {
+      return checks.filter((cb) => cb.checked).map((cb) => cb.value)
+    }
+    function updateSelection() {
+      const n = selectedIds().length
+      count.textContent = `已选择 ${n} 个`
+      deleteBtn.disabled = n === 0
+      selectAll.checked = n === checks.length
+      selectAll.indeterminate = n > 0 && n < checks.length
+    }
+    function cleanup() {
+      overlay.remove()
+      document.removeEventListener('keydown', onKey)
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') cleanup()
+    }
+
+    selectAll.addEventListener('change', () => {
+      checks.forEach((cb) => { cb.checked = selectAll.checked })
+      updateSelection()
+    })
+    checks.forEach((cb) => cb.addEventListener('change', updateSelection))
+    cancel.addEventListener('click', cleanup)
+    deleteBtn.addEventListener('click', async () => {
+      const ids = selectedIds()
+      cleanup()
+      await handleBulkDeleteSessions(ids)
+    })
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cleanup()
+    })
+
+    card.append(title, tools, list, actions)
+    overlay.append(card)
+    document.body.append(overlay)
+    document.addEventListener('keydown', onKey)
+    requestAnimationFrame(() => checks[0]?.focus())
+  }
+
+  async function openChatSearchModal() {
+    if (!state.selectedKbId) {
+      Toast.show('请先选择知识库', 'info')
+      return
+    }
+    try {
+      if (!state.sessions.length) {
+        state.sessions = await sessionApi.listSessions(state.selectedKbId)
+      }
+    } catch (e) {
+      Toast.show(`加载历史会话失败：${e?.message || e}`, 'error')
+      return
+    }
+
+    const overlay = document.createElement('div')
+    overlay.className = 'modal-overlay chat-search-overlay'
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-modal', 'true')
+
+    const card = document.createElement('div')
+    card.className = 'modal-card chat-search-modal'
+
+    const header = document.createElement('div')
+    header.className = 'chat-search-header'
+    const input = document.createElement('input')
+    input.type = 'search'
+    input.className = 'chat-search-input'
+    input.placeholder = '搜索聊天...'
+    input.setAttribute('aria-label', '搜索聊天')
+    const closeBtn = document.createElement('button')
+    closeBtn.type = 'button'
+    closeBtn.className = 'chat-search-close'
+    closeBtn.setAttribute('aria-label', '关闭')
+    closeBtn.textContent = '×'
+    header.append(input, closeBtn)
+
+    const body = document.createElement('div')
+    body.className = 'chat-search-body'
+
+    function cleanup() {
+      overlay.remove()
+      document.removeEventListener('keydown', onKey)
+    }
+
+    function appendResult(session) {
+      const item = document.createElement('button')
+      item.type = 'button'
+      item.className = 'chat-search-result'
+      const icon = createLineIcon('message', 'chat-search-icon')
+      const title = document.createElement('span')
+      title.textContent = compactSessionTitle(session)
+      title.title = session.title || session.session_id || ''
+      item.append(icon, title)
+      item.addEventListener('click', async () => {
+        cleanup()
+        await openSession(session.session_id)
+        setChatSidebarOpen(false)
+      })
+      body.append(item)
+    }
+
+    function renderResults() {
+      body.innerHTML = ''
+      const newBtn = document.createElement('button')
+      newBtn.type = 'button'
+      newBtn.className = 'chat-search-new'
+      const newIcon = createLineIcon('edit', 'chat-search-icon')
+      const newText = document.createElement('span')
+      newText.textContent = '新聊天'
+      newBtn.append(newIcon, newText)
+      newBtn.addEventListener('click', async () => {
+        cleanup()
+        await createNewChat()
+      })
+      body.append(newBtn)
+
+      const q = input.value.trim().toLowerCase()
+      const sessions = [...(state.sessions || [])]
+        .filter((s) => {
+          if (!q) return true
+          const haystack = `${s.title || ''} ${s.session_id || ''}`.toLowerCase()
+          return haystack.includes(q)
+        })
+        .sort((a, b) => sessionTimeValue(b) - sessionTimeValue(a))
+
+      if (!sessions.length) {
+        const empty = document.createElement('div')
+        empty.className = 'chat-search-empty'
+        empty.textContent = '没有找到匹配的聊天'
+        body.append(empty)
+        return
+      }
+
+      let lastGroup = ''
+      for (const session of sessions) {
+        const group = sessionSearchGroup(session)
+        if (group !== lastGroup) {
+          const label = document.createElement('div')
+          label.className = 'chat-search-section-label'
+          label.textContent = group
+          body.append(label)
+          lastGroup = group
+        }
+        appendResult(session)
+      }
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') cleanup()
+    }
+
+    input.addEventListener('input', renderResults)
+    closeBtn.addEventListener('click', cleanup)
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cleanup()
+    })
+
+    card.append(header, body)
+    overlay.append(card)
+    document.body.append(overlay)
+    document.addEventListener('keydown', onKey)
+    renderResults()
+    requestAnimationFrame(() => input.focus())
+  }
+
   function renderSessionListHost(sessions) {
     if (!elements.sessionList) return
     const host = elements.sessionList
@@ -612,6 +981,7 @@ export function initChatApp({
       p.className = 'muted'
       p.textContent = '暂无历史会话，点击「新建对话」开始。'
       host.append(p)
+      updateSessionListScrollEdge()
       return
     }
     const ul = document.createElement('ul')
@@ -624,7 +994,7 @@ export function initChatApp({
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = `session-list__item-title${s.session_id === state.currentSessionId ? ' is-active' : ''}`
-      btn.textContent = (s.title || s.session_id || '').slice(0, 80)
+      btn.textContent = compactSessionTitle(s)
       btn.title = s.title || s.session_id || ''
       btn.addEventListener('click', () => {
         void openSession(s.session_id)
@@ -663,24 +1033,39 @@ export function initChatApp({
         void handleDeleteSession(s.session_id)
       })
 
+      const bulkItem = document.createElement('button')
+      bulkItem.type = 'button'
+      bulkItem.className = 'session-menu-item'
+      bulkItem.textContent = '批量管理'
+      bulkItem.addEventListener('click', (e) => {
+        e.stopPropagation()
+        dropdown.hidden = true
+        openBulkManageModal()
+      })
+
       menuBtn.addEventListener('click', (e) => {
         e.stopPropagation()
         const wasHidden = dropdown.hidden
         closeAllSessionMenus()
         dropdown.hidden = !wasHidden
+        if (!dropdown.hidden) {
+          positionSessionDropdown(menuBtn, dropdown)
+        }
       })
 
-      dropdown.append(renameItem, deleteItem)
+      dropdown.append(renameItem, bulkItem, deleteItem)
       li.append(btn, menuBtn, dropdown)
       ul.append(li)
     }
     host.append(ul)
+    updateSessionListScrollEdge()
   }
 
   async function refreshSessionList() {
     if (!elements.sessionList || !state.selectedKbId) return
     try {
       const items = await sessionApi.listSessions(state.selectedKbId)
+      state.sessions = items
       renderSessionListHost(items)
     } catch {
       /* 侧栏列表失败不阻塞主对话 */
@@ -802,12 +1187,18 @@ export function initChatApp({
       }
     }
 
+    // Phase 8.3：深度思考开关
+    const deepReasoning =
+      elements.deepReasoningToggle?.checked === true
+    const mode = deepReasoning ? 'deep_reasoning' : 'quick'
+
     try {
       await chatApi.sendChatMessage({
         kbId: state.selectedKbId,
         question,
         agentMode,
         agentId,
+        mode,
         modelId: state.selectedModelId || '',
         sessionId: state.currentSessionId || '',
         profile: profileRequest,
@@ -928,32 +1319,17 @@ export function initChatApp({
   })
 
   elements.newChatButton.addEventListener('click', async () => {
+    await createNewChat()
+  })
+  elements.searchChatButton?.addEventListener('click', () => {
     if (state.isStreaming) return
-    if (!state.selectedKbId) {
-      Toast.show('请先选择知识库', 'info')
-      return
-    }
-    if (!elements.sessionList) {
-      resetChat()
-      return
-    }
-    try {
-      const { agentMode } = getSelectedAgent(elements.agentSelect)
-      const row = await sessionApi.createSession(state.selectedKbId, {
-        agentMode,
-      })
-      state.currentSessionId = row.session_id
-      setSessionHash(state.currentSessionId)
-      resetChat()
-      await refreshSessionList()
-    } catch (e) {
-      const msg = e?.message || String(e)
-      Toast.show(`新建会话失败：${msg}`, 'error')
-    }
+    void openChatSearchModal()
   })
 
   // 点击任意其他区域时关闭所有会话下拉菜单
   document.addEventListener('click', () => closeAllSessionMenus())
+  window.addEventListener('resize', () => closeAllSessionMenus())
+  elements.sessionList?.addEventListener('scroll', updateSessionListScrollEdge, { passive: true })
 
   elements.sidebarToggle?.addEventListener('click', () => {
     const next = !elements.sidebar?.classList.contains('is-open')

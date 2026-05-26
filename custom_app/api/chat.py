@@ -274,11 +274,24 @@ def chat():
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
 
+    # Phase 8.3: mode 控制策略 quick / deep_reasoning（IRCoT）
+    # 与 agent_mode（quick / agent，控制 ReAct 工具调用）互不冲突
+    mode = str(data.get("mode", "quick")).strip().lower()
+    if mode not in ("quick", "deep_reasoning"):
+        mode = "quick"
+    ircot_max_loops = int(data.get("ircot_max_loops", 2) or 2)
+    ircot_max_loops = max(1, min(ircot_max_loops, 5))  # 安全范围
+
     agent_id = _resolve_request_agent_id(data)
     model_id = _resolve_request_model_id(data, agent_id=agent_id, agent_mode=agent_mode)
     try:
         runner = _get_runner(kb_id, model_id, agent_id, agent_mode=agent_mode)
-        result = runner.chat(question=question, top_k=top_k, agent_mode=agent_mode)
+        if mode == "deep_reasoning":
+            result = runner.chat_ircot(
+                question=question, top_k=top_k, max_loops=ircot_max_loops,
+            )
+        else:
+            result = runner.chat(question=question, top_k=top_k, agent_mode=agent_mode)
         return jsonify(result)
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
@@ -388,6 +401,12 @@ def chat_stream():
     agent_mode = str(data.get("agent_mode", "quick")).strip().lower()
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
+    # Phase 8.3: mode 控制策略（quick / deep_reasoning IRCoT）
+    mode = str(data.get("mode", "quick")).strip().lower()
+    if mode not in ("quick", "deep_reasoning"):
+        mode = "quick"
+    ircot_max_loops = int(data.get("ircot_max_loops", 2) or 2)
+    ircot_max_loops = max(1, min(ircot_max_loops, 5))
     session_id_opt = str(data.get("session_id", "")).strip() or None
     profile = bool(data.get("profile"))
     if str(os.environ.get("ULTRARAG_CHAT_PROFILE", "")).lower() in ("1", "true", "yes"):
@@ -441,6 +460,42 @@ def chat_stream():
                 event_iter = runner.chat_stream(
                     question=question, top_k=top_k, profile=profile, history=history
                 )
+            elif mode == "deep_reasoning":
+                # Phase 8.3 IRCoT 路径：非流式调用包装成 SSE。
+                # 思考过程作为 thought 事件推送给前端展示推理可见。
+                logger.info(
+                    "chat_stream routing → RagRunner.chat_ircot kb_id=%s loops=%d model_id=%s",
+                    kb_id, ircot_max_loops, model_id,
+                )
+                runner = _get_runner(kb_id, model_id, agent_id, agent_mode="quick")
+
+                def _ircot_to_sse():
+                    yield {"type": "status", "content": f"深度思考模式：将多轮检索，最多 {ircot_max_loops} 轮…"}
+                    result = runner.chat_ircot(
+                        question=question, top_k=top_k, max_loops=ircot_max_loops,
+                    )
+                    # 把每轮思考作为 thought 事件依次推（前端可视化推理过程）
+                    for i, thought in enumerate(result.get("thoughts") or [], start=1):
+                        yield {
+                            "type": "thought",
+                            "content": f"【第 {i} 轮思考】{thought}",
+                        }
+                    # 最终答案一次性 chunk
+                    display = str(result.get("answer") or "")
+                    if display:
+                        yield {"type": "chunk", "content": display}
+                    sources = result.get("sources") or []
+                    if sources:
+                        yield {"type": "sources", "sources": sources}
+                    meta_event = {
+                        "type": "meta",
+                        "kb_id": kb_id,
+                        "meta": result.get("meta", {}),
+                    }
+                    yield meta_event
+                    yield {"type": "done", "answer": display}
+
+                event_iter = _ircot_to_sse()
             else:
                 logger.info(
                     "chat_stream routing → RagRunner kb_id=%s agent_mode=%s model_id=%s agent_id=%s",

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AGV 知识库助手 · 对话</title>
+    <title>AWP 知识库助手 · 对话</title>
     <link rel="icon" href="/frontend/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/frontend/style.css">
   </head>
@@ -11,11 +11,30 @@
     <div id="app" class="app-shell chat-shell" data-page="chat">
       <aside class="chat-sidebar" aria-label="对话侧栏">
         <section>
-          <h1 class="brand-title">AGV 知识库助手</h1>
-          <p class="brand-subtitle">面向内网 SOP 的私有问答系统</p>
+          <h1 class="brand-title">AWP 知识库助手</h1>
+          <p class="brand-subtitle">面向企业生产经营相关的私有问答系统</p>
         </section>
 
-        <button class="primary-action" type="button" data-role="new-chat">+ 新建对话</button>
+        <section class="sidebar-actions" aria-label="对话操作">
+          <button class="sidebar-action" type="button" data-role="new-chat">
+            <span class="sidebar-action__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+              </svg>
+            </span>
+            <span>新聊天</span>
+          </button>
+          <button class="sidebar-action" type="button" data-role="search-chat">
+            <span class="sidebar-action__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <span>搜索聊天</span>
+          </button>
+        </section>
 
         <section class="sidebar-section">
           <label class="sidebar-caption" for="kb-select">知识库</label>
@@ -35,7 +54,7 @@
       <main class="chat-workspace">
         <header class="mobile-topbar">
           <button class="icon-button" type="button" aria-label="打开侧栏" data-role="sidebar-toggle">☰</button>
-          <strong>AGV 知识库助手</strong>
+          <strong>AWP 知识库助手</strong>
         </header>
 
         <section class="message-list" aria-label="消息列表" data-role="message-list">
@@ -62,6 +81,14 @@
               <span data-role="model-chip-name">默认模型</span>
               <span class="model-chip__caret">▾</span>
             </button>
+            <label class="deep-toggle" title="深度思考模式：多轮检索 + 推理链，适合跨文档/多步骤问题（耗时 ~2 倍）">
+              <input
+                type="checkbox"
+                data-role="deep-reasoning-toggle"
+                aria-label="深度思考模式"
+              />
+              <span>深度思考</span>
+            </label>
             <span class="muted" data-role="char-count">0/500</span>
           </div>
           <div class="composer-row">

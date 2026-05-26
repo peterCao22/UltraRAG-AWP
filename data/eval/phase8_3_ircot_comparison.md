@@ -118,3 +118,67 @@ PLAN §四.4 三种结果中匹配第 3 种：
 2. **决定 Week 2 是否启动**：
    - 启动 → 走 §四 路径
    - 暂缓 → 留作"功能就绪但默认关"，让业务侧用现有 quick 模式继续，等需要时再开 deep_reasoning 按钮
+
+---
+
+## 八、Week 2 全量评测补充（2026-05-26）
+
+**问题**：Week 1 只测了 multi_step 子集（n=20）。Week 2 启动 IRCoT 默认开关前，必须验证它在**全量 130 条 agv 集**上**不会退化非 multi_step 样本**。
+
+### 8.1 全量对比表（agv_demo n=130）
+
+| 指标 | Quick baseline | **IRCoT loops=2 全集** | Δ |
+|---|---|---|---|
+| **Recall@1** | 0.6436 | 0.6346 | -0.90pp |
+| **Recall@5** | 0.7654 | 0.7641 | **-0.13pp** ⚠️ |
+| **Recall@10** | 0.7885 | **0.8269** | **+3.84pp** 🟢 |
+| MRR | 0.7925 | 0.8023 | +0.98pp |
+| Hit@1 | 0.7538 | 0.7538 | 0 |
+| Hit@5 | 0.8615 | 0.8692 | +0.77pp |
+| nDCG@5 | 0.7318 | 0.7333 | +0.15pp |
+| F1（生成） | n/a（quick 默认未跑生成） | **0.3797** | — |
+
+### 8.2 per-tag 关键对比（agv 全集）
+
+| Tag | n | Quick R@5 | **IRCoT R@5** | Quick R@10 | **IRCoT R@10** | IRCoT F1 |
+|---|---|---|---|---|---|---|
+| passing | 49 | 0.9592 | 0.9592 = | 0.9592 | 0.9592 = | 0.4446 |
+| **multi_step** | 20 | 0.4833 | 0.4583 ↓ | 0.4833 | **0.5833** ↑+10pp | 0.4024 |
+| **failing** | 20 | 0.4833 | 0.4583 ↓ | 0.4833 | **0.5833** ↑+10pp | 0.4024 |
+| description_query | ~80 | 0.8135 | 0.8016 ↓ | (高) | 0.8611 ↑ | 0.4076 |
+| alarm_id_query | ~50 | 0.8167 | 0.8167 = | 0.8167 | 0.8167 = | 0.4488 |
+| zh_query | ~70 | 0.8431 | 0.8284 ↓ | (高) | 0.8627 ↑ | 0.3290 |
+| en_query | ~60 | 0.7895 | 0.7895 = | (高) | 0.8246 ↑ | 0.5105 |
+
+### 8.3 关键洞察
+
+#### 🟢 multi_step 子集结论可复制到全量
+
+- multi_step R@10 在全量评测中仍 **+10pp**（0.4833 → 0.5833），与 Week 1 子集（n=20）+20.83pp 趋势一致（子集样本少波动大）
+- failing 完全同样表现 → 印证 failing ≈ multi_step 这个 tagging 假设
+
+#### ⚠️ 全量上 R@5 微降（-0.13pp）的原因
+
+- IRCoT 第 2 轮把更多 chunks 拉进 top-N，但**部分 chunks 不相关**（次轮 query 走偏）
+- 对**单跳** query（passing 类）来说 IRCoT 是浪费——它不需要第 2 轮
+- 对 multi_step IRCoT 优势在 R@10（找到的 chunks 排在 5-10 位）
+
+#### ✅ 决策：必须走双轨（不能默认开 IRCoT）
+
+| 模式 | 默认场景 | 不适合 |
+|---|---|---|
+| **quick** | 单跳 alarm / 概览问 / "ID NN 是什么" | multi_step / 跨文档诊断 |
+| **deep_reasoning** | "涉及哪些步骤" / "怎么排查" / 跨告警跨文档 | 简单事实查询（浪费 ~2× 延迟） |
+
+### 8.4 Week 2 落地配置
+
+| 文件 | 改动 |
+|---|---|
+| `custom_app/services/rag_runner.py` | 加 `chat_ircot()` 方法（与 chat / chat_stream 同层） |
+| `custom_app/api/chat.py` | `/api/chat` 和 `/api/chat/stream` 支持 `mode=deep_reasoning` + `ircot_max_loops` |
+| `custom_app/frontend/index.html` | 工具栏加"深度思考" checkbox 开关 |
+| `custom_app/frontend/style.css` | `.deep-toggle` 样式 |
+| `custom_app/frontend/main.js` | 读 toggle 状态传 `mode` 给 sendChatMessage |
+| `custom_app/frontend/services/chatApi.js` | `sendChatMessage` 接收 `mode` / `ircotMaxLoops` 参数 |
+
+**生产配置**：默认 mode=quick（开关默认未勾选）；用户问跨文档/多步骤问题时手动勾"深度思考"。

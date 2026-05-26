@@ -14,6 +14,11 @@ from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 
 from custom_app.services.google_embedder import embed_query
+from custom_app.services.language_policy import (
+    AUTO_LANGUAGE_POLICY,
+    append_system_language_rule,
+    answer_language_policy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -633,6 +638,11 @@ class RagRunner:
             "未找到与该问题相关的信息" in s or "无法回答" in s
         ):
             return True
+        sl = s.lower()
+        if "based on the available documents" in sl and (
+            "no information relevant" in sl or "cannot answer" in sl
+        ):
+            return True
         return False
 
     def _no_information_display_text(
@@ -647,6 +657,11 @@ class RagRunner:
             if "根据现有文档" in ls and ("未找到" in ls or "无法回答" in ls):
                 keep.append(ls)
             elif "文档中未找到足够相关信息" in ls and "无法回答" in ls:
+                keep.append(ls)
+            elif "based on the available documents" in ls.lower() and (
+                "no information relevant" in ls.lower()
+                or "cannot answer" in ls.lower()
+            ):
                 keep.append(ls)
         if keep:
             return "\n\n".join(dict.fromkeys(keep))
@@ -679,6 +694,13 @@ class RagRunner:
         if "文档中未找到足够相关信息" in t:
             return False
         if "没有足够信息回答" in t:
+            return False
+        tl = t.lower()
+        if "no information relevant" in tl:
+            return False
+        if "based on the available documents" in tl and "cannot answer" in tl:
+            return False
+        if "documentation is insufficient" in tl:
             return False
         if "无法回答" in t and len(t) < 360:
             return False
@@ -779,7 +801,14 @@ class RagRunner:
                 "contents": plain_text,
                 "source_id": str(row.get("id", idx)),
             })
-        return tmpl.render(question=question, passages=passages)
+        policy = answer_language_policy(question)
+        return tmpl.render(
+            question=question,
+            passages=passages,
+            answer_language=policy.language,
+            language_instruction=policy.instruction,
+            no_information_text=policy.no_information_text,
+        )
 
     def _gemini_rest_base(self) -> str:
         """Google AI（Generative Language API）根 URL；Vertex 等可换 ULTRARAG_GEMINI_API_HOST。"""
@@ -1413,6 +1442,9 @@ class RagRunner:
         self._apply_chat_model_override()
         # Phase 7.2.A: agent_config 行（system_prompt / 采样参数）覆盖前面所有来源
         self._apply_agent_config_override()
+        self._chat_cfg["system_prompt"] = append_system_language_rule(
+            self._chat_cfg.get("system_prompt") or ""
+        )
         if (self._chat_cfg.get("backend") or "").strip().lower() == "gemini":
             logger.info(
                 "RagRunner generation: backend=gemini model=%s",
@@ -1485,6 +1517,7 @@ class RagRunner:
             ctx = {
                 "kb_name": cfg.get("kb_name") or self.kb_id,
                 "kb_description": cfg.get("kb_description") or "",
+                "language": AUTO_LANGUAGE_POLICY,
             }
             self._chat_cfg["system_prompt"] = render_prompt(
                 system_prompt_template, ctx
@@ -1787,6 +1820,86 @@ class RagRunner:
         prep = self._prepare_chat_context(question, top_k, agent_mode=agent_mode)
         answer_raw = self._generate(prep["prompt_text"])
         return self._build_result_from_raw(prep, answer_raw)
+
+    def chat_ircot(
+        self,
+        question: str,
+        top_k: int | None = None,
+        *,
+        max_loops: int = 2,
+    ) -> Dict[str, Any]:
+        """
+        Phase 8.3 深度推理（IRCoT）：多轮检索 + 推理链。
+
+        与 ``chat()`` 的差异：
+            - 第 1 轮检索后，让 LLM 生成"一步思考"
+            - 如思考含 "答案是" / "so the answer is" → 提取最终答案返回
+            - 否则用思考首句作为下一轮 query 再检索，累计 chunks 后再生成
+            - 最多 ``max_loops`` 轮（默认 2，论文常用 2-4）
+
+        适用：跨文档 / 多步骤诊断类问题（multi_step）。
+
+        参数:
+            question: 用户问题。
+            top_k: 第 1 轮 top_k；缺省取 self._top_k。
+            max_loops: 最大轮数。
+
+        返回:
+            Dict[str, Any]: 兼容 ``chat()`` 的结构（answer / sources / meta）。
+            额外字段：
+                meta.ircot_strategy = True
+                meta.n_loops、meta.n_chunks_seen、meta.total_ms、meta.early_stopped
+                thoughts: list[str]（所有轮的思考链，供前端展示推理过程）
+        """
+        from custom_app.services.strategies.ircot import chat_ircot as _chat_ircot
+
+        first_k = int(top_k) if top_k is not None else int(self._top_k)
+        ircot_out = _chat_ircot(
+            self,
+            question,
+            max_loops=max_loops,
+            first_round_top_k=first_k,
+            next_round_top_k=max(3, first_k // 2),
+        )
+
+        # 为兼容前端 / api/chat.py 的输出结构，构造 sources 与 meta。
+        # 复用 _build_sources / _build_result_from_raw 拿到展示 Markdown + 图片块。
+        hit_ids: List[int] = list(ircot_out.get("hit_ids") or [])
+        if not hit_ids:
+            # 兜底：从 chunks_seen（chunk_id 字符串）反查 _rows 行号
+            id_to_row = {
+                str(self._rows[i].get("id", "")): i for i in range(len(self._rows))
+            }
+            hit_ids = [
+                id_to_row[c]
+                for c in (ircot_out.get("chunks_seen") or [])
+                if c in id_to_row
+            ]
+
+        # 构造一个最小化的 prep 字典让 _build_result_from_raw 复用
+        prep_like: Dict[str, Any] = {
+            "q": question,
+            "rewritten_q": question,
+            "hit_ids": hit_ids,
+            "rerank_meta": {},
+            "expanded_docs": [],
+            "recall_k": len(hit_ids),
+            "final_k": len(hit_ids),
+            "final_k_cfg": 0,
+            "requested_agent_mode": "quick",
+            "effective_agent_mode": "quick",
+            "degraded": False,
+            "degrade_reason": None,
+        }
+        # IRCoT 最终答案文本进 _build_result_from_raw 当 answer_raw
+        result = self._build_result_from_raw(prep_like, ircot_out["answer"])
+        # 注入 IRCoT 专属 meta
+        meta_out = dict(result.get("meta") or {})
+        meta_out.update(ircot_out.get("meta") or {})
+        result["meta"] = meta_out
+        # 思考链给前端展示
+        result["thoughts"] = ircot_out.get("thoughts") or []
+        return result
 
     # ──────────────────────────────────────────────────────────────
     # 阶段 A：agent 模式模拟推理步骤 SSE（接口与阶段 B ReAct 兼容）

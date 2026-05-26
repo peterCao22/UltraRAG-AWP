@@ -1,0 +1,3623 @@
+{
+  "kb_id": "agv_demo",
+  "n_items": 130,
+  "retrieval_metrics": {
+    "recall@1": 0.6346153846153846,
+    "hit@1": 0.7538461538461538,
+    "ndcg@1": 0.7538461538461538,
+    "recall@5": 0.7641025641025639,
+    "hit@5": 0.8692307692307693,
+    "ndcg@5": 0.7333339867135859,
+    "recall@10": 0.8269230769230768,
+    "hit@10": 0.9076923076923077,
+    "ndcg@10": 0.7572640125074327,
+    "mrr": 0.8022560772560773
+  },
+  "generation_metrics": {
+    "avg_acc": 0.046153846153846156,
+    "avg_em": 0.015384615384615385,
+    "avg_stringem": 0.015384615384615385,
+    "avg_coverem": 0.07692307692307693,
+    "avg_f1": 0.37972694131353946,
+    "avg_rouge-1": 0.0,
+    "avg_rouge-2": 0.0,
+    "avg_rouge-l": 0.0
+  },
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.6541666666666668,
+      "hit@1": 0.8125,
+      "ndcg@1": 0.8125,
+      "recall@5": 0.7645833333333334,
+      "hit@5": 0.9,
+      "ndcg@5": 0.7543990926035351,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 0.9375,
+      "ndcg@10": 0.7807773424926248,
+      "mrr": 0.8518898809523809
+    },
+    "alarm_id": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Right_Arm_FTC_SOP": {
+      "recall@1": 0.6,
+      "hit@1": 0.7,
+      "ndcg@1": 0.7,
+      "recall@5": 0.75,
+      "hit@5": 0.9,
+      "ndcg@5": 0.7163797735485103,
+      "recall@10": 0.75,
+      "hit@10": 0.9,
+      "ndcg@10": 0.7163797735485103,
+      "mrr": 0.7833333333333333
+    },
+    "resolution": {
+      "recall@1": 0.3555555555555555,
+      "hit@1": 0.4666666666666667,
+      "ndcg@1": 0.4666666666666667,
+      "recall@5": 0.6555555555555554,
+      "hit@5": 0.8,
+      "ndcg@5": 0.5254188256592792,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 0.9333333333333333,
+      "ndcg@10": 0.5921283831308081,
+      "mrr": 0.5867460317460318
+    },
+    "button_sequence": {
+      "recall@1": 0.06666666666666667,
+      "hit@1": 0.2,
+      "ndcg@1": 0.2,
+      "recall@5": 0.16666666666666666,
+      "hit@5": 0.4,
+      "ndcg@5": 0.15517046448109711,
+      "recall@10": 0.16666666666666666,
+      "hit@10": 0.4,
+      "ndcg@10": 0.15517046448109711,
+      "mrr": 0.26666666666666666
+    },
+    "automatic_mode": {
+      "recall@1": 0.06666666666666667,
+      "hit@1": 0.2,
+      "ndcg@1": 0.2,
+      "recall@5": 0.26666666666666666,
+      "hit@5": 0.4,
+      "ndcg@5": 0.2200416959188428,
+      "recall@10": 0.26666666666666666,
+      "hit@10": 0.4,
+      "ndcg@10": 0.2200416959188428,
+      "mrr": 0.3
+    },
+    "alarm_cause": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_name": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Error_UDC_Presence_SOP": {
+      "recall@1": 0.3,
+      "hit@1": 0.3,
+      "ndcg@1": 0.3,
+      "recall@5": 0.9,
+      "hit@5": 0.9,
+      "ndcg@5": 0.5879135676952785,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6212469010286118,
+      "mrr": 0.500952380952381
+    },
+    "no_button_sequence": {
+      "recall@1": 0.0,
+      "hit@1": 0.0,
+      "ndcg@1": 0.0,
+      "recall@5": 0.0,
+      "hit@5": 0.0,
+      "ndcg@5": 0.0,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.23711181124339076,
+      "mrr": 0.08928571428571429
+    },
+    "doc:Inserting_SOP": {
+      "recall@1": 0.65,
+      "hit@1": 0.7,
+      "ndcg@1": 0.7,
+      "recall@5": 0.7,
+      "hit@5": 0.7,
+      "ndcg@5": 0.7,
+      "recall@10": 0.8,
+      "hit@10": 0.8,
+      "ndcg@10": 0.7378002100396839,
+      "mrr": 0.7125
+    },
+    "manual_insert": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "automatic_insert": {
+      "recall@1": 0.375,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.5,
+      "hit@5": 0.5,
+      "ndcg@5": 0.5,
+      "recall@10": 0.5,
+      "hit@10": 0.5,
+      "ndcg@10": 0.5,
+      "mrr": 0.5
+    },
+    "remote": {
+      "recall@1": 0.8,
+      "hit@1": 0.8,
+      "ndcg@1": 0.8,
+      "recall@5": 0.8,
+      "hit@5": 0.8,
+      "ndcg@5": 0.8,
+      "recall@10": 0.8,
+      "hit@10": 0.8,
+      "ndcg@10": 0.8,
+      "mrr": 0.8
+    },
+    "override": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:PH_Box_Presence_UDC_SOP": {
+      "recall@1": 0.5666666666666667,
+      "hit@1": 0.7,
+      "ndcg@1": 0.7,
+      "recall@5": 0.5666666666666667,
+      "hit@5": 0.7,
+      "ndcg@5": 0.5938557452045513,
+      "recall@10": 0.6333333333333334,
+      "hit@10": 0.7,
+      "ndcg@10": 0.6227865380388276,
+      "mrr": 0.7
+    },
+    "doc:Loop_Emergency_SOP": {
+      "recall@1": 0.9,
+      "hit@1": 0.9,
+      "ndcg@1": 0.9,
+      "recall@5": 0.9,
+      "hit@5": 0.9,
+      "ndcg@5": 0.9,
+      "recall@10": 0.9,
+      "hit@10": 0.9,
+      "ndcg@10": 0.9,
+      "mrr": 0.9
+    },
+    "technician_required": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "battery": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "battery_change": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:BatteryChangeSequenceSOP": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "en_query": {
+      "recall@1": 0.7368421052631579,
+      "hit@1": 0.9210526315789473,
+      "ndcg@1": 0.9210526315789473,
+      "recall@5": 0.7894736842105262,
+      "hit@5": 0.9473684210526315,
+      "ndcg@5": 0.8131366021255219,
+      "recall@10": 0.8245614035087719,
+      "hit@10": 0.9473684210526315,
+      "ndcg@10": 0.8297261500438974,
+      "mrr": 0.9342105263157895
+    },
+    "description_query": {
+      "recall@1": 0.7063492063492063,
+      "hit@1": 0.8809523809523809,
+      "ndcg@1": 0.8809523809523809,
+      "recall@5": 0.8015873015873015,
+      "hit@5": 0.9523809523809523,
+      "ndcg@5": 0.8080489815156329,
+      "recall@10": 0.8611111111111113,
+      "hit@10": 0.9523809523809523,
+      "ndcg@10": 0.8359631947225429,
+      "mrr": 0.9107142857142857
+    },
+    "passing": {
+      "recall@1": 0.8673469387755102,
+      "hit@1": 0.8979591836734694,
+      "ndcg@1": 0.8979591836734694,
+      "recall@5": 0.9591836734693877,
+      "hit@5": 0.9591836734693877,
+      "ndcg@5": 0.9365875359329464,
+      "recall@10": 0.9591836734693877,
+      "hit@10": 0.9591836734693877,
+      "ndcg@10": 0.9365875359329464,
+      "mrr": 0.9285714285714286
+    },
+    "zh_query": {
+      "recall@1": 0.7156862745098039,
+      "hit@1": 0.8823529411764706,
+      "ndcg@1": 0.8823529411764706,
+      "recall@5": 0.8284313725490197,
+      "hit@5": 0.9705882352941176,
+      "ndcg@5": 0.8216162931384401,
+      "recall@10": 0.8627450980392157,
+      "hit@10": 0.9705882352941176,
+      "ndcg@10": 0.8375572970734976,
+      "mrr": 0.9191176470588235
+    },
+    "alarm_id_34": {
+      "recall@1": 0.5,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.625,
+      "hit@5": 0.75,
+      "ndcg@5": 0.622590627025877,
+      "recall@10": 0.625,
+      "hit@10": 0.75,
+      "ndcg@10": 0.622590627025877,
+      "mrr": 0.75
+    },
+    "doc:Alarm Block Battery Low SOP": {
+      "recall@1": 0.5,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.625,
+      "hit@5": 0.75,
+      "ndcg@5": 0.622590627025877,
+      "recall@10": 0.625,
+      "hit@10": 0.75,
+      "ndcg@10": 0.622590627025877,
+      "mrr": 0.75
+    },
+    "alarm_id_query": {
+      "recall@1": 0.7555555555555554,
+      "hit@1": 0.9333333333333333,
+      "ndcg@1": 0.9333333333333333,
+      "recall@5": 0.8166666666666667,
+      "hit@5": 0.9666666666666667,
+      "ndcg@5": 0.8298695874606739,
+      "recall@10": 0.8166666666666667,
+      "hit@10": 0.9666666666666667,
+      "ndcg@10": 0.8298695874606739,
+      "mrr": 0.95
+    },
+    "failing": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.45833333333333337,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5470677793381209,
+      "recall@10": 0.5833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6056876270726319,
+      "mrr": 0.9625
+    },
+    "missing_steps": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.45833333333333337,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5470677793381209,
+      "recall@10": 0.5833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6056876270726319,
+      "mrr": 0.9625
+    },
+    "multi_step": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.45833333333333337,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5470677793381209,
+      "recall@10": 0.5833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6056876270726319,
+      "mrr": 0.9625
+    },
+    "cross_section": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.45833333333333337,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5470677793381209,
+      "recall@10": 0.5833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6056876270726319,
+      "mrr": 0.9625
+    },
+    "cannot_enter_system": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.8333333333333334,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8710490642551528,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8710490642551528,
+      "mrr": 1.0
+    },
+    "doc:Cannot Enter System SOP": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.8333333333333334,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8710490642551528,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8710490642551528,
+      "mrr": 1.0
+    },
+    "alarm_id_17": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Error Position Lift Table SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_27": {
+      "recall@1": 0.9,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.9,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9226294385530917,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9663109259167244,
+      "mrr": 1.0
+    },
+    "doc:Error UDC Presence SOP": {
+      "recall@1": 0.9,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.9,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9226294385530917,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9663109259167244,
+      "mrr": 1.0
+    },
+    "incomplete_answer": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.8571428571428571,
+      "ndcg@1": 0.8571428571428571,
+      "recall@5": 0.4047619047619047,
+      "hit@5": 1.0,
+      "ndcg@5": 0.48106820174207615,
+      "recall@10": 0.5714285714285714,
+      "hit@10": 1.0,
+      "ndcg@10": 0.557298037065976,
+      "mrr": 0.8928571428571429
+    },
+    "alarm_id_01": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:E-Stop SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_56": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7346393630113782,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7346393630113782,
+      "mrr": 1.0
+    },
+    "doc:Flexi Case SOP": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7346393630113782,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7346393630113782,
+      "mrr": 1.0
+    },
+    "alarm_id_58": {
+      "recall@1": 0.41666666666666663,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6423718014042425,
+      "recall@10": 0.8333333333333333,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7211721540165263,
+      "mrr": 0.875
+    },
+    "doc:Flexi Double PH SOP": {
+      "recall@1": 0.41666666666666663,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6423718014042425,
+      "recall@10": 0.8333333333333333,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7211721540165263,
+      "mrr": 0.875
+    },
+    "alarm_id_53": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6131471927654584,
+      "recall@10": 0.5,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6131471927654584,
+      "mrr": 1.0
+    },
+    "doc:Flexi MOC SOP": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6131471927654584,
+      "recall@10": 0.5,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6131471927654584,
+      "mrr": 1.0
+    },
+    "alarm_id_57": {
+      "recall@1": 0.625,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7193038288345124,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7193038288345124,
+      "mrr": 0.8125
+    },
+    "doc:Flexi Module Status SOP": {
+      "recall@1": 0.625,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7193038288345124,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7193038288345124,
+      "mrr": 0.8125
+    },
+    "alarm_id_02": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Front PLS SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "old_agv_only": {
+      "recall@1": 0.5,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.8333333333333334,
+      "hit@5": 0.8333333333333334,
+      "ndcg@5": 0.7103099178571526,
+      "recall@10": 0.8333333333333334,
+      "hit@10": 0.8333333333333334,
+      "ndcg@10": 0.7103099178571526,
+      "mrr": 0.6666666666666666
+    },
+    "alarm_id_18_right": {
+      "recall@1": 0.25,
+      "hit@1": 0.25,
+      "ndcg@1": 0.25,
+      "recall@5": 0.75,
+      "hit@5": 0.75,
+      "ndcg@5": 0.5654648767857288,
+      "recall@10": 0.75,
+      "hit@10": 0.75,
+      "ndcg@10": 0.5654648767857288,
+      "mrr": 0.5
+    },
+    "doc:Right Arm FTC SOP": {
+      "recall@1": 0.25,
+      "hit@1": 0.25,
+      "ndcg@1": 0.25,
+      "recall@5": 0.75,
+      "hit@5": 0.75,
+      "ndcg@5": 0.5654648767857288,
+      "recall@10": 0.75,
+      "hit@10": 0.75,
+      "ndcg@10": 0.5654648767857288,
+      "mrr": 0.5
+    },
+    "alarm_id_21": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.41666666666666663,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5198055626478933,
+      "recall@10": 0.7499999999999999,
+      "hit@10": 1.0,
+      "ndcg@10": 0.679502589503624,
+      "mrr": 1.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.41666666666666663,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5198055626478933,
+      "recall@10": 0.7499999999999999,
+      "hit@10": 1.0,
+      "ndcg@10": 0.679502589503624,
+      "mrr": 1.0
+    },
+    "alarm_id_62": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Loop Emergency SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_16": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Master Link Down SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_14": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7346393630113783,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7346393630113783,
+      "mrr": 1.0
+    },
+    "doc:Navigation SOP": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7346393630113783,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7346393630113783,
+      "mrr": 1.0
+    },
+    "alarm_id_22": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Rear PLS SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    }
+  },
+  "per_tag_generation": {
+    "from_session": {
+      "avg_acc": 0.0375,
+      "avg_em": 0.0125,
+      "avg_stringem": 0.0125,
+      "avg_coverem": 0.05,
+      "avg_f1": 0.41601602564653034,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.7167557932263815,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Right_Arm_FTC_SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.1,
+      "avg_f1": 0.35030125021868735,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "resolution": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.06666666666666667,
+      "avg_f1": 0.2623450381368797,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "button_sequence": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.09142857142857141,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "automatic_mode": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.13333333333333333,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_cause": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.125,
+      "avg_f1": 0.3558863863241428,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_name": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.6666666666666666,
+      "avg_f1": 0.6033251733986128,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Error_UDC_Presence_SOP": {
+      "avg_acc": 0.1,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.1,
+      "avg_f1": 0.2815601499949326,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "no_button_sequence": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.2660536398467433,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Inserting_SOP": {
+      "avg_acc": 0.1,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.1,
+      "avg_f1": 0.3162010403389714,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "manual_insert": {
+      "avg_acc": 0.3333333333333333,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.3333333333333333,
+      "avg_f1": 0.4688644688644688,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "automatic_insert": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.29304029304029305,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "remote": {
+      "avg_acc": 0.2,
+      "avg_em": 0.2,
+      "avg_stringem": 0.2,
+      "avg_coverem": 0.2,
+      "avg_f1": 0.46600985221674873,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "override": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.46008077042559803,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:PH_Box_Presence_UDC_SOP": {
+      "avg_acc": 0.1,
+      "avg_em": 0.1,
+      "avg_stringem": 0.1,
+      "avg_coverem": 0.1,
+      "avg_f1": 0.3568154399188882,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Loop_Emergency_SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.2,
+      "avg_f1": 0.30344415143229575,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "technician_required": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3347857661583152,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "battery": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.19753086419753085,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "battery_change": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.12677897450059836,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:BatteryChangeSequenceSOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.12677897450059836,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "en_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.02631578947368421,
+      "avg_f1": 0.5104637209297525,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "description_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.023809523809523808,
+      "avg_f1": 0.40764714162276433,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "passing": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.02040816326530612,
+      "avg_f1": 0.4445529113924579,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "zh_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.32901919243534006,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_34": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4548204527712724,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Alarm Block Battery Low SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4548204527712724,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.44876979966586844,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "failing": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40240214360735377,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "missing_steps": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40240214360735377,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "multi_step": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40240214360735377,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "cross_section": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40240214360735377,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "cannot_enter_system": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.17821358748778104,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Cannot Enter System SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.17821358748778104,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_17": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.45786740413526855,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Error Position Lift Table SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.45786740413526855,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_27": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.44388660351263143,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Error UDC Presence SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.44388660351263143,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "incomplete_answer": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.48061193903715616,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_01": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.5438094057360112,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:E-Stop SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.5438094057360112,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_56": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.361332687768565,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Flexi Case SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.361332687768565,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_58": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.46549130633722263,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Flexi Double PH SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.46549130633722263,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_53": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3042184265010352,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Flexi MOC SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3042184265010352,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_57": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.46448513444371997,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Flexi Module Status SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.46448513444371997,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_02": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.7524441483910638,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Front PLS SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.7524441483910638,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "old_agv_only": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.2960635652521617,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_18_right": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.26190911306042886,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Right Arm FTC SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.26190911306042886,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_21": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40327874656988577,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40327874656988577,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_62": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.5223740911936059,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Loop Emergency SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.5223740911936059,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_16": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40465013886066514,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Master Link Down SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40465013886066514,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_14": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3272394491665782,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Navigation SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3272394491665782,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_22": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.6433265925176946,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Rear PLS SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.6433265925176946,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    }
+  },
+  "failures": [
+    {
+      "id": "eval_agv_demo_003",
+      "query": "将电池滑出后，下一步需要注意什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_4"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "确保所有线缆远离电池传感器及其他运动部件，避免造成干扰或损坏。",
+      "predicted_answer": "将电池滑出后，下一步（STEP 4）需要注意确保所有线缆都放置在远离电池传感器（battery sensor）和其他运动部件的位置。",
+      "retrieve_ms": null,
+      "generate_ms": 12916,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 12916,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_agv_demo_004",
+      "query": "What should you do once the AGV is aligned with the correct charged battery bay?",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_6"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Power off the AGV and swap the connectors to the fully charged battery.",
+      "predicted_answer": "Once the AGV is aligned with the correct bay, you must power off the AGV and swap the connectors to the fully charged battery.",
+      "retrieve_ms": null,
+      "generate_ms": 13626,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 13626,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": 0.6896551724137931
+    },
+    {
+      "id": "eval_agv_demo_005",
+      "query": "AGV换电的第十一步是什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_11"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "按下蓝色按钮，再按下绿色按钮。等待自动导引车（AGV）重新接入系统，主链路断开状态需消除。",
+      "predicted_answer": "第十一步是再次按下蓝色按钮，然后按下绿色按钮。等待 AGV 重新连接到系统（此时 Master Link Down 状态应当清除）。",
+      "retrieve_ms": null,
+      "generate_ms": 19648,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 19648,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.125
+    },
+    {
+      "id": "eval_agv_demo_006",
+      "query": "那上面一步呢？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_10"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将自动导引车切换至自动模式，随后执行以下操作：1.先按下蓝色按钮，再按下绿色按钮,2.点击电池组升降按键，升起电池组",
+      "predicted_answer": "抱歉，由于缺少之前的对话上下文，我无法确定您当前指的是哪一步。请告诉我您目前在操作或查看哪一步（例如 STEP 11），我将为您提供它的上一步骤。如果您需要，我也可以为您列出完整的更换电池（How To Change A Battery）的 11 个步骤。",
+      "retrieve_ms": null,
+      "generate_ms": 31962,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 31962,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_agv_demo_007",
+      "query": "连接新电池后，应如何处理电池线缆，并完成安装？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_7"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将电池线缆整齐地排列在AGV顶部，以防止线缆卷入夹点，然后小心地将新电池滑入AGV中。",
+      "predicted_answer": "连接新电池后，应将电池线缆整齐地排列在 AGV 顶部，以防止与夹点（pinch points）发生干涉；随后小心地将新电池滑入 AGV 中。",
+      "retrieve_ms": null,
+      "generate_ms": 18832,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 18832,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_agv_demo_008",
+      "query": "AGV启动后第九步需要确认什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "确认电池没有压在电池块上方，且位置对齐，能够正常进行垂直移动。",
+      "predicted_answer": "第九步需要确认电池没有放置在电池挡块（battery block）上方，并且已经正确对齐，以允许其进行垂直移动。",
+      "retrieve_ms": null,
+      "generate_ms": 14329,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 14329,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_right_arm_ftc_003",
+      "query": "清除右臂障碍物后，需要按哪两个按钮来恢复AGV运行？",
+      "tags": [
+        "button_sequence",
+        "automatic_mode",
+        "doc:Right_Arm_FTC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Right Arm FTC SOP_section_2",
+        "Cannot Enter System SOP_section_2",
+        "Left Arm FTC SOP_section_1",
+        "Flexi MOC SOP_section_2",
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "gold_answer": "清除障碍物后，切换到自动模式，依次按蓝色按钮和绿色按钮。",
+      "predicted_answer": "清除右臂障碍物后，需要依次按下蓝色按钮（Blue button）和绿色按钮（Green button）来恢复 AGV 运行。",
+      "retrieve_ms": null,
+      "generate_ms": 42836,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 42836,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_right_arm_ftc_004",
+      "query": "AGV右臂FTC报警是什么原因触发的？",
+      "tags": [
+        "alarm_cause",
+        "right_arm",
+        "doc:Right_Arm_FTC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Right Arm FTC SOP_section_1",
+        "Left Arm FTC SOP_section_1",
+        "Inserting SOP_section_1",
+        "Error UDC Presence SOP_section_1",
+        "Right Arm FTC SOP_section_2"
+      ],
+      "gold_answer": "ID 13右臂FTC报警是由AGV右臂存在障碍物时触发的。",
+      "predicted_answer": "。答案是：AGV 右臂 FTC 报警（ID 13: Right FTC Alarm）是因为 AGV 的右臂遇到了障碍物（obstruction）而触发的。",
+      "retrieve_ms": null,
+      "generate_ms": 15581,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15581,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.11764705882352941
+    },
+    {
+      "id": "eval_right_arm_ftc_005",
+      "query": "清除AGV右臂障碍物后，如何执行自动序列恢复运行？",
+      "tags": [
+        "automatic_sequence",
+        "resolution",
+        "doc:Right_Arm_FTC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_2",
+        "Right Arm FTC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Right Arm FTC SOP_section_2",
+        "Left Arm FTC SOP_section_1",
+        "PH Box Presence UDC SOP_section_3",
+        "Flexi MOC SOP_section_2",
+        "Left Arm FTC SOP_section_2",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Flexi MOC SOP_section_1"
+      ],
+      "gold_answer": "清除右臂障碍物后，切换到自动模式，依次按下蓝色按钮和绿色按钮，完成自动序列。",
+      "predicted_answer": "根据现有文档，清除AGV右臂障碍物后需要执行自动序列（Perform the automatic sequence），但由于文档信息不足，缺失具体的按键操作步骤，无法提供完整的恢复运行指南。",
+      "retrieve_ms": null,
+      "generate_ms": 36044,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 8,
+        "total_ms": 36044,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_right_arm_ftc_007",
+      "query": "右臂FTC报警处理完毕后，需要做哪些操作让AGV恢复正常？",
+      "tags": [
+        "resolution",
+        "button_sequence",
+        "doc:Right_Arm_FTC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_2",
+        "Right Arm FTC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Left Arm FTC SOP_section_1",
+        "Right Arm FTC SOP_section_1",
+        "Right Arm FTC SOP_section_2",
+        "Navigation SOP_section_2",
+        "Flexi MOC SOP_section_2"
+      ],
+      "gold_answer": "先清除右臂障碍物，然后切换至自动模式，依次按蓝色按钮和绿色按钮执行自动序列即可。",
+      "predicted_answer": "右臂 FTC 报警处理完毕（清理障碍物）后，需要执行自动序列（automatic sequence）让 AGV 恢复正常。具体操作步骤为：1. 按下蓝色按钮（Blue button）；2. 按下绿色按钮（Green button）；3. 再次按下蓝色按钮。如果问题仍然存在，请联系合格的 AGV 技术人员寻求帮助。",
+      "retrieve_ms": null,
+      "generate_ms": 17278,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 17278,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_error_udc_002",
+      "query": "How do you resolve the Error UDC Presence alarm if no platform is present on the AGV?",
+      "tags": [
+        "resolution",
+        "no_platform",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "Error UDC Presence SOP_section_2",
+        "PH Box Presence UDC SOP_section_1",
+        "Error Position Lift Table SOP_section_2",
+        "Error Position Lift Table SOP_section_1"
+      ],
+      "gold_answer": "If no platform is present, cancel the mission.",
+      "predicted_answer": "如果 AGV 上没有 platform，请取消任务（cancel the mission），并在 AGV 键盘上长按 2 键（Hold 2）来卸载 AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 32118,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 32118,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.26086956521739124
+    },
+    {
+      "id": "eval_error_udc_003",
+      "query": "解决Error UDC Presence报警时，应在AGV键盘上长按哪个键来卸载AGV？",
+      "tags": [
+        "keypad",
+        "unload",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "Error UDC Presence SOP_section_2",
+        "Flexi MOC SOP_section_2",
+        "Cannot Enter System SOP_section_1"
+      ],
+      "gold_answer": "长按键盘上的2键来卸载AGV。",
+      "predicted_answer": "解决 Error UDC Presence 报警时，应在 AGV 键盘上长按 2 号键（Hold 2）来卸载 AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 14427,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 14427,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_error_udc_004",
+      "query": "ID 27 Error UDC Presence报警是什么原因导致的？",
+      "tags": [
+        "alarm_cause",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "Load Unit Not Found SOP_section_1",
+        "Rear PLS SOP_intro",
+        "Flexi Case SOP_section_1"
+      ],
+      "gold_answer": "该报警发生在平台没有正确放置在AGV后置台面上时触发。",
+      "predicted_answer": "ID 27 Error UDC Presence 报警是由于平台（platform）没有正确放置在 AGV 的后部托台（back table）上导致的。",
+      "retrieve_ms": null,
+      "generate_ms": 14381,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 14381,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_error_udc_005",
+      "query": "如何解决Error UDC Presence报警？有哪几种处理方式？",
+      "tags": [
+        "resolution",
+        "three_options",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Flexi MOC SOP_section_2",
+        "Error UDC Presence SOP_section_2"
+      ],
+      "gold_answer": "有三种处理方式：①确保平台正确放置在AGV后置台面上；②如果没有平台，取消任务；③在AGV键盘上长按2键卸载AGV。",
+      "predicted_answer": "Error UDC Presence（ID 27）报警通常发生在平台未正确放置在 AGV 后方托板（back table）上时。解决该报警有以下两种处理方式：1. 确保平台正确放置在 AGV 的后方托板上；2. 如果当前没有平台，请取消任务（cancel the mission），并在 AGV 键盘上长按 2 号键来卸载（unload）AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 15830,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15830,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_error_udc_006",
+      "query": "AGV上没有平台时，出现UDC报警应该按什么键？",
+      "tags": [
+        "keypad",
+        "no_platform",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Error UDC Presence SOP_section_1",
+        "Error UDC Presence SOP_section_2",
+        "E-Stop SOP_intro",
+        "Error Position Lift Table SOP_section_1"
+      ],
+      "gold_answer": "如果AGV上没有平台，应取消任务，或在AGV键盘上长按2键进行卸载。",
+      "predicted_answer": "当 AGV 上没有平台时出现 UDC 报警，应该先取消任务（cancel the mission），然后在 AGV 键盘上按住 2 号键（Hold 2 on the AGV keypad）来卸载 AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 15700,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15700,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_error_udc_007",
+      "query": "Error UDC Presence报警时，平台放置不正确应如何处理？",
+      "tags": [
+        "platform_placement",
+        "resolution",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Error UDC Presence SOP_section_2",
+        "Error Position Lift Table SOP_section_1"
+      ],
+      "gold_answer": "确保平台正确放置在AGV的后置台面上，重新对位后报警应自动消除。",
+      "predicted_answer": "当出现 Error UDC Presence 报警时，处理方法如下：首先确保平台正确放置在 AGV 的后部托板（back table）上；如果没有平台，则取消任务（cancel the mission）；最后在 AGV 键盘上长按 2 键来卸载 AGV（unload the AGV）。",
+      "retrieve_ms": null,
+      "generate_ms": 15319,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15319,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_error_udc_010",
+      "query": "Does the Error UDC Presence alarm require a button sequence like Blue/Green to reset?",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Error_UDC_Presence_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "PH Box Presence UDC SOP_section_1",
+        "PH Box Presence UDC SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "Right Arm FTC SOP_section_3",
+        "PH Box Presence UDC SOP_section_2",
+        "Error UDC Presence SOP_section_2"
+      ],
+      "gold_answer": "No, this alarm does not require a Blue/Green button sequence. The resolution involves repositioning the platform, cancelling the mission, or holding 2 on the keypad to unload.",
+      "predicted_answer": "No, the Error UDC Presence alarm does not require a Blue/Green button sequence to reset. According to the SOP, to resolve this issue, you need to ensure the platform is correctly placed on the AGV’s back table. If no platform is present, you should cancel the mission and hold 2 on the AGV keypad to unload the AGV.",
+      "retrieve_ms": null,
+      "generate_ms": 32929,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 7,
+        "total_ms": 32929,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": 0.4533333333333333
+    },
+    {
+      "id": "eval_inserting_004",
+      "query": "Inserting报警出现时，说明AGV正在做什么？",
+      "tags": [
+        "alarm_cause",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Inserting SOP_section_1",
+        "Error UDC Presence SOP_section_1",
+        "Cannot Enter System SOP_section_1",
+        "Loop Emergency SOP_intro",
+        "Inserting SOP_section_2"
+      ],
+      "gold_answer": "表示AGV正在尝试插入其驱动路径。",
+      "predicted_answer": "Inserting 报警出现时，说明 AGV 正在尝试插入其行驶路径（attempting to insert into its drive path）。",
+      "retrieve_ms": null,
+      "generate_ms": 15002,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15002,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_inserting_005",
+      "query": "如何用遥控器自动将AGV插入驱动路径？",
+      "tags": [
+        "automatic_insert",
+        "remote",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将AGV切换到自动模式，确保遥控器处于前进模式，然后将速度摇杆拨向慢速方向，AGV将自动行驶并对齐插入驱动路径。",
+      "predicted_answer": "当前提供的 SOP 文档信息不足，仅包含更换电池的流程，没有关于遥控器操作或将 AGV 插入驱动路径的说明，因此无法解答该问题。请提供相关的专项 SOP 文档。",
+      "retrieve_ms": null,
+      "generate_ms": 31870,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 12,
+        "total_ms": 31870,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_inserting_006",
+      "query": "手动插入AGV到驱动路径时，需要注意哪两个方面？",
+      "tags": [
+        "manual_insert",
+        "positioning",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Inserting SOP_section_2",
+        "Inserting SOP_section_3",
+        "Cannot Enter System SOP_section_2",
+        "Inserting SOP_section_1",
+        "Navigation SOP_section_4"
+      ],
+      "gold_answer": "需要确保AGV方向正确，并且位于驱动路径的中心位置。",
+      "predicted_answer": "手动插入 AGV 到驱动路径时，需要注意以下两个方面：1. 确保 AGV 的方向正确（oriented correctly）；2. 确保 AGV 位于驱动路径的中心位置（positioned at the center of the drive path）。",
+      "retrieve_ms": null,
+      "generate_ms": 14433,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 14433,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_inserting_009",
+      "query": "In the automatic insert method, what does the AGV do after the speed stick is held toward the slow side?",
+      "tags": [
+        "automatic_insert",
+        "behavior",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "The AGV will automatically drive and align itself into the drive path.",
+      "predicted_answer": "The provided documentation is insufficient to answer what the AGV does after the speed stick is held toward the slow side in the automatic insert method, as the excerpts only cover the standard battery change sequence.",
+      "retrieve_ms": null,
+      "generate_ms": 38717,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 12,
+        "total_ms": 38717,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.05128205128205129
+    },
+    {
+      "id": "eval_inserting_010",
+      "query": "Does the Inserting Alarm require the Blue/Green button sequence to resolve?",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_2",
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_2",
+        "PH Box Presence UDC SOP_section_3",
+        "Right Arm FTC SOP_section_3",
+        "Flexi Double PH SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "Inserting SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Inserting SOP_section_2",
+        "Inserting SOP_section_3",
+        "Right Arm FTC SOP_section_1"
+      ],
+      "gold_answer": "No. The Inserting Alarm is resolved by either manually positioning the AGV at the center of the drive path, or using the remote in Automatic/Forward Mode with the speed stick held to the slow side.",
+      "predicted_answer": "不需要。解决 Inserting Alarm 不需要使用 Blue/Green 按钮序列；其正确的处理方法是手动将 AGV 定位到 drive path 中心，或者使用遥控器（在 Automatic Mode 和 Forward Mode 下，将 speed stick 拨向慢速一侧）让 AGV 自动对齐并插入路径。",
+      "retrieve_ms": null,
+      "generate_ms": 42372,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 10,
+        "total_ms": 42372,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": 0.3448275862068966
+    },
+    {
+      "id": "eval_ph_box_003",
+      "query": "清除PH Box Presence UDC障碍物后，如何让AGV返回自动模式？",
+      "tags": [
+        "automatic_mode",
+        "button_sequence",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "PH Box Presence UDC SOP_section_2",
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Cannot Enter System SOP_section_2",
+        "Flexi MOC SOP_section_2",
+        "Error UDC Presence SOP_section_2",
+        "Error UDC Presence SOP_section_1"
+      ],
+      "gold_answer": "障碍物清除后，依次按蓝色按钮和绿色按钮，AGV将重新进入自动模式并启动自动序列。",
+      "predicted_answer": "目前提供的文档信息不足，[Excerpt 1] 在关键步骤处截断，无法得知具体的按键顺序，请补充完整的 SOP 文档。",
+      "retrieve_ms": null,
+      "generate_ms": 20334,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 20334,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_ph_box_004",
+      "query": "PH Box Presence UDC报警发生时，应该首先做什么？",
+      "tags": [
+        "first_step",
+        "override",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Error UDC Presence SOP_section_1",
+        "Flexi Double PH SOP_section_2",
+        "Flexi Double PH SOP_section_1",
+        "Load Unit Not Found SOP_section_1"
+      ],
+      "gold_answer": "首先使用遥控器上的override按钮，将AGV从障碍物或平台旁驶离。",
+      "predicted_answer": "发生 PH Box Presence UDC 报警时，首先应该使用遥控器上的 override 按钮，将 AGV 驶离障碍物或平台（如果 override 程序无法启动，请尝试使用其他遥控器）。",
+      "retrieve_ms": null,
+      "generate_ms": 18740,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 18740,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_ph_box_005",
+      "query": "如果遥控器的override功能无法触发，应该怎么办？",
+      "tags": [
+        "troubleshooting",
+        "remote",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Module Status SOP_section_2",
+        "Left Arm FTC SOP_section_2",
+        "Right Arm FTC SOP_section_3"
+      ],
+      "gold_answer": "尝试换一台遥控器。",
+      "predicted_answer": "如果遥控器的 override 功能无法触发，应该尝试使用另一个不同的遥控器（try using a different remote）。",
+      "retrieve_ms": null,
+      "generate_ms": 15642,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15642,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_ph_box_006",
+      "query": "AGV清除障碍物后，按哪些按钮可以重新启动自动序列？",
+      "tags": [
+        "button_sequence",
+        "automatic_mode",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_2",
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "按蓝色按钮，再按绿色按钮，即可重新进入自动模式并启动自动序列。",
+      "predicted_answer": "当前提供的文档信息不足，SOP 片段中没有提及清除障碍物后如何重新启动自动序列的说明，无法回答该问题。",
+      "retrieve_ms": null,
+      "generate_ms": 44239,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 12,
+        "total_ms": 44239,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_ph_box_007",
+      "query": "PH Box Presence UDC报警处理中，按下蓝色和绿色按钮的作用是什么？",
+      "tags": [
+        "button_function",
+        "automatic_mode",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Flexi Case SOP_section_3",
+        "Flexi Double PH SOP_section_3",
+        "Right Arm FTC SOP_section_3",
+        "PH Box Presence UDC SOP_section_2"
+      ],
+      "gold_answer": "按下蓝色和绿色按钮可以让AGV重新进入自动模式，重新启动自动序列。",
+      "predicted_answer": "在处理 PH Box Presence UDC 报警时，按下蓝色和绿色按钮的作用是使 AGV 在清除障碍物后返回 Automatic Mode（自动模式）。",
+      "retrieve_ms": null,
+      "generate_ms": 16646,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 16646,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_ph_box_008",
+      "query": "What is the purpose of pressing Blue then Green after resolving the PH Box Presence UDC alarm?",
+      "tags": [
+        "button_sequence",
+        "purpose",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Right Arm FTC SOP_section_3",
+        "Flexi Double PH SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "Left Arm FTC SOP_section_2",
+        "PH Box Presence UDC SOP_section_1"
+      ],
+      "gold_answer": "Pressing Blue then Green re-initiates the automatic sequence and returns the AGV to Automatic Mode.",
+      "predicted_answer": "The purpose of pressing the Blue button then the Green button is to return the AGV to Automatic Mode once it is clear of the obstruction.",
+      "retrieve_ms": null,
+      "generate_ms": 22385,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 22384,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": 0.4571428571428571
+    },
+    {
+      "id": "eval_loop_emergency_003",
+      "query": "ID 62 Loop Emergency Not Online报警与哪个部件相关？",
+      "tags": [
+        "component",
+        "battery",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "Loop Emergency SOP_intro",
+        "E-Stop SOP_intro",
+        "Flexi Case SOP_section_2",
+        "Master Link Down SOP_section_1",
+        "Load Unit Not Found SOP_section_1"
+      ],
+      "gold_answer": "该报警与AGV的电池部件相关，表示电池存在故障。",
+      "predicted_answer": "。答案是：ID 62 Loop Emergency Not Online 报警与**电池（battery）**相关。根据 SOP，当电池出现问题时会触发此告警，处理建议是咨询合格的 AGV 技术人员。",
+      "retrieve_ms": null,
+      "generate_ms": 12863,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 12863,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_loop_emergency_004",
+      "query": "ID 62 Loop Emergency Not Online报警是什么原因引起的？",
+      "tags": [
+        "alarm_cause",
+        "battery",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "Loop Emergency SOP_intro",
+        "Flexi Module Status SOP_section_2",
+        "Master Link Down SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Flexi Double PH SOP_section_1"
+      ],
+      "gold_answer": "该报警是由电池出现问题时触发的。",
+      "predicted_answer": "ID 62 Loop Emergency Not Online 报警是由电池出现问题（problem with the battery）引起的。处理建议是请咨询有资质的 AGV 技术人员（qualified AGV Technician）。",
+      "retrieve_ms": null,
+      "generate_ms": 12942,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 12942,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_loop_emergency_005",
+      "query": "出现Loop Emergency Not Online报警时，操作员应该怎么做？",
+      "tags": [
+        "resolution",
+        "technician_required",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "Loop Emergency SOP_intro",
+        "Master Link Down SOP_section_2",
+        "Flexi Case SOP_section_2",
+        "Flexi MOC SOP_section_2",
+        "E-Stop SOP_intro"
+      ],
+      "gold_answer": "操作员无法自行解决，需要联系专业的AGV技术人员进行检修。",
+      "predicted_answer": "出现 Loop Emergency Not Online 报警时，说明电池存在问题，操作员应该联系合格的 AGV 技术人员（qualified AGV Technician）进行咨询和处理。",
+      "retrieve_ms": null,
+      "generate_ms": 15798,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15798,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_loop_emergency_006",
+      "query": "Loop Emergency Not Online报警需要按蓝色绿色按钮来解除吗？",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "不需要。该报警涉及电池故障，必须由专业AGV技术人员处理，不是标准自动序列能解决的。",
+      "predicted_answer": "提供的文档不足，现有 SOP 片段仅包含更换电池的流程，完全未提及“Loop Emergency Not Online”报警，因此无法确定是否需要按蓝色和绿色按钮来解除该报警。",
+      "retrieve_ms": null,
+      "generate_ms": 37301,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 12,
+        "total_ms": 37301,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_loop_emergency_008",
+      "query": "Is the Loop Emergency Not Online alarm something an operator can resolve using the standard Blue/Green button sequence?",
+      "tags": [
+        "resolution",
+        "operator_limitation",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "Loop Emergency SOP_intro",
+        "PH Box Presence UDC SOP_section_2",
+        "Flexi Case SOP_section_3",
+        "Flexi Double PH SOP_section_3",
+        "Error Position Lift Table SOP_section_3"
+      ],
+      "gold_answer": "No. This alarm requires a qualified AGV Technician and cannot be resolved with the standard button sequence.",
+      "predicted_answer": "不能。根据 SOP，Loop Emergency Not Online 告警表明电池存在问题，操作员无法使用标准的蓝/绿按键顺序来解决，而是必须咨询合格的 AGV 技术人员（qualified AGV Technician）进行处理。",
+      "retrieve_ms": null,
+      "generate_ms": 33388,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 33388,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.18750000000000003
+    },
+    {
+      "id": "eval_agv_demo_new_001",
+      "query": "how do i change the agv battery?",
+      "tags": [
+        "from_session",
+        "battery_change",
+        "doc:BatteryChangeSequenceSOP",
+        "en_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "How To Change A Battery\nSTEP 1: Press 7 on the front numerical pad of the AGV to move it to an empty battery bay.",
+      "predicted_answer": "To change the AGV battery, follow these steps:\n1. Press 7 on the front numerical pad of the AGV to move it to an empty battery bay.\n2. Press and hold the Up/Down Battery Block button until the green indicator light turns off.\n3. Slide the depleted battery out of the AGV and into the empty bay.\n4. Ensure that all cables are positioned clear of the battery sensor and other moving parts.\n5. Press 7 again on the numerical pad to move to the next battery bay.\n6. Once the AGV is aligned with the correct bay, power off the AGV and swap the connectors to the fully charged battery.\n7. Neatly arrange the battery cables on top of the AGV to prevent interference with pinch points, then carefully slide the new battery into the AGV.\n8. Power on the AGV and wait for it to complete its startup sequence.\n9. Ensure the battery is not positioned over the battery block and is properly aligned to allow vertical movement.\n10. Switch the AGV to Automatic Mode, press the blue button, then the green button, and use the Up/Down Battery Block button to raise the battery block.\n11. Press the blue button, then the green button again, and wait for the AGV to reconnect to the system (the Master Link Down status should clear).",
+      "retrieve_ms": null,
+      "generate_ms": 18463,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 18463,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.1784037558685446
+    },
+    {
+      "id": "eval_agv_demo_new_002",
+      "query": "how can i change a battery on the agv",
+      "tags": [
+        "from_session",
+        "battery_change",
+        "doc:BatteryChangeSequenceSOP",
+        "en_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "How To Change A Battery\nSTEP 1: Press 7 on the front numerical pad of the AGV to move it to an empty battery bay.",
+      "predicted_answer": "To change a battery on the AGV, please follow these steps:\n1. Press 7 on the front numerical pad of the AGV to move it to an empty battery bay.\n2. Press and hold the Up/Down Battery Block button until the green indicator light turns off.\n3. Slide the depleted battery out of the AGV and into the empty bay.\n4. Ensure that all cables are positioned clear of the battery sensor and other moving parts.\n5. Press 7 again on the numerical pad to move to the next battery bay.\n6. Once aligned with the correct bay, power off the AGV and swap the connectors to the fully charged battery.\n7. Neatly arrange the battery cables on top of the AGV to prevent interference with pinch points, then carefully slide the new battery into the AGV.\n8. Power on the AGV and wait for it to complete its startup sequence.\n9. Ensure the battery is not positioned over the battery block and is properly aligned to allow vertical movement.\n10. Switch the AGV to Automatic Mode, press the blue button, then the green button, and use the Up/Down Battery Block button to raise the battery block.\n11. Press the blue button, then the green button again, and wait for the AGV to reconnect to the system (the Master Link Down status should clear).",
+      "retrieve_ms": null,
+      "generate_ms": 22651,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 22651,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.1784037558685446
+    },
+    {
+      "id": "eval_agv_demo_new_003",
+      "query": "我该如何更换 AGV 的电池？",
+      "tags": [
+        "from_session",
+        "battery_change",
+        "doc:BatteryChangeSequenceSOP",
+        "zh_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "更换电池：AGV 数字键盘按 7→移动到空电池仓",
+      "predicted_answer": "根据 SOP，更换 AGV 电池的完整步骤如下：\n\n1. 在 AGV 前置数字键盘上按 7，使其移动到空的电池仓。\n2. 按住 Up/Down Battery Block（电池挡块升降）按钮，直到绿色指示灯熄灭。\n3. 将耗尽的电池从 AGV 滑出并推入空电池仓。\n4. 确保所有线缆避开电池传感器和其他运动部件。\n5. 再次在数字键盘上按 7，移动到下一个电池仓。\n6. 当 AGV 与正确的电池仓对齐后，关闭 AGV 电源，并将连接器切换到充满电的电池上。\n7. 连接新电池后：将电池线缆整齐地整理在 AGV 顶部，防止干扰夹点（pinch points）；小心地将新电池滑入 AGV。\n8. 开启 AGV 电源，等待其完成启动程序。\n9. 确保电池没有放置在电池挡块上方，并且对齐正确以允许垂直移动。\n10. 将 AGV 切换到自动模式（Automatic Mode），然后：先按蓝色按钮，再按绿色按钮；使用 Up/Down Battery Block 按钮升起电池挡块。\n11. 再次按蓝色按钮，然后按绿色按钮。等待 AGV 重新连接到系统（Master Link Down 状态应当清除）。",
+      "retrieve_ms": null,
+      "generate_ms": 18409,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 18409,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.023529411764705882
+    },
+    {
+      "id": "eval_agv_demo_new_004",
+      "query": "How do  fix alarm block battery low alarm?",
+      "tags": [
+        "from_session",
+        "alarm_id_34",
+        "doc:Alarm Block Battery Low SOP",
+        "en_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Alarm Block Battery Low SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Alarm:     ID 34: Alarm Block Battery Low\nHow To Fix:This alarm is triggered when the battery block is lowered.",
+      "predicted_answer": "The provided documentation is insufficient to determine how to fix the \"block battery low alarm\".",
+      "retrieve_ms": null,
+      "generate_ms": 78497,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 12,
+        "total_ms": 78497,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": 0.5
+    },
+    {
+      "id": "eval_agv_demo_new_008",
+      "query": "How do i fix the alarm cannot enter system?",
+      "tags": [
+        "from_session",
+        "cannot_enter_system",
+        "doc:Cannot Enter System SOP",
+        "en_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Cannot Enter System SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Inserting SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Loop Emergency SOP_intro",
+        "Cannot Enter System SOP_section_2",
+        "Navigation SOP_section_2",
+        "Inserting SOP_section_2"
+      ],
+      "gold_answer": "Alarm:      Cannot Enter System\nHow To Fix:This alarm occurs when the AGV is not correctly aligned on its path.",
+      "predicted_answer": "To fix the \"Cannot Enter System\" alarm, first drive the AGV toward the center of the path, ensuring it is facing the correct direction. Then, restart the AGV using the automatic sequence by following these steps: 1) Switch to Automatic Mode, 2) Press the Blue button, and 3) Press the Green button.",
+      "retrieve_ms": null,
+      "generate_ms": 34724,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 8,
+        "total_ms": 34724,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2903225806451613
+    },
+    {
+      "id": "eval_agv_demo_new_009",
+      "query": "我该如何解决报警系统无法进入的问题？",
+      "tags": [
+        "from_session",
+        "cannot_enter_system",
+        "doc:Cannot Enter System SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Cannot Enter System SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Inserting SOP_section_1",
+        "Navigation SOP_section_2",
+        "Flexi Case SOP_section_1",
+        "Loop Emergency SOP_intro"
+      ],
+      "gold_answer": "告警：无法进入系统→AGV 未对准路径→使 AGV 对准路径中心，确保方向正确→重启 AGV 自动序列→切换至 Automatic Mode→按 Blue button→按 Green button",
+      "predicted_answer": "Cannot Enter System 报警的原因是 AGV 未在其路径上正确对齐（[Excerpt 1]），但当前文档信息不足，未提供具体的修复操作步骤。初始逻辑和片段检索已验证，跳过中间分析过程，我需要直接检索 Cannot Enter System SOP 的后续章节或路径对齐恢复指南以获取完整的解决方案。",
+      "retrieve_ms": null,
+      "generate_ms": 32355,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 32355,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0625
+    },
+    {
+      "id": "eval_agv_demo_new_013",
+      "query": "我该如何修复报警 ID 17？",
+      "tags": [
+        "from_session",
+        "alarm_id_17",
+        "doc:Error Position Lift Table SOP",
+        "zh_query",
+        "alarm_id_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Error Position Lift Table SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Error Position Lift Table SOP_section_1",
+        "Rear PLS SOP_intro",
+        "Left Arm FTC SOP_section_1",
+        "Master Link Down SOP_section_2",
+        "Navigation SOP_section_1",
+        "Error Position Lift Table SOP_section_2",
+        "Load Unit Not Found SOP_section_3",
+        "Error UDC Presence SOP_section_1",
+        "Error Position Lift Table SOP_section_3"
+      ],
+      "gold_answer": "告警 ID 17：Error Position Lift Table（升降台位置错误）；处理：检查升降台到位状态并按 Up/Down 复位",
+      "predicted_answer": "修复报警 ID 17（Error Position Lift Table）的步骤如下：\n1. 确保平台正确放置在 AGV 的背部。\n2. 确认升降台（table）已升至最大高度。\n3. 启动自动序列（automatic sequence）：将 AGV 切换至自动模式（Automatic Mode），按下蓝色按钮（Blue button），然后按下绿色按钮（Green button）。",
+      "retrieve_ms": null,
+      "generate_ms": 33012,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 33011,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2727272727272727
+    },
+    {
+      "id": "eval_agv_demo_new_017",
+      "query": "我该如何修复报警 ID 27？",
+      "tags": [
+        "from_session",
+        "alarm_id_27",
+        "doc:Error UDC Presence SOP",
+        "zh_query",
+        "alarm_id_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Error UDC Presence SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Error UDC Presence SOP_section_1",
+        "Rear PLS SOP_intro",
+        "Left Arm FTC SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Alarm Block Battery Low SOP_section_1",
+        "Error UDC Presence SOP_section_2",
+        "Cannot Enter System SOP_section_1",
+        "E-Stop SOP_intro"
+      ],
+      "gold_answer": "告警：ID 27: Error UDC Presence，平台未正确放置在 AGV 背板上，检查平台位置",
+      "predicted_answer": "。答案是：报警 ID 27 (Error UDC Presence) 是由于平台未正确放置在 AGV 后方托板（back table）上引起的。修复步骤如下：1. 确保平台正确放置在 AGV 的后方托板上；2. 如果当前没有平台，请取消任务（cancel the mission）；3. 在 AGV 键盘上长按 2 键（Hold 2）来卸载 AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 57626,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 8,
+        "total_ms": 57626,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.27906976744186046
+    },
+    {
+      "id": "eval_agv_demo_new_020",
+      "query": "我该如何解决急停按钮激活的报警？",
+      "tags": [
+        "from_session",
+        "alarm_id_01",
+        "doc:E-Stop SOP",
+        "zh_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "E-Stop SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "E-Stop SOP_intro",
+        "Flexi Case SOP_section_2",
+        "Inserting SOP_section_1",
+        "Flexi MOC SOP_section_2",
+        "Loop Emergency SOP_intro"
+      ],
+      "gold_answer": "告警：E-Stop Button Active（ID 01），检查 AGV 左右两侧急停按钮，红色旋转式/黑色按压式，确保两个按钮都已松开，恢复正常运行",
+      "predicted_answer": "要解决急停按钮激活的报警，请检查 AGV 左右两侧的两个急停按钮。对于较新的 AGV，按钮是红色的旋转式急停按钮；对于较旧的 AGV，两侧是黑色的按压式按钮。确保两个按钮都已解除（松开）状态，即可让 AGV 恢复正常运行。",
+      "retrieve_ms": null,
+      "generate_ms": 15253,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15253,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.13333333333333333
+    },
+    {
+      "id": "eval_agv_demo_new_025",
+      "query": "我该如何修复报警 ID 56？",
+      "tags": [
+        "from_session",
+        "alarm_id_56",
+        "doc:Flexi Case SOP",
+        "zh_query",
+        "alarm_id_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Case SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Front PLS SOP_intro",
+        "Flexi Case SOP_section_2",
+        "Rear PLS SOP_intro",
+        "Flexi Module Status SOP_section_1"
+      ],
+      "gold_answer": "告警：ID 56: Flexi PLS Case→问题原因：remote→修复方法：检查 remote",
+      "predicted_answer": "报警 ID 56 表示遥控器（remote）出现问题。修复方法为：1. 检查遥控器，确保所有功能正常工作；2. 如有必要，更换遥控器；3. 执行自动序列（automatic sequence）以清除报警并恢复正常操作（注：当前文档片段在“执行自动序列”后未提供具体步骤，该部分信息不足，无法提供具体序列操作）。",
+      "retrieve_ms": null,
+      "generate_ms": 48029,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 48029,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.1935483870967742
+    },
+    {
+      "id": "eval_agv_demo_new_029",
+      "query": "我该如何修复报警 ID 58？",
+      "tags": [
+        "from_session",
+        "alarm_id_58",
+        "doc:Flexi Double PH SOP",
+        "zh_query",
+        "alarm_id_query",
+        "acceptable"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Double PH SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Double PH SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Rear PLS SOP_intro",
+        "Flexi Case SOP_section_2",
+        "Flexi Module Status SOP_section_1",
+        "Flexi Double PH SOP_section_2",
+        "Flexi Double PH SOP_section_3",
+        "Flexi MOC SOP_section_2"
+      ],
+      "gold_answer": "告警：ID 58: Flexi Double PH→前电池传感器问题",
+      "predicted_answer": "报警 ID 58 (Flexi Double PH) 是由前部电池传感器（front battery sensor）故障引起的。修复步骤如下：1. 确保传感器已亮起，并且在木块或电池顶部能看到两盏灯。2. 执行自动序列（Automatic Mode）：按下蓝色按钮（Blue button），然后按下绿色按钮（Green button）。",
+      "retrieve_ms": null,
+      "generate_ms": 32412,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 8,
+        "total_ms": 32412,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.25806451612903225
+    },
+    {
+      "id": "eval_agv_demo_new_031",
+      "query": "how do i fix alarm ID 53?",
+      "tags": [
+        "from_session",
+        "alarm_id_53",
+        "doc:Flexi MOC SOP",
+        "en_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi MOC SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Flexi Case SOP_section_1",
+        "Flexi Double PH SOP_section_1",
+        "Left Arm FTC SOP_section_1",
+        "Right Arm FTC SOP_section_2"
+      ],
+      "gold_answer": "Alarm:     ID 53: Flexi MOC\nHow To Fix:To clear the alarm:\nPerform the automatic sequence:\nAutomatic Mode\nPress the Blue button\nPress the Green button\nPress the Blue button again\nIf the issue persists, contact a qualified AGV Technician for assistance.",
+      "predicted_answer": "ID 53 是 Flexi MOC 告警，修复该告警需要执行自动序列（automatic sequence）。但是，当前提供的文档不足，未包含该自动序列的具体操作步骤，因此无法给出完整的修复指南。",
+      "retrieve_ms": null,
+      "generate_ms": 53174,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 7,
+        "total_ms": 53174,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.25000000000000006
+    },
+    {
+      "id": "eval_agv_demo_new_033",
+      "query": "我该如何修复报警 ID 53？",
+      "tags": [
+        "from_session",
+        "alarm_id_53",
+        "doc:Flexi MOC SOP",
+        "zh_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi MOC SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Front PLS SOP_intro",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Flexi Case SOP_section_1",
+        "Left Arm FTC SOP_section_1",
+        "Right Arm FTC SOP_section_2"
+      ],
+      "gold_answer": "告警：ID 53: Flexi MOC→清除告警：Automatic Mode→按 Blue button→按 Green button→再按 Blue button→问题依旧，联系 AGV 技术员",
+      "predicted_answer": "报警 ID 53 是 Flexi MOC 告警。根据现有文档，修复该报警需要执行自动序列（automatic sequence）来清除，但当前 SOP 文档信息不足，缺失了具体的自动序列操作步骤，无法提供完整的修复指南。请查阅或补充包含“automatic sequence”完整步骤的文档。",
+      "retrieve_ms": null,
+      "generate_ms": 37749,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 7,
+        "total_ms": 37749,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2857142857142857
+    },
+    {
+      "id": "eval_agv_demo_new_037",
+      "query": "我该如何修复报警 ID 57？",
+      "tags": [
+        "from_session",
+        "alarm_id_57",
+        "doc:Flexi Module Status SOP",
+        "zh_query",
+        "alarm_id_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Module Status SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Module Status SOP_section_1",
+        "Flexi MOC SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Flexi MOC SOP_section_2",
+        "Flexi Module Status SOP_section_2",
+        "Flexi Double PH SOP_section_3",
+        "Flexi Case SOP_section_3"
+      ],
+      "gold_answer": "告警：ID 57: Flexi Module Status，从 Automatic Mode 切换到 Manual Mode 失败，修复方法",
+      "predicted_answer": "。答案是：报警 ID 57 (Flexi Module Status) 是由于从自动模式切换到手动模式失败引起的。修复步骤如下：1. 返回到所需的模式并再次尝试切换；2. 如果问题仍然存在，请尝试更换新的遥控器 (remote)；3. 如果问题持续无法解决，请联系合格的 AGV 技术人员 (AGV Technician) 寻求帮助。",
+      "retrieve_ms": null,
+      "generate_ms": 29359,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 29359,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.27027027027027023
+    },
+    {
+      "id": "eval_agv_demo_new_042",
+      "query": "How do i insert the agv?",
+      "tags": [
+        "from_session",
+        "inserting_sequence",
+        "doc:Inserting SOP",
+        "en_query",
+        "description_query"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_1",
+        "Inserting SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Inserting AGV back to the path: follow the sequence to bring AGV onto driving line; not an alarm.",
+      "predicted_answer": "The provided documentation does not contain instructions on how to insert the AGV itself. However, if you are asking how to insert a new battery into the AGV, you should follow these steps: First, after connecting the new battery, neatly arrange the battery cables on top of the AGV to prevent interference with pinch points. Then, carefully slide the new battery into the AGV. Finally, ensure the battery is not positioned over the battery block and is properly aligned to allow vertical movement.",
+      "retrieve_ms": null,
+      "generate_ms": 20820,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 12,
+        "total_ms": 20820,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.13793103448275862
+    },
+    {
+      "id": "eval_agv_demo_new_047",
+      "query": "我该如何修复报警 ID 18？",
+      "tags": [
+        "from_session",
+        "alarm_id_18_right",
+        "doc:Right Arm FTC SOP",
+        "zh_query",
+        "alarm_id_query",
+        "passing",
+        "old_agv_only"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Left Arm FTC SOP_section_1",
+        "Rear PLS SOP_intro",
+        "Navigation SOP_section_1",
+        "Master Link Down SOP_section_2",
+        "Master Link Down SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Flexi MOC SOP_section_1",
+        "Right Arm FTC SOP_section_2"
+      ],
+      "gold_answer": "告警：ID 13: Right FTC Alarm→AGV 右臂有障碍物→检查右臂",
+      "predicted_answer": "修复报警 ID 18（Left Side FTC）的方法是，首先清除 AGV 左臂传感器上的障碍物。之后需要“执行自动序列（Perform the automatic sequence）”，但当前提供的 SOP 文档信息不足，缺失了该自动序列的具体操作步骤，无法提供完整的恢复流程。",
+      "retrieve_ms": null,
+      "generate_ms": 34259,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 34259,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "retrieval_miss",
+        "gen_low_f1"
+      ],
+      "f1": 0.14814814814814817
+    },
+    {
+      "id": "eval_agv_demo_new_049",
+      "query": "请问如何修复右侧 FTC 报警？",
+      "tags": [
+        "from_session",
+        "alarm_id_18_right",
+        "doc:Right Arm FTC SOP",
+        "zh_query",
+        "description_query",
+        "passing",
+        "old_agv_only"
+      ],
+      "gold_chunk_ids": [
+        "Right Arm FTC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Left Arm FTC SOP_section_1",
+        "Right Arm FTC SOP_section_1",
+        "Front PLS SOP_intro",
+        "Rear PLS SOP_intro",
+        "Right Arm FTC SOP_section_2",
+        "Cannot Enter System SOP_section_2",
+        "Error Position Lift Table SOP_section_2",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Flexi MOC SOP_section_1"
+      ],
+      "gold_answer": "告警：ID 13: Right FTC Alarm，右侧机械臂受阻→检查右侧机械臂是否有障碍物→移除障碍物",
+      "predicted_answer": "右侧 FTC 报警（ID 13）的修复方法是，首先清除 AGV 右臂上的障碍物，然后执行自动序列（automatic sequence）来恢复运行：1. 切换到自动模式（Automatic Mode）；2. 按下蓝色按钮（Blue button）；3. 按下绿色按钮（Green button）。",
+      "retrieve_ms": null,
+      "generate_ms": 43751,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 10,
+        "total_ms": 43751,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.1875
+    },
+    {
+      "id": "eval_agv_demo_new_052",
+      "query": "我该如何解决“加载单元未找到”的报警？",
+      "tags": [
+        "from_session",
+        "alarm_id_21",
+        "doc:Load Unit Not Found SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Load Unit Not Found SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Master Link Down SOP_section_2",
+        "Error UDC Presence SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Navigation SOP_section_2",
+        "Load Unit Not Found SOP_section_2",
+        "Load Unit Not Found SOP_section_3",
+        "Load Unit Not Found SOP_section_4"
+      ],
+      "gold_answer": "告警：ID 21: Load Unit Not Found，原因：box sensor 未接触 platform leg，解决：重新放置 platform 使 sensor 接触 platform leg→若无法重新放置：切换 AGV 至 Manual Mode→升高 table 至最高→返回",
+      "predicted_answer": "解决“加载单元未找到”报警的方法如下：\n1. 首先尝试在地板上重新放置平台，使传感器能够与平台支腿接触。\n2. 如果无法重新放置，请将 AGV 切换到手动模式（Manual Mode）并将升降台升至最高高度，然后将 AGV 切回自动模式（Automatic Mode），并在 AGV 前屏幕上按 1 来加载平台。\n3. 如果需要调整 AGV 路线，请在 AGV 电脑上取消现有任务，手动重新规划 AGV 路线，并在最终目的地使用正确的编号重命名平台。如果仍遇到问题，请联系合格的 AGV 技术人员寻求帮助。",
+      "retrieve_ms": null,
+      "generate_ms": 36153,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 8,
+        "total_ms": 36153,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.06153846153846154
+    },
+    {
+      "id": "eval_agv_demo_new_057",
+      "query": "我该如何修复报警 ID 62？",
+      "tags": [
+        "from_session",
+        "alarm_id_62",
+        "doc:Loop Emergency SOP",
+        "zh_query",
+        "alarm_id_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "Loop Emergency SOP_intro",
+        "Rear PLS SOP_intro",
+        "Front PLS SOP_intro",
+        "Flexi Case SOP_section_2",
+        "Flexi Case SOP_section_1"
+      ],
+      "gold_answer": "告警：ID 62：回路紧急情况未上线→问题：电池故障→修复：咨询合格 AGV 技术员",
+      "predicted_answer": "报警 ID 62（Loop Emergency Not Online）表示电池出现了问题；处理方法是请咨询有资质的 AGV 技术人员（qualified AGV Technician）进行处理。",
+      "retrieve_ms": null,
+      "generate_ms": 13707,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 13707,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.26086956521739135
+    },
+    {
+      "id": "eval_agv_demo_new_059",
+      "query": "how do i fix alarm id 16?",
+      "tags": [
+        "from_session",
+        "alarm_id_16",
+        "doc:Master Link Down SOP",
+        "en_query",
+        "alarm_id_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Master Link Down SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Master Link Down SOP_section_1",
+        "Left Arm FTC SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Navigation SOP_section_1",
+        "Right Arm FTC SOP_section_1",
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4"
+      ],
+      "gold_answer": "Alarm:     ID 16: Master Link Down\nHow To Fix:\nThis alarm occurs when the AGV loses connection with its local server, typically right after the AGV is powered on.",
+      "predicted_answer": "The provided documentation is insufficient to give the full dedicated fix for Alarm ID 16 (Master Link Down). However, based on the battery change procedure, you can attempt to clear the Master Link Down status by pressing the blue button, then the green button again, and waiting for the AGV to reconnect to the system.",
+      "retrieve_ms": null,
+      "generate_ms": 31530,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 17,
+        "total_ms": 31530,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.29729729729729726
+    },
+    {
+      "id": "eval_agv_demo_new_062",
+      "query": "how do i fix the navigation alarm?",
+      "tags": [
+        "from_session",
+        "alarm_id_14",
+        "doc:Navigation SOP",
+        "en_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Navigation SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Navigation SOP_section_1",
+        "Master Link Down SOP_section_2",
+        "Navigation SOP_section_4",
+        "Cannot Enter System SOP_section_1",
+        "Navigation SOP_section_2",
+        "Cannot Enter System SOP_section_2",
+        "Error Position Lift Table SOP_section_2",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Flexi MOC SOP_section_1"
+      ],
+      "gold_answer": "Alarm:     ID 14: Navigation\nHow To Fix:This alarm occurs when the AGV loses communication with its top laser.",
+      "predicted_answer": "To fix the Navigation alarm (ID 14), first walk the AGV until it has a clear view of its reflectors. Next, restart the AGV using the automatic sequence: Switch to Automatic Mode, press the Blue button, and then press the Green button. If the issue persists, try cleaning the top laser and reflectors, and if necessary, reboot the AGV.",
+      "retrieve_ms": null,
+      "generate_ms": 36833,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 10,
+        "total_ms": 36833,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2985074626865672
+    },
+    {
+      "id": "eval_agv_demo_new_064",
+      "query": "我该如何修复导航警报？",
+      "tags": [
+        "from_session",
+        "alarm_id_14",
+        "doc:Navigation SOP",
+        "zh_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Navigation SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Navigation SOP_section_1",
+        "E-Stop SOP_intro",
+        "Inserting SOP_section_1",
+        "Cannot Enter System SOP_section_2",
+        "Cannot Enter System SOP_section_1",
+        "Navigation SOP_section_4",
+        "Master Link Down SOP_section_2",
+        "Navigation SOP_section_2",
+        "Navigation SOP_section_3"
+      ],
+      "gold_answer": "告警：ID 14: Navigation，AGV 失去与顶部激光的通信，检查通信",
+      "predicted_answer": "修复导航警报（ID 14: Navigation）的步骤如下：\n1. 移动（Walk）AGV，直到它能清晰地看到反射器（reflectors）。\n2. 使用自动序列重启 AGV：切换到自动模式（Automatic Mode），按下蓝色按钮（Blue button），然后按下绿色按钮（Green button）。\n3. 如果问题仍然存在，请尝试清洁顶部激光器（top laser）和反射器；您可能还需要重启（reboot）AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 32167,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 32167,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.20512820512820512
+    },
+    {
+      "id": "eval_agv_demo_new_067",
+      "query": "我该如何解决 PH Box 的“Presence UDC”报警？",
+      "tags": [
+        "from_session",
+        "ph_box_presence_udc",
+        "doc:PH Box Presence UDC SOP",
+        "zh_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1",
+        "Error UDC Presence SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_1",
+        "Load Unit Not Found SOP_section_1",
+        "Flexi Double PH SOP_section_3",
+        "Flexi Case SOP_section_3",
+        "PH Box Presence UDC SOP_section_3",
+        "PH Box Presence UDC SOP_section_2"
+      ],
+      "gold_answer": "PH Box Presence UDC 报警，Remote override 按钮→驶离障碍物/平台，override 无效→更换 Remote，清除障碍物→Automatic Mode",
+      "predicted_answer": "。答案是：解决 PH Box Presence UDC 报警的步骤如下：\n1. 使用遥控器上的 override 按钮将 AGV 驶离障碍物或平台。\n2. 如果 override 程序无法启动，请尝试使用另一个遥控器。\n3. 当 AGV 驶离障碍物后，依次按下 Blue button 和 Green button 返回 Automatic Mode（自动模式），这将重新启动自动程序。",
+      "retrieve_ms": null,
+      "generate_ms": 36498,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 36498,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2978723404255319
+    },
+    {
+      "id": "eval_agv_demo_new_072",
+      "query": "ow do i fix the alarm cannot enter system?",
+      "tags": [
+        "from_session",
+        "cannot_enter_system",
+        "doc:Cannot Enter System SOP",
+        "en_query",
+        "description_query",
+        "passing",
+        "typo_query"
+      ],
+      "gold_chunk_ids": [
+        "Cannot Enter System SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Inserting SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Loop Emergency SOP_intro",
+        "Master Link Down SOP_section_1"
+      ],
+      "gold_answer": "Cannot Enter System alarm: check Master Link / IP config / restart console.",
+      "predicted_answer": "The provided documentation states that the \"Cannot Enter System\" alarm occurs when the AGV is not correctly aligned on its path. However, the documentation is insufficient because it does not provide the specific procedural steps to fix the alignment.",
+      "retrieve_ms": null,
+      "generate_ms": 18831,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 18831,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.18181818181818182
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-26T16:24:53+00:00",
+    "git_sha": "8fc34d5",
+    "kb_id": "agv_demo",
+    "top_k": 10,
+    "with_generation": true,
+    "n_items": 130,
+    "strategy": "ircot",
+    "ircot_max_loops": 2
+  }
+}

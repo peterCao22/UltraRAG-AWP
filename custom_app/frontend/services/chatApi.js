@@ -98,6 +98,10 @@ export async function sendChatMessage({
   kbId,
   question,
   agentMode = 'quick',
+  /** Phase 8.3: 'quick' | 'deep_reasoning'（IRCoT 多轮检索） */
+  mode = 'quick',
+  /** Phase 8.3: deep_reasoning 模式下最大循环轮数（默认 2） */
+  ircotMaxLoops = 2,
   /** Phase 7: 可选 model_id；缺省时服务端取 ChatModelRepository 默认 */
   modelId = '',
   /** Phase 7.2.A: 可选 agent_id；缺省时按 agentMode 取 builtin */
@@ -157,6 +161,13 @@ export async function sendChatMessage({
       question,
       stream: true,
       agent_mode: agentMode,
+    }
+    // Phase 8.3 deep_reasoning：服务端走 chat_ircot 多轮检索
+    if (mode === 'deep_reasoning') {
+      bodyPayload.mode = 'deep_reasoning'
+      if (ircotMaxLoops && ircotMaxLoops !== 2) {
+        bodyPayload.ircot_max_loops = ircotMaxLoops
+      }
     }
     if (profile) {
       bodyPayload.profile = true

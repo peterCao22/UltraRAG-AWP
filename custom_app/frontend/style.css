@@ -13,6 +13,9 @@
   --color-bg-base: #f5f5f5;
   --color-bg-card: #ffffff;
   --color-bg-sidebar: #001529;
+  --color-bg-chat-sidebar: #ffffff;
+  --color-bg-sidebar-hover: #f3f4f6;
+  --color-bg-sidebar-active: #e6f4ff;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 16px;
@@ -56,6 +59,7 @@ body {
   background: var(--color-bg-base);
   font-family: var(--font-family);
   font-size: var(--text-base);
+  overflow-x: hidden;
 }
 
 button,
@@ -87,13 +91,14 @@ a {
   width: 276px;
   min-width: 276px;
   height: 100%;          /* 与 .chat-shell 等高 */
-  overflow-y: auto;      /* 侧栏内容过长时独立滚动 */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
-  padding: var(--space-lg);
-  color: #fff;
-  background: var(--color-bg-sidebar);
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-md);
+  color: var(--color-text-primary);
+  background: var(--color-bg-chat-sidebar);
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .brand-title {
@@ -101,9 +106,12 @@ a {
   font-size: var(--text-lg);
 }
 
-.brand-subtitle,
-.sidebar-caption,
-.chat-sidebar .muted,
+.chat-sidebar .brand-subtitle,
+.chat-sidebar .sidebar-caption,
+.chat-sidebar .muted {
+  color: var(--color-text-secondary);
+}
+
 .admin-sidebar .muted {
   color: rgba(255, 255, 255, 0.72);
 }
@@ -122,6 +130,66 @@ a {
 .sidebar-section {
   display: grid;
   gap: var(--space-sm);
+}
+
+.sidebar-actions {
+  display: grid;
+  gap: 2px;
+}
+
+.sidebar-action {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.sidebar-action:hover,
+.sidebar-action:focus-visible {
+  background: var(--color-bg-sidebar-hover);
+  outline: none;
+}
+
+.sidebar-action:disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.sidebar-action__icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.sidebar-action__icon svg,
+.chat-search-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chat-sidebar [data-role="session-section"] {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .primary-action,
@@ -193,16 +261,42 @@ a {
 .sidebar-link {
   margin-top: auto;
   padding-top: var(--space-lg);
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.86);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
   text-decoration: none;
 }
 
 .session-list-host {
-  /* 侧栏本身已有 overflow-y: auto 负责滚动；
-     这里不再限高裁剪，否则 position:absolute 的下拉菜单会被截断并触发滚动条 */
-  overflow: visible;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
   margin-top: var(--space-sm);
+  margin-right: calc(-1 * var(--space-md));
+  border-top: 1px solid transparent;
+  padding-top: var(--space-xs);
+  padding-right: 40px;
+  scrollbar-gutter: stable;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.session-list-host.is-scrolled {
+  border-top-color: rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 8px 8px -12px rgba(0, 0, 0, 0.45);
+}
+
+.session-list-host::-webkit-scrollbar {
+  width: 6px;
+  height: 0;
+}
+
+.session-list-host::-webkit-scrollbar-thumb {
+  background: #c7c7c7;
+  border-radius: 999px;
+}
+
+.session-list-host::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .session-list {
@@ -218,12 +312,14 @@ a {
   align-items: center;
   gap: 2px;
   margin: 0 0 var(--space-xs);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  background: transparent;
+  max-width: 100%;
+  transition: background var(--transition-fast);
 }
 
 .session-list__item-wrap:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-sidebar-hover);
 }
 
 .session-list__item-wrap:hover .session-menu-btn {
@@ -237,7 +333,7 @@ a {
   text-align: left;
   border: 0;
   border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--color-text-primary);
   background: transparent;
   cursor: pointer;
   font-size: var(--text-sm);
@@ -248,12 +344,12 @@ a {
 }
 
 .session-list__item-title.is-active {
-  color: #fff;
+  color: var(--color-text-primary);
   font-weight: 500;
 }
 
 .session-list__item-wrap:has(.session-list__item-title.is-active) {
-  background: var(--color-primary);
+  background: var(--color-bg-sidebar-active);
 }
 
 /* 保留旧 .session-list__item 兼容（测试文件） */
@@ -265,20 +361,20 @@ a {
   text-align: left;
   border: 0;
   border-radius: var(--radius-sm);
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-primary);
+  background: transparent;
   cursor: pointer;
   font-size: var(--text-sm);
   line-height: 1.35;
 }
 
 .session-list__item:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-sidebar-hover);
 }
 
 .session-list__item.is-active {
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-bg-sidebar-active);
+  color: var(--color-text-primary);
 }
 
 /* "···" 触发按钮 */
@@ -290,7 +386,7 @@ a {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--color-text-secondary);
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
@@ -302,23 +398,70 @@ a {
 }
 
 .session-menu-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: #e5e7eb;
+  color: var(--color-text-primary);
   opacity: 1;
 }
 
 /* 弹出菜单 */
 .session-menu-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
+  position: fixed;
   z-index: 50;
-  min-width: 110px;
+  min-width: 128px;
   padding: var(--space-xs) 0;
   border-radius: var(--radius-md);
   background: #fff;
   box-shadow: var(--shadow-modal);
   border: 1px solid var(--color-border);
+}
+
+.session-bulk-modal {
+  width: min(100%, 520px);
+}
+
+.session-bulk-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.session-bulk-select-all,
+.session-bulk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+}
+
+.session-bulk-list {
+  max-height: min(420px, 50vh);
+  overflow: auto;
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.session-bulk-row {
+  min-height: 38px;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.session-bulk-row:last-child {
+  border-bottom: 0;
+}
+
+.session-bulk-row:hover {
+  background: var(--color-bg-base);
+}
+
+.session-bulk-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-menu-item {
@@ -1506,6 +1649,108 @@ a {
   font-size: var(--text-lg);
 }
 
+.chat-search-overlay {
+  align-items: flex-start;
+  padding-top: 4px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.chat-search-modal {
+  width: min(748px, calc(100vw - 16px));
+  max-height: min(86vh, 720px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.chat-search-header {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.chat-search-input {
+  flex: 1;
+  min-height: 72px;
+  padding: 0 28px;
+  border: 0;
+  color: var(--color-text-primary);
+  background: transparent;
+  font-size: var(--text-md);
+}
+
+.chat-search-input:focus {
+  outline: none;
+}
+
+.chat-search-close {
+  width: 40px;
+  height: 40px;
+  margin-right: var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.chat-search-close:hover {
+  background: var(--color-bg-sidebar-hover);
+  color: var(--color-text-primary);
+}
+
+.chat-search-body {
+  max-height: calc(min(86vh, 720px) - 73px);
+  overflow-y: auto;
+  padding: var(--space-sm) 12px var(--space-lg);
+}
+
+.chat-search-new,
+.chat-search-result {
+  min-height: 48px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-search-new:hover,
+.chat-search-result:hover,
+.chat-search-result:focus-visible {
+  background: var(--color-bg-sidebar-hover);
+  outline: none;
+}
+
+.chat-search-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+}
+
+.chat-search-section-label {
+  margin: var(--space-md) var(--space-md) var(--space-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.chat-search-empty {
+  padding: var(--space-lg) var(--space-md);
+  color: var(--color-text-secondary);
+}
+
 .modal-message {
   margin: 0 0 var(--space-lg);
   line-height: 1.5;
@@ -1957,6 +2202,37 @@ a {
 .model-chip__caret {
   font-size: 10px;
   opacity: 0.6;
+}
+
+/* Phase 8.3 深度思考开关：与 model-chip 同风格的小 toggle */
+.deep-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 100ms ease, border-color 100ms ease;
+}
+
+.deep-toggle:hover {
+  background: var(--color-bg-base);
+}
+
+.deep-toggle input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.deep-toggle:has(input:checked) {
+  background: var(--color-accent, #3b82f6);
+  color: #fff;
+  border-color: var(--color-accent, #3b82f6);
 }
 
 .model-picker-overlay {
