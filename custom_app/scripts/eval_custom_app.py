@@ -104,6 +104,24 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="覆盖默认输出路径（与 --save-baseline 互斥）",
     )
+    p.add_argument(
+        "--strategy",
+        choices=("quick", "ircot"),
+        default="quick",
+        help="检索/生成策略：quick（单跳，默认）/ ircot（多跳 + 推理链，Phase 8.3）",
+    )
+    p.add_argument(
+        "--ircot-max-loops",
+        type=int,
+        default=2,
+        help="IRCoT 最大轮数（默认 2；仅 --strategy ircot 生效）",
+    )
+    p.add_argument(
+        "--tag-filter",
+        type=str,
+        default=None,
+        help="仅评测含该 tag 的样本子集（如 multi_step / failing）",
+    )
     args = p.parse_args(argv)
 
     dataset_path = args.dataset or Path("data/eval") / f"{args.kb}.jsonl"
@@ -125,7 +143,12 @@ def main(argv: list[str] | None = None) -> int:
     _logger.info("loaded %d items from %s", n, dataset_path)
 
     try:
-        report = runner.run(with_generation=args.with_generation)
+        report = runner.run(
+            with_generation=args.with_generation,
+            strategy=args.strategy,
+            ircot_max_loops=args.ircot_max_loops,
+            tag_filter=args.tag_filter,
+        )
     except RuntimeError as e:
         _logger.error("eval run failed: %s", e)
         return 2

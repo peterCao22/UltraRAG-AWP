@@ -108,10 +108,39 @@ class EvalRunner:
         with_generation: bool = False,
         ks: tuple[int, ...] = DEFAULT_KS,
         gen_metrics: list[str] | None = None,
+        strategy: str = "quick",
+        ircot_max_loops: int = 2,
+        tag_filter: str | None = None,
     ) -> EvalReport:
-        """跑一轮评测。返回 EvalReport。"""
+        """跑一轮评测。返回 EvalReport。
+
+        Args:
+            with_generation: True 时 quick 模式调 chat() 跑生成指标
+            ks: Recall/Hit/nDCG 计算的 k 值
+            gen_metrics: 子集生成指标（默认全部）
+            strategy: "quick"（单跳，默认）/ "ircot"（多跳，Phase 8.3）
+                      ircot 模式下 with_generation 强制 True，retrieved 用 chunks_seen
+            ircot_max_loops: IRCoT 最大轮数（仅 strategy=ircot 时生效）
+            tag_filter: 仅评测含该 tag 的样本子集（如 "multi_step"）
+        """
         if not self._items:
             raise RuntimeError("dataset not loaded; call load_dataset() first")
+        if strategy not in ("quick", "ircot"):
+            raise ValueError(f"strategy must be 'quick' or 'ircot', got {strategy!r}")
+
+        # 应用 tag filter（用于跑 multi_step 子集等场景）
+        items = self._items
+        if tag_filter:
+            items = [it for it in items if tag_filter in it.tags]
+            if not items:
+                raise RuntimeError(
+                    f"tag_filter {tag_filter!r} matched 0 items in dataset"
+                )
+            _logger.info("tag_filter=%s narrowed dataset to %d items", tag_filter, len(items))
+
+        # IRCoT 必带生成
+        if strategy == "ircot":
+            with_generation = True
 
         runner = self._ensure_runner()
         gold_ids_list: list[list[str]] = []
@@ -120,39 +149,61 @@ class EvalRunner:
         predicted_answers: list[str] = []
         per_item_records: list[dict[str, Any]] = []
 
-        for it in self._items:
+        for it in items:
             t0 = time.perf_counter()
-            retrieved = self._retrieve_chunk_ids(runner, it.query)
-            retrieve_ms = int((time.perf_counter() - t0) * 1000)
-
+            retrieved: list[str] = []
             answer = ""
             generate_ms: int | None = None
-            if with_generation:
-                t1 = time.perf_counter()
+            retrieve_ms: int | None = None
+            ircot_meta: dict[str, Any] | None = None
+
+            if strategy == "ircot":
+                # IRCoT：一次调用同时拿 chunks_seen + answer
+                from custom_app.services.strategies.ircot import chat_ircot
+
                 try:
-                    answer = self._generate(runner, it.query)
-                except Exception as e:  # noqa: BLE001 — 单条样本错误不阻塞全局
-                    _logger.warning("generation failed on %s: %s", it.id, e)
-                    answer = ""
-                generate_ms = int((time.perf_counter() - t1) * 1000)
+                    out = chat_ircot(
+                        runner, it.query,
+                        max_loops=ircot_max_loops,
+                        first_round_top_k=self._top_k,
+                        next_round_top_k=max(3, self._top_k // 2),
+                    )
+                    retrieved = out["chunks_seen"]
+                    answer = out["answer"]
+                    ircot_meta = out["meta"]
+                except Exception as e:  # noqa: BLE001
+                    _logger.warning("ircot failed on %s: %s", it.id, e)
+                generate_ms = int((time.perf_counter() - t0) * 1000)
+            else:
+                # quick 模式（旧路径）
+                retrieved = self._retrieve_chunk_ids(runner, it.query)
+                retrieve_ms = int((time.perf_counter() - t0) * 1000)
+                if with_generation:
+                    t1 = time.perf_counter()
+                    try:
+                        answer = self._generate(runner, it.query)
+                    except Exception as e:  # noqa: BLE001
+                        _logger.warning("generation failed on %s: %s", it.id, e)
+                    generate_ms = int((time.perf_counter() - t1) * 1000)
 
             gold_ids_list.append(list(it.relevant_chunk_ids))
             retrieved_ids_list.append(retrieved)
             gold_answers.append([it.gold_answer])
             predicted_answers.append(answer)
-            per_item_records.append(
-                {
-                    "id": it.id,
-                    "query": it.query,
-                    "tags": list(it.tags),
-                    "gold_chunk_ids": list(it.relevant_chunk_ids),
-                    "retrieved_chunk_ids": retrieved[: max(ks)],
-                    "gold_answer": it.gold_answer,
-                    "predicted_answer": answer,
-                    "retrieve_ms": retrieve_ms,
-                    "generate_ms": generate_ms,
-                }
-            )
+            rec: dict[str, Any] = {
+                "id": it.id,
+                "query": it.query,
+                "tags": list(it.tags),
+                "gold_chunk_ids": list(it.relevant_chunk_ids),
+                "retrieved_chunk_ids": retrieved[: max(ks)],
+                "gold_answer": it.gold_answer,
+                "predicted_answer": answer,
+                "retrieve_ms": retrieve_ms,
+                "generate_ms": generate_ms,
+            }
+            if ircot_meta:
+                rec["ircot"] = ircot_meta
+            per_item_records.append(rec)
 
         retrieval_metrics = compute_retrieval_metrics(
             gold_ids_list, retrieved_ids_list, ks=ks
@@ -176,20 +227,26 @@ class EvalRunner:
             per_item_records, ks=ks, with_generation=with_generation
         )
 
+        meta = _collect_run_metadata(
+            kb_id=self.kb_id,
+            top_k=self._top_k,
+            with_generation=with_generation,
+            n_items=len(items),
+        )
+        meta["strategy"] = strategy
+        if strategy == "ircot":
+            meta["ircot_max_loops"] = ircot_max_loops
+        if tag_filter:
+            meta["tag_filter"] = tag_filter
         return EvalReport(
             kb_id=self.kb_id,
-            n_items=len(self._items),
+            n_items=len(items),
             retrieval_metrics=retrieval_metrics,
             generation_metrics=generation_metrics,
             per_tag_retrieval=per_tag_retrieval,
             per_tag_generation=per_tag_generation,
             failures=tuple(failures),
-            run_metadata=_collect_run_metadata(
-                kb_id=self.kb_id,
-                top_k=self._top_k,
-                with_generation=with_generation,
-                n_items=len(self._items),
-            ),
+            run_metadata=meta,
         )
 
     # ─────────────────────────────────────────────────────────

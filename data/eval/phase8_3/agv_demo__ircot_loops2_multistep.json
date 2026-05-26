@@ -1,0 +1,653 @@
+{
+  "kb_id": "agv_demo",
+  "n_items": 20,
+  "retrieval_metrics": {
+    "recall@1": 0.3916666666666666,
+    "hit@1": 0.95,
+    "ndcg@1": 0.95,
+    "recall@5": 0.5,
+    "hit@5": 1.0,
+    "ndcg@5": 0.5690330323016132,
+    "recall@10": 0.6916666666666667,
+    "hit@10": 1.0,
+    "ndcg@10": 0.6578516464662507,
+    "mrr": 0.9625
+  },
+  "generation_metrics": {
+    "avg_acc": 0.0,
+    "avg_em": 0.0,
+    "avg_stringem": 0.0,
+    "avg_coverem": 0.0,
+    "avg_f1": 0.4245961001926403,
+    "avg_rouge-1": 0.0,
+    "avg_rouge-2": 0.0,
+    "avg_rouge-l": 0.0
+  },
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5690330323016132,
+      "recall@10": 0.6916666666666667,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6578516464662507,
+      "mrr": 0.9625
+    },
+    "en_query": {
+      "recall@1": 0.4,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.4,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5268261127198373,
+      "recall@10": 0.7,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6659065518706757,
+      "mrr": 1.0
+    },
+    "alarm_id_query": {
+      "recall@1": 0.40740740740740744,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.4999999999999999,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5850175411387505,
+      "recall@10": 0.6296296296296295,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6443074130573393,
+      "mrr": 1.0
+    },
+    "failing": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5690330323016132,
+      "recall@10": 0.6916666666666667,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6578516464662507,
+      "mrr": 0.9625
+    },
+    "missing_steps": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5690330323016132,
+      "recall@10": 0.6916666666666667,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6578516464662507,
+      "mrr": 0.9625
+    },
+    "multi_step": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5690330323016132,
+      "recall@10": 0.6916666666666667,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6578516464662507,
+      "mrr": 0.9625
+    },
+    "cross_section": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5690330323016132,
+      "recall@10": 0.6916666666666667,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6578516464662507,
+      "mrr": 0.9625
+    },
+    "zh_query": {
+      "recall@1": 0.38333333333333336,
+      "hit@1": 0.9,
+      "ndcg@1": 0.9,
+      "recall@5": 0.6000000000000001,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6112399518833891,
+      "recall@10": 0.6833333333333333,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6497967410618257,
+      "mrr": 0.925
+    },
+    "description_query": {
+      "recall@1": 0.37878787878787884,
+      "hit@1": 0.9090909090909091,
+      "ndcg@1": 0.9090909090909091,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5559547977985008,
+      "recall@10": 0.7424242424242423,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6689332919826328,
+      "mrr": 0.9318181818181818
+    },
+    "incomplete_answer": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.8571428571428571,
+      "ndcg@1": 0.8571428571428571,
+      "recall@5": 0.4047619047619047,
+      "hit@5": 1.0,
+      "ndcg@5": 0.48106820174207615,
+      "recall@10": 0.7857142857142857,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6586058354599981,
+      "mrr": 0.8928571428571429
+    },
+    "alarm_id_53": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6131471927654584,
+      "recall@10": 0.5,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6131471927654584,
+      "mrr": 1.0
+    },
+    "doc:Flexi MOC SOP": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6131471927654584,
+      "recall@10": 0.5,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6131471927654584,
+      "mrr": 1.0
+    },
+    "alarm_id_21": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5703323992730303,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6491327518853139,
+      "mrr": 1.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.5,
+      "hit@5": 1.0,
+      "ndcg@5": 0.5703323992730303,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6491327518853139,
+      "mrr": 1.0
+    }
+  },
+  "per_tag_generation": {
+    "from_session": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4245961001926403,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "en_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.5366673989447788,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4487647521455117,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "failing": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4245961001926403,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "missing_steps": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4245961001926403,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "multi_step": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4245961001926403,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "cross_section": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4245961001926403,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "zh_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3125248014405019,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "description_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40482174859483655,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "incomplete_answer": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.5283622424915972,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_53": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.26815876820947815,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Flexi MOC SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.26815876820947815,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_21": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4026812313803376,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4026812313803376,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    }
+  },
+  "failures": [
+    {
+      "id": "eval_agv_demo_new_009",
+      "query": "我该如何解决报警系统无法进入的问题？",
+      "tags": [
+        "from_session",
+        "cannot_enter_system",
+        "doc:Cannot Enter System SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Cannot Enter System SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Inserting SOP_section_1",
+        "Navigation SOP_section_2",
+        "Loop Emergency SOP_intro",
+        "Cannot Enter System SOP_section_2"
+      ],
+      "gold_answer": "告警：无法进入系统→AGV 未对准路径→使 AGV 对准路径中心，确保方向正确→重启 AGV 自动序列→切换至 Automatic Mode→按 Blue button→按 Green button",
+      "predicted_answer": "当 AGV 未正确对齐路径时会触发此告警。解决方法为：将 AGV 驶向路径中心，确保其朝向正确的方向；然后使用自动序列重启 AGV：切换到自动模式（Automatic Mode），按下蓝色按钮，再按下绿色按钮。",
+      "retrieve_ms": null,
+      "generate_ms": 15993,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15992,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.20689655172413796
+    },
+    {
+      "id": "eval_agv_demo_new_022",
+      "query": "How do i fix the flexi pls case alarm?",
+      "tags": [
+        "from_session",
+        "alarm_id_56",
+        "doc:Flexi Case SOP",
+        "en_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "incomplete_answer",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Case SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Module Status SOP_section_1",
+        "Front PLS SOP_intro",
+        "Flexi MOC SOP_section_1",
+        "Flexi Double PH SOP_section_1"
+      ],
+      "gold_answer": "Alarm:     ID 56: Flexi PLS Case\nHow To Fix:This alarm indicates a problem with the remote.\nTo resolve:\nInspect the remote to ensure all functions are working correctly.\nIf necessary, replace the remote.\nTo clear the alarm and resume normal operation:\nPerform the automatic sequence:\nAutomatic Mode\nPress the Blue button\nPress the Green button",
+      "predicted_answer": "The Flexi PLS Case alarm indicates a problem with the remote. However, the provided documentation is insufficient as it does not contain the specific procedural steps to actually fix or reset the remote.",
+      "retrieve_ms": null,
+      "generate_ms": 22631,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 22631,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2933333333333333
+    },
+    {
+      "id": "eval_agv_demo_new_024",
+      "query": "我该如何解决 Flexi PLS 机箱报警问题？",
+      "tags": [
+        "from_session",
+        "alarm_id_56",
+        "doc:Flexi Case SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "incomplete_answer",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Case SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Module Status SOP_section_1",
+        "Flexi MOC SOP_section_1",
+        "Front PLS SOP_intro",
+        "Flexi Double PH SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Module Status SOP_section_2",
+        "Inserting SOP_section_3",
+        "PH Box Presence UDC SOP_section_1"
+      ],
+      "gold_answer": "ID 56: Flexi PLS Case 报警→检查 remote 功能是否正常→必要时更换 remote→Automatic Mode→按 Blue button→按 Green button→清除报警，恢复正常运行",
+      "predicted_answer": "，但需要指出“自动序列”的具体步骤在片段中缺失。答案是：Flexi PLS Case 报警（ID 56）表明遥控器（remote）存在问题。解决方法如下：1. 检查遥控器，确保所有功能正常工作；2. 如有必要，更换遥控器；3. 要清除报警并恢复正常运行，请执行自动序列（automatic sequence）。（注：当前提供的 SOP 片段中缺失了执行 automatic sequence 的具体操作步骤，文档信息不足）。",
+      "retrieve_ms": null,
+      "generate_ms": 47478,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 47478,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.26086956521739135
+    },
+    {
+      "id": "eval_agv_demo_new_031",
+      "query": "how do i fix alarm ID 53?",
+      "tags": [
+        "from_session",
+        "alarm_id_53",
+        "doc:Flexi MOC SOP",
+        "en_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi MOC SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Front PLS SOP_intro",
+        "Flexi Case SOP_section_1",
+        "Flexi Double PH SOP_section_1",
+        "Right Arm FTC SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_2",
+        "Left Arm FTC SOP_section_1",
+        "Right Arm FTC SOP_section_2"
+      ],
+      "gold_answer": "Alarm:     ID 53: Flexi MOC\nHow To Fix:To clear the alarm:\nPerform the automatic sequence:\nAutomatic Mode\nPress the Blue button\nPress the Green button\nPress the Blue button again\nIf the issue persists, contact a qualified AGV Technician for assistance.",
+      "predicted_answer": "根据现有文档，要修复 ID 53 (Flexi MOC) 告警，需要执行“automatic sequence”（自动序列）。但由于提供的 SOP 片段缺失了具体的步骤说明，文档信息不足，无法提供完整的处理方法。建议查阅完整的 Flexi MOC SOP 文档以获取详细步骤。",
+      "retrieve_ms": null,
+      "generate_ms": 38088,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 2,
+        "n_chunks_seen": 9,
+        "total_ms": 38088,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.14545454545454545
+    },
+    {
+      "id": "eval_agv_demo_new_032",
+      "query": "我该如何解决 Flexi MOC 告警？",
+      "tags": [
+        "from_session",
+        "alarm_id_53",
+        "doc:Flexi MOC SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi MOC SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi Module Status SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Flexi Double PH SOP_section_1",
+        "Flexi Case SOP_section_2"
+      ],
+      "gold_answer": "告警：ID 53: Flexi MOC，解决方法：Automatic Mode，按 Blue button，按 Green button，再按 Blue button，问题依旧联系 AGV 技术员",
+      "predicted_answer": "根据当前文档，解决 Flexi MOC 告警需要执行自动序列（automatic sequence），但由于文档信息不足，缺少具体的后续操作步骤，无法提供完整的解决流程。",
+      "retrieve_ms": null,
+      "generate_ms": 16522,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 16522,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2
+    },
+    {
+      "id": "eval_agv_demo_new_052",
+      "query": "我该如何解决“加载单元未找到”的报警？",
+      "tags": [
+        "from_session",
+        "alarm_id_21",
+        "doc:Load Unit Not Found SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Load Unit Not Found SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Master Link Down SOP_section_2",
+        "Error UDC Presence SOP_section_2",
+        "Load Unit Not Found SOP_section_2",
+        "Master Link Down SOP_section_1"
+      ],
+      "gold_answer": "告警：ID 21: Load Unit Not Found，原因：box sensor 未接触 platform leg，解决：重新放置 platform 使 sensor 接触 platform leg→若无法重新放置：切换 AGV 至 Manual Mode→升高 table 至最高→返回",
+      "predicted_answer": "该报警（ID 21）是由于箱体传感器未能接触到平台支腿引起的；解决方法是在地面上重新放置平台（Reposition the platform on the floor），确保传感器能够接触到平台支腿。",
+      "retrieve_ms": null,
+      "generate_ms": 14770,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 14770,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.15789473684210525
+    },
+    {
+      "id": "eval_agv_demo_new_065",
+      "query": "我该如何修复报警 ID 14？",
+      "tags": [
+        "from_session",
+        "alarm_id_14",
+        "doc:Navigation SOP",
+        "zh_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "wrong_document_retrieval",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Navigation SOP_section_1",
+        "Navigation SOP_section_2",
+        "Navigation SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Navigation SOP_section_1",
+        "Left Arm FTC SOP_section_1",
+        "Master Link Down SOP_section_2",
+        "Flexi MOC SOP_section_1",
+        "Navigation SOP_section_4"
+      ],
+      "gold_answer": "告警 ID 14: Navigation，AGV 失去与顶部激光的通信，走到 AGV 可以清楚看到反射器的地方，重启 AGV，Automatic Mode，按 Blue button，按 Green button",
+      "predicted_answer": "报警 ID 14 是 Navigation 报警（通常发生在 AGV 与顶部激光器失去通信时）。修复方法为：尝试清洁顶部激光器（top laser）和反射板（reflectors）；如果问题仍然存在，可能需要重启 AGV。",
+      "retrieve_ms": null,
+      "generate_ms": 15390,
+      "ircot": {
+        "ircot_strategy": true,
+        "n_loops": 1,
+        "n_chunks_seen": 5,
+        "total_ms": 15390,
+        "early_stopped": true
+      },
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.27027027027027023
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-26T15:12:16+00:00",
+    "git_sha": "7ae9f27",
+    "kb_id": "agv_demo",
+    "top_k": 10,
+    "with_generation": true,
+    "n_items": 20,
+    "strategy": "ircot",
+    "ircot_max_loops": 2,
+    "tag_filter": "multi_step"
+  }
+}
