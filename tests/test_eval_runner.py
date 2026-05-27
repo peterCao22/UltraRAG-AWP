@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 
 from custom_app.services.eval.dataset import write_eval_dataset
-from custom_app.services.eval.runner import EvalRunner
+from custom_app.services.eval.runner import EvalRunner, _extract_plain_answer
 from custom_app.services.eval.schema import EvalItem
 
 
@@ -232,3 +232,54 @@ class TestEvalRunnerDataset:
         ]
         with pytest.raises(ValueError, match="kb_id"):
             runner.set_items(items)
+
+
+class TestExtractPlainAnswer:
+    """Phase 11.1.D：F1 评测不应被图片 data URL 淹没。"""
+
+    def test_prefers_text_blocks_over_display_markdown(self) -> None:
+        out = {
+            "answer": "## 故障\n\n打开报警块。\n\n![Alarm](data:image/jpeg;base64,/9j/4AAQSkZJRgABA" + "X" * 5000 + ")",
+            "answer_blocks": [
+                {"type": "text", "content": "## 故障\n\n打开报警块。"},
+                {"type": "image", "content": "data:image/jpeg;base64,/9j/" + "X" * 5000},
+            ],
+        }
+        out_text = _extract_plain_answer(out)
+        assert "打开报警块" in out_text
+        assert "base64" not in out_text
+        assert "data:image" not in out_text
+
+    def test_joins_multiple_text_blocks(self) -> None:
+        out = {
+            "answer": "ignored",
+            "answer_blocks": [
+                {"type": "text", "content": "## 步骤一\n\n打开。"},
+                {"type": "image", "content": "data:image/png;base64,AAA"},
+                {"type": "text", "content": "## 步骤二\n\n关闭。"},
+            ],
+        }
+        text = _extract_plain_answer(out)
+        assert "步骤一" in text and "步骤二" in text
+        assert "打开" in text and "关闭" in text
+        assert "data:image" not in text
+
+    def test_falls_back_to_stripping_image_markdown_from_answer(self) -> None:
+        out = {
+            "answer": "前缀\n\n![img](data:image/jpeg;base64,/9j/" + "X" * 200 + ")\n\n后缀",
+            "answer_blocks": [],
+        }
+        text = _extract_plain_answer(out)
+        assert "前缀" in text and "后缀" in text
+        assert "data:image" not in text
+
+    def test_empty_inputs(self) -> None:
+        assert _extract_plain_answer({}) == ""
+        assert _extract_plain_answer({"answer": "", "answer_blocks": []}) == ""
+
+    def test_text_only_blocks_no_images(self) -> None:
+        out = {
+            "answer": "纯文字答案",
+            "answer_blocks": [{"type": "text", "content": "纯文字答案"}],
+        }
+        assert _extract_plain_answer(out) == "纯文字答案"

@@ -1,0 +1,629 @@
+{
+  "kb_id": "agv_demo",
+  "n_items": 20,
+  "retrieval_metrics": {
+    "recall@1": 0.3916666666666666,
+    "hit@1": 0.95,
+    "ndcg@1": 0.95,
+    "recall@5": 0.8416666666666666,
+    "hit@5": 1.0,
+    "ndcg@5": 0.8438079177538904,
+    "recall@10": 0.8416666666666666,
+    "hit@10": 1.0,
+    "ndcg@10": 0.8438079177538904,
+    "mrr": 0.9625
+  },
+  "generation_metrics": {
+    "avg_acc": 0.0,
+    "avg_em": 0.0,
+    "avg_stringem": 0.0,
+    "avg_coverem": 0.0,
+    "avg_f1": 0.43324243095728254,
+    "avg_rouge-1": 0.0,
+    "avg_rouge-2": 0.0,
+    "avg_rouge-l": 0.0
+  },
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8416666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8438079177538904,
+      "recall@10": 0.8416666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8438079177538904,
+      "mrr": 0.9625
+    },
+    "en_query": {
+      "recall@1": 0.4,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.8166666666666667,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8479770411439619,
+      "recall@10": 0.8166666666666667,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8479770411439619,
+      "mrr": 1.0
+    },
+    "alarm_id_query": {
+      "recall@1": 0.40740740740740744,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.8148148148148149,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8523762302803671,
+      "recall@10": 0.8148148148148149,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8523762302803671,
+      "mrr": 1.0
+    },
+    "failing": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8416666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8438079177538904,
+      "recall@10": 0.8416666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8438079177538904,
+      "mrr": 0.9625
+    },
+    "missing_steps": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8416666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8438079177538904,
+      "recall@10": 0.8416666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8438079177538904,
+      "mrr": 0.9625
+    },
+    "multi_step": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8416666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8438079177538904,
+      "recall@10": 0.8416666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8438079177538904,
+      "mrr": 0.9625
+    },
+    "cross_section": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8416666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8438079177538904,
+      "recall@10": 0.8416666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8438079177538904,
+      "mrr": 0.9625
+    },
+    "zh_query": {
+      "recall@1": 0.38333333333333336,
+      "hit@1": 0.9,
+      "ndcg@1": 0.9,
+      "recall@5": 0.8666666666666668,
+      "hit@5": 1.0,
+      "ndcg@5": 0.839638794363819,
+      "recall@10": 0.8666666666666668,
+      "hit@10": 1.0,
+      "ndcg@10": 0.839638794363819,
+      "mrr": 0.925
+    },
+    "description_query": {
+      "recall@1": 0.37878787878787884,
+      "hit@1": 0.9090909090909091,
+      "ndcg@1": 0.9090909090909091,
+      "recall@5": 0.8636363636363636,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8367974802322279,
+      "recall@10": 0.8636363636363636,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8367974802322279,
+      "mrr": 0.9318181818181818
+    },
+    "incomplete_answer": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.8571428571428571,
+      "ndcg@1": 0.8571428571428571,
+      "recall@5": 0.8809523809523808,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8384100482653698,
+      "recall@10": 0.8809523809523808,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8384100482653698,
+      "mrr": 0.8928571428571429
+    },
+    "alarm_id_53": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8065735963827292,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8065735963827292,
+      "mrr": 1.0
+    },
+    "doc:Flexi MOC SOP": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8065735963827292,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8065735963827292,
+      "mrr": 1.0
+    },
+    "alarm_id_21": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7872524440066304,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7872524440066304,
+      "mrr": 1.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7872524440066304,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7872524440066304,
+      "mrr": 1.0
+    }
+  },
+  "per_tag_generation": {
+    "from_session": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.43324243095728254,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "en_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.7114529733701711,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.4621316160539505,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "failing": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.43324243095728254,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "missing_steps": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.43324243095728254,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "multi_step": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.43324243095728254,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "cross_section": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.43324243095728254,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "zh_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.15503188854439404,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "description_query": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.40960582496909964,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "incomplete_answer": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.502630509898416,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_53": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.39187067758496325,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Flexi MOC SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.39187067758496325,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "alarm_id_21": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3801926430949738,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "avg_acc": 0.0,
+      "avg_em": 0.0,
+      "avg_stringem": 0.0,
+      "avg_coverem": 0.0,
+      "avg_f1": 0.3801926430949738,
+      "avg_rouge-1": 0.0,
+      "avg_rouge-2": 0.0,
+      "avg_rouge-l": 0.0
+    }
+  },
+  "failures": [
+    {
+      "id": "eval_agv_demo_new_007",
+      "query": "我该如何解决 34 号报警？",
+      "tags": [
+        "from_session",
+        "alarm_id_34",
+        "doc:Alarm Block Battery Low SOP",
+        "zh_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Alarm Block Battery Low SOP_section_1",
+        "Alarm Block Battery Low SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Alarm Block Battery Low SOP_section_1",
+        "Alarm Block Battery Low SOP_section_2",
+        "PH Box Presence UDC SOP_section_3",
+        "PH Box Presence UDC SOP_section_2",
+        "Navigation SOP_section_1"
+      ],
+      "gold_answer": "告警：ID 34：Alarm Block Battery Low，电池块降低→解决方法：按AGV前部的Up/Down button抬起电池块",
+      "predicted_answer": "## 流程说明\n\n当电池块降低时会触发 34 号报警（电池块降低报警）。\n\n## To resolve the issue:\n\n要解决此问题，请按下 AGV 正面的**向上/向下（Up/Down）**按钮将电池块升起。",
+      "retrieve_ms": 5346,
+      "generate_ms": 16439,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.14285714285714285
+    },
+    {
+      "id": "eval_agv_demo_new_009",
+      "query": "我该如何解决报警系统无法进入的问题？",
+      "tags": [
+        "from_session",
+        "cannot_enter_system",
+        "doc:Cannot Enter System SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Cannot Enter System SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Cannot Enter System SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Cannot Enter System SOP_section_2",
+        "Inserting SOP_section_1",
+        "PH Box Presence UDC SOP_section_2"
+      ],
+      "gold_answer": "告警：无法进入系统→AGV 未对准路径→使 AGV 对准路径中心，确保方向正确→重启 AGV 自动序列→切换至 Automatic Mode→按 Blue button→按 Green button",
+      "predicted_answer": "## 流程说明\n\n**解决方法**：当AGV未在其路径上正确对齐时，会触发此报警。",
+      "retrieve_ms": 4960,
+      "generate_ms": 13642,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_agv_demo_new_024",
+      "query": "我该如何解决 Flexi PLS 机箱报警问题？",
+      "tags": [
+        "from_session",
+        "alarm_id_56",
+        "doc:Flexi Case SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "incomplete_answer",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Case SOP_section_2",
+        "Flexi Case SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Case SOP_section_3",
+        "Flexi Case SOP_section_2",
+        "Flexi Double PH SOP_section_1",
+        "Front PLS SOP_intro"
+      ],
+      "gold_answer": "ID 56: Flexi PLS Case 报警→检查 remote 功能是否正常→必要时更换 remote→Automatic Mode→按 Blue button→按 Green button→清除报警，恢复正常运行",
+      "predicted_answer": "## 流程说明\n\n该报警表明遥控器存在问题。\n\n## Automatic Mode\n\n自动模式操作步骤：\n1. 按下**蓝色**按钮。\n2. 按下**绿色**按钮。\n\n## To resolve:\n\n解决方法如下：\n1. 检查遥控器，确保所有功能正常工作。\n2. 如有必要，更换遥控器。\n3. 要清除报警并恢复正常操作，请执行自动序列操作。",
+      "retrieve_ms": 5284,
+      "generate_ms": 16040,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_agv_demo_new_033",
+      "query": "我该如何修复报警 ID 53？",
+      "tags": [
+        "from_session",
+        "alarm_id_53",
+        "doc:Flexi MOC SOP",
+        "zh_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi MOC SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi MOC SOP_section_1",
+        "Flexi Case SOP_section_1",
+        "Right Arm FTC SOP_section_1",
+        "Alarm Block Battery Low SOP_section_1",
+        "Flexi Double PH SOP_section_2"
+      ],
+      "gold_answer": "告警：ID 53: Flexi MOC→清除告警：Automatic Mode→按 Blue button→按 Green button→再按 Blue button→问题依旧，联系 AGV 技术员",
+      "predicted_answer": "## 流程说明\n\n要清除该报警：\n执行自动序列。",
+      "retrieve_ms": 5757,
+      "generate_ms": 16221,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.0
+    },
+    {
+      "id": "eval_agv_demo_new_036",
+      "query": "我该如何解决 Flexi 模块的状态告警？",
+      "tags": [
+        "from_session",
+        "alarm_id_57",
+        "doc:Flexi Module Status SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "incomplete_answer",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Flexi Module Status SOP_section_1",
+        "Flexi Module Status SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "Flexi Case SOP_section_1",
+        "Flexi Double PH SOP_section_1",
+        "Flexi MOC SOP_section_1",
+        "Flexi Module Status SOP_section_1",
+        "Flexi Double PH SOP_section_3"
+      ],
+      "gold_answer": "告警：ID 57: Flexi Module Status，从 Automatic 切换到 Manual 模式失败→解决方法：返回所需模式并重试→如果问题仍然存在：更换 remote→如果问题继续：联系 AGV 技术人员",
+      "predicted_answer": "## 流程说明\n\n当从自动模式切换到手动模式失败时，会触发此告警（ID 57：Flexi 模块状态）。",
+      "retrieve_ms": 5659,
+      "generate_ms": 14079,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.25
+    },
+    {
+      "id": "eval_agv_demo_new_052",
+      "query": "我该如何解决“加载单元未找到”的报警？",
+      "tags": [
+        "from_session",
+        "alarm_id_21",
+        "doc:Load Unit Not Found SOP",
+        "zh_query",
+        "description_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Load Unit Not Found SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "PH Box Presence UDC SOP_section_3",
+        "Inserting SOP_section_1",
+        "Cannot Enter System SOP_section_1"
+      ],
+      "gold_answer": "告警：ID 21: Load Unit Not Found，原因：box sensor 未接触 platform leg，解决：重新放置 platform 使 sensor 接触 platform leg→若无法重新放置：切换 AGV 至 Manual Mode→升高 table 至最高→返回",
+      "predicted_answer": "## 流程说明\n\n该报警（ID 21：加载单元未找到）发生在箱体传感器未能接触到平台支腿时。\n\n## To resolve:\n\n**解决方法：**\n在地面上重新定位平台，使传感器能够接触到平台支腿。\n\n## For AGV routing adjustments:\n\n**对于AGV路线调整：**\n1. 在AGV电脑上取消现有任务。\n2. 手动重新规划AGV的路线。\n3. 在最终目的地使用正确的编号重命名平台。\n4. 如果遇到问题，请联系合格的AGV技术人员。",
+      "retrieve_ms": 4986,
+      "generate_ms": 17967,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.1132075471698113
+    },
+    {
+      "id": "eval_agv_demo_new_053",
+      "query": "如何修复报警 ID 21？",
+      "tags": [
+        "from_session",
+        "alarm_id_21",
+        "doc:Load Unit Not Found SOP",
+        "zh_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Load Unit Not Found SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Load Unit Not Found SOP_section_1",
+        "Load Unit Not Found SOP_section_2",
+        "Front PLS SOP_intro",
+        "Load Unit Not Found SOP_section_3",
+        "Flexi Case SOP_section_2"
+      ],
+      "gold_answer": "告警：ID 21: Load Unit Not Found，原因：box sensor 未接触 platform leg，解决：重新放置 platform 使 sensor 接触 platform leg→若无法重新放置：切换 AGV 至 Manual Mode，升高 table 至最大高度",
+      "predicted_answer": "## 流程说明\n\n此报警（ID 21：未找到载荷单元）发生的原因是箱体传感器未能接触到平台支腿。\n\n## To resolve:\n\n**解决方法：**\n在地面上重新定位平台，使传感器能够接触到平台支腿。\n\n## If repositioning isn’t possible:\n\n**如果无法重新定位：**\n1. 将 AGV 切换到**手动模式**，并将升降台升至最大高度。\n2. 将 AGV 恢复为**自动模式**。\n3. 按下 AGV 前面板屏幕上的 **1** 键来加载平台。",
+      "retrieve_ms": 6414,
+      "generate_ms": 16300,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.09523809523809523
+    },
+    {
+      "id": "eval_agv_demo_new_065",
+      "query": "我该如何修复报警 ID 14？",
+      "tags": [
+        "from_session",
+        "alarm_id_14",
+        "doc:Navigation SOP",
+        "zh_query",
+        "alarm_id_query",
+        "failing",
+        "missing_steps",
+        "wrong_document_retrieval",
+        "multi_step",
+        "cross_section"
+      ],
+      "gold_chunk_ids": [
+        "Navigation SOP_section_1",
+        "Navigation SOP_section_2",
+        "Navigation SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "Navigation SOP_section_1",
+        "Navigation SOP_section_2",
+        "Navigation SOP_section_4",
+        "Alarm Block Battery Low SOP_section_1",
+        "Navigation SOP_section_3"
+      ],
+      "gold_answer": "告警 ID 14: Navigation，AGV 失去与顶部激光的通信，走到 AGV 可以清楚看到反射器的地方，重启 AGV，Automatic Mode，按 Blue button，按 Green button",
+      "predicted_answer": "## 流程说明\n\n报警 ID 14（导航报警）发生的原因是 AGV 与其顶部激光器失去通信。\n\n## To resolve:\n\n**解决方法：**\n1. 移动 AGV，直到其能清晰地看到反射板。\n2. 使用自动序列重启 AGV。\n\n## Additional Tips:\n\n**附加提示：**\n* 如果问题仍然存在，请尝试清洁顶部激光器和反射板。\n* 您可能还需要重启 AGV。\n\n## Automatic Mode\n\n**自动模式（自动序列）：**\n1. 按下蓝色按钮。\n2. 按下绿色按钮。",
+      "retrieve_ms": 4861,
+      "generate_ms": 15586,
+      "failure_reason": [
+        "gen_low_f1"
+      ],
+      "f1": 0.2692307692307693
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-27T16:54:53+00:00",
+    "git_sha": "d2fb5cd",
+    "kb_id": "agv_demo",
+    "top_k": 10,
+    "with_generation": true,
+    "n_items": 20,
+    "strategy": "quick",
+    "tag_filter": "multi_step"
+  }
+}

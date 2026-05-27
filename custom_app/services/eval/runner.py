@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 import time
 from collections import defaultdict
@@ -37,6 +38,31 @@ _logger = logging.getLogger(__name__)
 
 DEFAULT_KS: tuple[int, ...] = (1, 5, 10)
 FAILURE_F1_THRESHOLD = 0.3  # F1 低于此线 + gold 未命中 → 失败样本
+
+
+def _extract_plain_answer(out: dict[str, Any]) -> str:
+    """从 RagRunner.chat() 返回中抽取仅含文字的答案，用于 F1 / Cover-EM 评分。
+
+    Why: `out["answer"]` 是展示 Markdown，含 `![alt](data:image/...;base64,...)`
+    几十 KB 的图片 data URL，会淹没 token 比对（Phase 11.1.D 评测时发现）。
+    Fix: 走 `answer_blocks`，只拼 type=="text" 的块。降级到 `answer` 时再用 re 剥图。
+    """
+    blocks = out.get("answer_blocks") or []
+    if blocks:
+        texts = [
+            str(b.get("content") or "").strip()
+            for b in blocks
+            if isinstance(b, dict) and b.get("type") == "text"
+        ]
+        joined = "\n\n".join(t for t in texts if t).strip()
+        if joined:
+            return joined
+    raw = (out.get("answer") or "").strip()
+    return _IMG_DATA_URL_RE.sub("", raw).strip()
+
+
+# 兜底：清掉 ![alt](data:image/...) 图片块
+_IMG_DATA_URL_RE = re.compile(r"!\[[^\]]*\]\(data:image/[^)]+\)")
 
 
 class EvalRunner:
@@ -99,8 +125,7 @@ class EvalRunner:
 
     def _generate(self, runner: RagRunner, query: str) -> str:
         out = runner.chat(query)
-        # chat() 返回结构化 dict；用 answer 字段（已是展示 Markdown）作 prediction
-        return (out.get("answer") or "").strip()
+        return _extract_plain_answer(out)
 
     def run(
         self,

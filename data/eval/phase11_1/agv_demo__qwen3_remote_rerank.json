@@ -1,0 +1,1210 @@
+{
+  "kb_id": "agv_demo",
+  "n_items": 130,
+  "retrieval_metrics": {
+    "recall@1": 0.5423076923076924,
+    "hit@1": 0.6615384615384615,
+    "ndcg@1": 0.6615384615384615,
+    "recall@5": 0.8782051282051283,
+    "hit@5": 0.9,
+    "ndcg@5": 0.7700980991976367,
+    "recall@10": 0.9012820512820514,
+    "hit@10": 0.9230769230769231,
+    "ndcg@10": 0.7773124302471518,
+    "mrr": 0.7563494838494838
+  },
+  "generation_metrics": {},
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.5666666666666667,
+      "hit@1": 0.725,
+      "ndcg@1": 0.725,
+      "recall@5": 0.8708333333333332,
+      "hit@5": 0.9,
+      "ndcg@5": 0.7904230542421842,
+      "recall@10": 0.9083333333333332,
+      "hit@10": 0.9375,
+      "ndcg@10": 0.802146342197646,
+      "mrr": 0.7939732142857144
+    },
+    "alarm_id": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 0.6666666666666666,
+      "ndcg@1": 0.6666666666666666,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7956176024115139,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7956176024115139,
+      "mrr": 0.7333333333333334
+    },
+    "doc:Right_Arm_FTC_SOP": {
+      "recall@1": 0.45,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.95,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7319624420420265,
+      "recall@10": 0.95,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7319624420420265,
+      "mrr": 0.6900000000000001
+    },
+    "resolution": {
+      "recall@1": 0.3222222222222222,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 0.9,
+      "hit@5": 0.9333333333333333,
+      "ndcg@5": 0.688370724926673,
+      "recall@10": 0.9,
+      "hit@10": 0.9333333333333333,
+      "ndcg@10": 0.688370724926673,
+      "mrr": 0.6355555555555555
+    },
+    "button_sequence": {
+      "recall@1": 0.16666666666666666,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7337406981226264,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7337406981226264,
+      "mrr": 0.64
+    },
+    "automatic_mode": {
+      "recall@1": 0.16666666666666666,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.7035565121611999,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.7035565121611999,
+      "mrr": 0.6066666666666667
+    },
+    "alarm_cause": {
+      "recall@1": 0.875,
+      "hit@1": 0.875,
+      "ndcg@1": 0.875,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9375,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9375,
+      "mrr": 0.9166666666666666
+    },
+    "alarm_name": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Error_UDC_Presence_SOP": {
+      "recall@1": 0.3,
+      "hit@1": 0.3,
+      "ndcg@1": 0.3,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6797424628754913,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6797424628754913,
+      "mrr": 0.5733333333333334
+    },
+    "no_button_sequence": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.3333333333333333,
+      "ndcg@1": 0.3333333333333333,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.46228426907818054,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.46228426907818054,
+      "mrr": 0.39999999999999997
+    },
+    "doc:Inserting_SOP": {
+      "recall@1": 0.65,
+      "hit@1": 0.7,
+      "ndcg@1": 0.7,
+      "recall@5": 0.7,
+      "hit@5": 0.7,
+      "ndcg@5": 0.7,
+      "recall@10": 0.7,
+      "hit@10": 0.7,
+      "ndcg@10": 0.7,
+      "mrr": 0.7
+    },
+    "manual_insert": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "automatic_insert": {
+      "recall@1": 0.375,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.5,
+      "hit@5": 0.5,
+      "ndcg@5": 0.5,
+      "recall@10": 0.5,
+      "hit@10": 0.5,
+      "ndcg@10": 0.5,
+      "mrr": 0.5
+    },
+    "remote": {
+      "recall@1": 0.4,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 0.6,
+      "hit@5": 0.6,
+      "ndcg@5": 0.5,
+      "recall@10": 0.6,
+      "hit@10": 0.6,
+      "ndcg@10": 0.5,
+      "mrr": 0.4666666666666666
+    },
+    "override": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.3333333333333333,
+      "ndcg@1": 0.3333333333333333,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.5,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.5,
+      "mrr": 0.4444444444444444
+    },
+    "doc:PH_Box_Presence_UDC_SOP": {
+      "recall@1": 0.31666666666666665,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.9,
+      "hit@5": 0.9,
+      "ndcg@5": 0.7130929753571458,
+      "recall@10": 0.9,
+      "hit@10": 0.9,
+      "ndcg@10": 0.7130929753571458,
+      "mrr": 0.6499999999999999
+    },
+    "doc:Loop_Emergency_SOP": {
+      "recall@1": 0.8,
+      "hit@1": 0.8,
+      "ndcg@1": 0.8,
+      "recall@5": 0.9,
+      "hit@5": 0.9,
+      "ndcg@5": 0.8630929753571458,
+      "recall@10": 0.9,
+      "hit@10": 0.9,
+      "ndcg@10": 0.8630929753571458,
+      "mrr": 0.85
+    },
+    "technician_required": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 0.6666666666666666,
+      "ndcg@1": 0.6666666666666666,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.6666666666666666,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.6666666666666666,
+      "mrr": 0.6666666666666666
+    },
+    "battery": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 0.6666666666666666,
+      "ndcg@1": 0.6666666666666666,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.6666666666666666,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.6666666666666666,
+      "mrr": 0.6666666666666666
+    },
+    "battery_change": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:BatteryChangeSequenceSOP": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "en_query": {
+      "recall@1": 0.6578947368421052,
+      "hit@1": 0.8421052631578947,
+      "ndcg@1": 0.8421052631578947,
+      "recall@5": 0.9078947368421053,
+      "hit@5": 0.9473684210526315,
+      "ndcg@5": 0.8669404543442918,
+      "recall@10": 0.9078947368421053,
+      "hit@10": 0.9473684210526315,
+      "ndcg@10": 0.8669404543442918,
+      "mrr": 0.8859649122807017
+    },
+    "description_query": {
+      "recall@1": 0.5396825396825398,
+      "hit@1": 0.7142857142857143,
+      "ndcg@1": 0.7142857142857143,
+      "recall@5": 0.9047619047619048,
+      "hit@5": 0.9285714285714286,
+      "ndcg@5": 0.8050008653103343,
+      "recall@10": 0.9047619047619048,
+      "hit@10": 0.9285714285714286,
+      "ndcg@10": 0.8050008653103343,
+      "mrr": 0.7964285714285714
+    },
+    "passing": {
+      "recall@1": 0.7244897959183674,
+      "hit@1": 0.7551020408163265,
+      "ndcg@1": 0.7551020408163265,
+      "recall@5": 0.9591836734693877,
+      "hit@5": 0.9591836734693877,
+      "ndcg@5": 0.865521873908579,
+      "recall@10": 0.9591836734693877,
+      "hit@10": 0.9591836734693877,
+      "ndcg@10": 0.865521873908579,
+      "mrr": 0.8340136054421768
+    },
+    "zh_query": {
+      "recall@1": 0.5980392156862745,
+      "hit@1": 0.7647058823529411,
+      "ndcg@1": 0.7647058823529411,
+      "recall@5": 0.9460784313725492,
+      "hit@5": 0.9705882352941176,
+      "ndcg@5": 0.8462448386319305,
+      "recall@10": 0.9460784313725492,
+      "hit@10": 0.9705882352941176,
+      "ndcg@10": 0.8462448386319305,
+      "mrr": 0.836764705882353
+    },
+    "alarm_id_34": {
+      "recall@1": 0.25,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.5,
+      "hit@5": 0.5,
+      "ndcg@5": 0.5,
+      "recall@10": 0.5,
+      "hit@10": 0.5,
+      "ndcg@10": 0.5,
+      "mrr": 0.5
+    },
+    "doc:Alarm Block Battery Low SOP": {
+      "recall@1": 0.25,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.5,
+      "hit@5": 0.5,
+      "ndcg@5": 0.5,
+      "recall@10": 0.5,
+      "hit@10": 0.5,
+      "ndcg@10": 0.5,
+      "mrr": 0.5
+    },
+    "alarm_id_query": {
+      "recall@1": 0.7555555555555554,
+      "hit@1": 0.9333333333333333,
+      "ndcg@1": 0.9333333333333333,
+      "recall@5": 0.9555555555555556,
+      "hit@5": 1.0,
+      "ndcg@5": 0.930200847851156,
+      "recall@10": 0.9555555555555556,
+      "hit@10": 1.0,
+      "ndcg@10": 0.930200847851156,
+      "mrr": 0.9555555555555555
+    },
+    "failing": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8833333333333334,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8652744978524172,
+      "recall@10": 0.8833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8652744978524172,
+      "mrr": 0.9625
+    },
+    "missing_steps": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8833333333333334,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8652744978524172,
+      "recall@10": 0.8833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8652744978524172,
+      "mrr": 0.9625
+    },
+    "multi_step": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8833333333333334,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8652744978524172,
+      "recall@10": 0.8833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8652744978524172,
+      "mrr": 0.9625
+    },
+    "cross_section": {
+      "recall@1": 0.3916666666666666,
+      "hit@1": 0.95,
+      "ndcg@1": 0.95,
+      "recall@5": 0.8833333333333334,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8652744978524172,
+      "recall@10": 0.8833333333333334,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8652744978524172,
+      "mrr": 0.9625
+    },
+    "cannot_enter_system": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9590717717793499,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9590717717793499,
+      "mrr": 1.0
+    },
+    "doc:Cannot Enter System SOP": {
+      "recall@1": 0.8333333333333334,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9590717717793499,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9590717717793499,
+      "mrr": 1.0
+    },
+    "alarm_id_17": {
+      "recall@1": 0.75,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.875,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.875,
+      "mrr": 0.8333333333333334
+    },
+    "doc:Error Position Lift Table SOP": {
+      "recall@1": 0.75,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.875,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.875,
+      "mrr": 0.8333333333333334
+    },
+    "alarm_id_27": {
+      "recall@1": 0.9,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9839441578296375,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9839441578296375,
+      "mrr": 1.0
+    },
+    "doc:Error UDC Presence SOP": {
+      "recall@1": 0.9,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9839441578296375,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9839441578296375,
+      "mrr": 1.0
+    },
+    "incomplete_answer": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 0.8571428571428571,
+      "ndcg@1": 0.8571428571428571,
+      "recall@5": 0.9523809523809523,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8722954358038406,
+      "recall@10": 0.9523809523809523,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8722954358038406,
+      "mrr": 0.8928571428571429
+    },
+    "alarm_id_01": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:E-Stop SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_56": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Flexi Case SOP": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_58": {
+      "recall@1": 0.41666666666666663,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.9166666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8490725976400197,
+      "recall@10": 0.9166666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8490725976400197,
+      "mrr": 0.875
+    },
+    "doc:Flexi Double PH SOP": {
+      "recall@1": 0.41666666666666663,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 0.9166666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8490725976400197,
+      "recall@10": 0.9166666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8490725976400197,
+      "mrr": 0.875
+    },
+    "alarm_id_53": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8065735963827292,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8065735963827292,
+      "mrr": 1.0
+    },
+    "doc:Flexi MOC SOP": {
+      "recall@1": 0.5,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.75,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8065735963827292,
+      "recall@10": 0.75,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8065735963827292,
+      "mrr": 1.0
+    },
+    "alarm_id_57": {
+      "recall@1": 0.625,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8552466561225187,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8552466561225187,
+      "mrr": 0.8125
+    },
+    "doc:Flexi Module Status SOP": {
+      "recall@1": 0.625,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.8552466561225187,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.8552466561225187,
+      "mrr": 0.8125
+    },
+    "alarm_id_02": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Front PLS SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "old_agv_only": {
+      "recall@1": 0.16666666666666666,
+      "hit@1": 0.16666666666666666,
+      "ndcg@1": 0.16666666666666666,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6081187190629095,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6081187190629095,
+      "mrr": 0.4777777777777777
+    },
+    "alarm_id_18_right": {
+      "recall@1": 0.25,
+      "hit@1": 0.25,
+      "ndcg@1": 0.25,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6577324383928644,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6577324383928644,
+      "mrr": 0.5416666666666666
+    },
+    "doc:Right Arm FTC SOP": {
+      "recall@1": 0.25,
+      "hit@1": 0.25,
+      "ndcg@1": 0.25,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6577324383928644,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.6577324383928644,
+      "mrr": 0.5416666666666666
+    },
+    "alarm_id_21": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.8333333333333333,
+      "hit@5": 1.0,
+      "ndcg@5": 0.845912284759475,
+      "recall@10": 0.8333333333333333,
+      "hit@10": 1.0,
+      "ndcg@10": 0.845912284759475,
+      "mrr": 1.0
+    },
+    "doc:Load Unit Not Found SOP": {
+      "recall@1": 0.3333333333333333,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.8333333333333333,
+      "hit@5": 1.0,
+      "ndcg@5": 0.845912284759475,
+      "recall@10": 0.8333333333333333,
+      "hit@10": 1.0,
+      "ndcg@10": 0.845912284759475,
+      "mrr": 1.0
+    },
+    "alarm_id_62": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "doc:Loop Emergency SOP": {
+      "recall@1": 1.0,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 1.0,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 1.0,
+      "mrr": 1.0
+    },
+    "alarm_id_16": {
+      "recall@1": 0.75,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.875,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.875,
+      "mrr": 0.8333333333333334
+    },
+    "doc:Master Link Down SOP": {
+      "recall@1": 0.75,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.875,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.875,
+      "mrr": 0.8333333333333334
+    },
+    "alarm_id_14": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.9166666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.928065766628649,
+      "recall@10": 0.9166666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.928065766628649,
+      "mrr": 1.0
+    },
+    "doc:Navigation SOP": {
+      "recall@1": 0.6666666666666666,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.9166666666666666,
+      "hit@5": 1.0,
+      "ndcg@5": 0.928065766628649,
+      "recall@10": 0.9166666666666666,
+      "hit@10": 1.0,
+      "ndcg@10": 0.928065766628649,
+      "mrr": 1.0
+    },
+    "alarm_id_22": {
+      "recall@1": 0.75,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9077324383928644,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9077324383928644,
+      "mrr": 0.875
+    },
+    "doc:Rear PLS SOP": {
+      "recall@1": 0.75,
+      "hit@1": 0.75,
+      "ndcg@1": 0.75,
+      "recall@5": 1.0,
+      "hit@5": 1.0,
+      "ndcg@5": 0.9077324383928644,
+      "recall@10": 1.0,
+      "hit@10": 1.0,
+      "ndcg@10": 0.9077324383928644,
+      "mrr": 0.875
+    }
+  },
+  "per_tag_generation": {},
+  "failures": [
+    {
+      "id": "eval_agv_demo_004",
+      "query": "What should you do once the AGV is aligned with the correct charged battery bay?",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_6"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Power off the AGV and swap the connectors to the fully charged battery.",
+      "predicted_answer": "",
+      "retrieve_ms": 4072,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_005",
+      "query": "AGV换电的第十一步是什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_11"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "按下蓝色按钮，再按下绿色按钮。等待自动导引车（AGV）重新接入系统，主链路断开状态需消除。",
+      "predicted_answer": "",
+      "retrieve_ms": 6164,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_006",
+      "query": "那上面一步呢？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_10"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将自动导引车切换至自动模式，随后执行以下操作：1.先按下蓝色按钮，再按下绿色按钮,2.点击电池组升降按键，升起电池组",
+      "predicted_answer": "",
+      "retrieve_ms": 6917,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_007",
+      "query": "连接新电池后，应如何处理电池线缆，并完成安装？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_7"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将电池线缆整齐地排列在AGV顶部，以防止线缆卷入夹点，然后小心地将新电池滑入AGV中。",
+      "predicted_answer": "",
+      "retrieve_ms": 5628,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_008",
+      "query": "AGV启动后第九步需要确认什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "确认电池没有压在电池块上方，且位置对齐，能够正常进行垂直移动。",
+      "predicted_answer": "",
+      "retrieve_ms": 5327,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_inserting_005",
+      "query": "如何用遥控器自动将AGV插入驱动路径？",
+      "tags": [
+        "automatic_insert",
+        "remote",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "将AGV切换到自动模式，确保遥控器处于前进模式，然后将速度摇杆拨向慢速方向，AGV将自动行驶并对齐插入驱动路径。",
+      "predicted_answer": "",
+      "retrieve_ms": 5042,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_inserting_009",
+      "query": "In the automatic insert method, what does the AGV do after the speed stick is held toward the slow side?",
+      "tags": [
+        "automatic_insert",
+        "behavior",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "The AGV will automatically drive and align itself into the drive path.",
+      "predicted_answer": "",
+      "retrieve_ms": 6474,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_inserting_010",
+      "query": "Does the Inserting Alarm require the Blue/Green button sequence to resolve?",
+      "tags": [
+        "resolution",
+        "no_button_sequence",
+        "doc:Inserting_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_2",
+        "Inserting SOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "PH Box Presence UDC SOP_section_3",
+        "Inserting SOP_section_1",
+        "Flexi Case SOP_section_3",
+        "Flexi Double PH SOP_section_3",
+        "PH Box Presence UDC SOP_section_2"
+      ],
+      "gold_answer": "No. The Inserting Alarm is resolved by either manually positioning the AGV at the center of the drive path, or using the remote in Automatic/Forward Mode with the speed stick held to the slow side.",
+      "predicted_answer": "",
+      "retrieve_ms": 5549,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ph_box_009",
+      "query": "What tool is used to move the AGV away from the obstruction during PH Box Presence UDC?",
+      "tags": [
+        "override",
+        "remote",
+        "doc:PH_Box_Presence_UDC_SOP"
+      ],
+      "gold_chunk_ids": [
+        "PH Box Presence UDC SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "The override button on the remote is used to drive the AGV away from the obstruction.",
+      "predicted_answer": "",
+      "retrieve_ms": 5151,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_loop_emergency_009",
+      "query": "Which AGV alarm requires consulting a technician due to a battery problem?",
+      "tags": [
+        "technician_required",
+        "battery",
+        "doc:Loop_Emergency_SOP"
+      ],
+      "gold_chunk_ids": [
+        "Loop Emergency SOP_intro"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Alarm ID 62: Loop Emergency Not Online requires consulting a qualified AGV Technician, as it is caused by a battery problem.",
+      "predicted_answer": "",
+      "retrieve_ms": 4800,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_new_004",
+      "query": "How do  fix alarm block battery low alarm?",
+      "tags": [
+        "from_session",
+        "alarm_id_34",
+        "doc:Alarm Block Battery Low SOP",
+        "en_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Alarm Block Battery Low SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Alarm:     ID 34: Alarm Block Battery Low\nHow To Fix:This alarm is triggered when the battery block is lowered.",
+      "predicted_answer": "",
+      "retrieve_ms": 5245,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_new_006",
+      "query": "我该如何修复电池报警模块的低电量报警功能？",
+      "tags": [
+        "from_session",
+        "alarm_id_34",
+        "doc:Alarm Block Battery Low SOP",
+        "zh_query",
+        "description_query",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "Alarm Block Battery Low SOP_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "告警：ID 34：Alarm Block Battery Low，电池模块低电量→触发条件：电池模块降低→修复：检查电池模块，更换电池",
+      "predicted_answer": "",
+      "retrieve_ms": 5398,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_agv_demo_new_042",
+      "query": "How do i insert the agv?",
+      "tags": [
+        "from_session",
+        "inserting_sequence",
+        "doc:Inserting SOP",
+        "en_query",
+        "description_query"
+      ],
+      "gold_chunk_ids": [
+        "Inserting SOP_section_1",
+        "Inserting SOP_section_2"
+      ],
+      "retrieved_chunk_ids": [
+        "BatteryChangeSequenceSOP_intro",
+        "BatteryChangeSequenceSOP_step_1",
+        "BatteryChangeSequenceSOP_step_2",
+        "BatteryChangeSequenceSOP_step_3",
+        "BatteryChangeSequenceSOP_step_4",
+        "BatteryChangeSequenceSOP_step_5",
+        "BatteryChangeSequenceSOP_step_6",
+        "BatteryChangeSequenceSOP_step_7",
+        "BatteryChangeSequenceSOP_step_8",
+        "BatteryChangeSequenceSOP_step_9"
+      ],
+      "gold_answer": "Inserting AGV back to the path: follow the sequence to bring AGV onto driving line; not an alarm.",
+      "predicted_answer": "",
+      "retrieve_ms": 4310,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-27T16:34:40+00:00",
+    "git_sha": "d2fb5cd",
+    "kb_id": "agv_demo",
+    "top_k": 10,
+    "with_generation": false,
+    "n_items": 130,
+    "strategy": "quick"
+  }
+}

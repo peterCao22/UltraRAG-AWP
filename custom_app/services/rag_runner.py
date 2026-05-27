@@ -1243,11 +1243,17 @@ class RagRunner:
     def _ensure_rerank_model(self) -> Any:
         """
         Phase 4.0: 通过 Reranker Protocol 加载 LocalReranker（替换原 sentence_transformers.CrossEncoder）。
+        Phase 11.1.D: 加 backend 路由 local | remote。
 
         从 self._rerank_cfg 读取配置（来自 servers/retriever/parameter.yaml rag_rerank 段）：
-            model_name_or_path: 模型路径（YAML 化，便于服务器迁移）
-            batch_size:         批量大小
-            device:             auto / cuda / cpu
+            backend:            local（默认） | remote
+            model_name_or_path: 模型路径（local 模式必填）
+            batch_size:         批量大小（local 模式）
+            device:             auto / cuda / cpu（local 模式）
+            remote.base_url:    远程服务地址（remote 模式必填）
+            remote.timeout_sec: 远程超时
+
+        env 覆盖：ULTRARAG_RERANK_BACKEND=local|remote
 
         失败时记录 _rerank_load_error 并返回 None，不抛异常（保持原契约）。
         """
@@ -1255,6 +1261,19 @@ class RagRunner:
             return self._rerank_model
         if not (self._rerank_cfg or {}).get("enabled"):
             return None
+
+        # backend 路由
+        env_backend = (os.environ.get("ULTRARAG_RERANK_BACKEND") or "").strip().lower()
+        yaml_backend = (self._rerank_cfg.get("backend") or "").strip().lower()
+        backend = env_backend or yaml_backend or "local"
+        if backend not in ("local", "remote"):
+            backend = "local"
+
+        if backend == "remote":
+            return self._ensure_remote_rerank_model()
+        return self._ensure_local_rerank_model()
+
+    def _ensure_local_rerank_model(self) -> Any:
         model_path = (self._rerank_cfg or {}).get("model_name_or_path") or ""
         if not model_path:
             self._rerank_load_error = "model_name_or_path empty"
@@ -1278,6 +1297,35 @@ class RagRunner:
             self._rerank_load_error = str(e)
             self._rerank_model = None
             logger.warning("rag_rerank: LocalReranker load failed: %s", e)
+        return self._rerank_model
+
+    def _ensure_remote_rerank_model(self) -> Any:
+        """Phase 11.1.D: 远程 Reranker 服务（HTTP /rerank）。"""
+        remote_cfg = (self._rerank_cfg or {}).get("remote") or {}
+        base_url = (
+            os.environ.get("ULTRARAG_RERANK_BACKEND_URL")
+            or remote_cfg.get("base_url")
+            or ""
+        ).strip()
+        if not base_url:
+            self._rerank_load_error = "rerank remote.base_url empty"
+            return None
+        timeout_sec = remote_cfg.get("timeout_sec")
+        try:
+            from custom_app.utils.remote_reranker import get_remote_reranker
+        except ImportError as e:
+            self._rerank_load_error = f"remote_reranker import: {e}"
+            return None
+        try:
+            self._rerank_model = get_remote_reranker(
+                base_url=base_url, timeout_sec=timeout_sec
+            )
+            self._rerank_resolved_device = self._rerank_model.device
+            self._rerank_load_error = None
+        except Exception as e:
+            self._rerank_load_error = str(e)
+            self._rerank_model = None
+            logger.warning("rag_rerank: RemoteReranker init failed: %s", e)
         return self._rerank_model
 
     def _rerank_hit_ids(
