@@ -82,3 +82,39 @@ class TestWarmupReranker:
         runner._rerank_cfg = None
         # 不应抛错
         runner._warmup_reranker()
+
+
+class TestWarmupRemoteProbe:
+    """Phase 11.1.D：remote 模式探活——发一次最小 rerank 请求。"""
+
+    def test_remote_backend_sends_probe_request(self) -> None:
+        runner = _make_stub_runner(rerank_cfg={"enabled": True})
+        mock_model = MagicMock()
+        mock_model.device = "remote"
+        with patch.object(runner, "_ensure_rerank_model", return_value=mock_model):
+            runner._warmup_reranker()
+        # remote 模式应该真发一次 rerank
+        mock_model.rerank.assert_called_once()
+        # 探活用最小 payload
+        call = mock_model.rerank.call_args
+        assert call.args[0] == "warmup"
+        assert call.args[1] == ["ping", "pong"]
+
+    def test_local_backend_does_not_send_probe(self) -> None:
+        """local 模式权重已加载，不应再发 rerank 请求。"""
+        runner = _make_stub_runner(rerank_cfg={"enabled": True})
+        mock_model = MagicMock()
+        mock_model.device = "cuda"
+        with patch.object(runner, "_ensure_rerank_model", return_value=mock_model):
+            runner._warmup_reranker()
+        mock_model.rerank.assert_not_called()
+
+    def test_remote_probe_failure_is_swallowed(self) -> None:
+        """探活失败（网络挂了）不阻塞 init，留给运行时 fallback。"""
+        runner = _make_stub_runner(rerank_cfg={"enabled": True})
+        mock_model = MagicMock()
+        mock_model.device = "remote"
+        mock_model.rerank.side_effect = RuntimeError("connection refused")
+        with patch.object(runner, "_ensure_rerank_model", return_value=mock_model):
+            # 不应抛错
+            runner._warmup_reranker()

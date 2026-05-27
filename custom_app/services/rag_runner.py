@@ -1534,10 +1534,14 @@ class RagRunner:
         self._warmup_reranker()
 
     def _warmup_reranker(self) -> None:
-        """Phase 11.1.A：在 init() 末尾触发一次 reranker 模型加载。
+        """Phase 11.1.A：在 init() 末尾触发一次 reranker 模型加载/探活。
+
+        local 模式：触发 ~5-15s 的本地权重加载（最大收益）。
+        remote 模式（Phase 11.1.D）：发一次最小 rerank 请求做探活，
+            目的：① 提前暴露 192.168.8.44:8022 不可达；② 让 requests
+            连接池建好 TCP 连接；③ 触发 vLLM 服务端 kv-cache 预热。
 
         rerank 配置未启用 / 无 chunks / 加载失败 → 全部静默降级。
-        正常加载耗时 5-15 秒（取决于模型大小 + 设备），但首次问答从此不再等。
         """
         if not (self._rerank_cfg or {}).get("enabled", True):
             return
@@ -1551,6 +1555,16 @@ class RagRunner:
             return
         if model is None:
             return
+        # remote 模式：再发一次最小探活请求（local 模式权重已加载，无需再发）
+        device = getattr(model, "device", "")
+        if device == "remote":
+            try:
+                model.rerank("warmup", ["ping", "pong"], top_k=1)
+            except Exception as e:  # noqa: BLE001 — 探活失败不阻塞 init
+                logger.warning(
+                    "reranker remote probe failed kb=%s: %s", self.kb_id, e
+                )
+                return
         warmup_ms = int((time.perf_counter() - t0) * 1000)
         logger.info(
             "reranker warmed up kb=%s device=%s elapsed_ms=%d",
