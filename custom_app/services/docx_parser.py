@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -32,10 +33,32 @@ STEP_RE = re.compile(r"^\s*STEP\s+(\d+)\s*:", re.IGNORECASE)
 
 IMAGES_MARK = "\n[IMAGES]\n"
 
-# Phase 8.0 兜底滑窗切分参数（针对无 STEP、无 Heading 的结构松散文档）
-SLIDING_WINDOW_THRESHOLD_CHARS = 800  # 整篇字符数 < 阈值 → 仍走 _full，单 chunk
-SLIDING_WINDOW_SIZE_CHARS = 800  # 单 chunk 目标字符数
-SLIDING_WINDOW_OVERLAP_CHARS = 100  # 相邻 chunk 重叠字符数（仅文本，不复制图片）
+# Phase 11.2 细粒度切块（借鉴 WeKnora splitter）
+# 现状：旧版 section 整段不切 → ifs_docs 单 chunk 高达 887 字，子项被埋
+# 改造：所有 section/step/intro 内容 > CHUNK_TARGET_SIZE 时按递归分隔符二次切分
+# 调参：可通过 env ULTRARAG_CHUNK_TARGET_SIZE / ULTRARAG_CHUNK_OVERLAP 覆盖
+CHUNK_TARGET_SIZE = int(os.environ.get("ULTRARAG_CHUNK_TARGET_SIZE", "400"))
+CHUNK_OVERLAP_SIZE = int(os.environ.get("ULTRARAG_CHUNK_OVERLAP", "80"))
+
+# 递归分隔符（按优先级降级；每个分隔符切完不达 size 才用下一级）
+# 中文优先句号 / 问号 / 感叹号 / 分号 / 逗号 / 顿号，最后兜底空格 / 字符
+_SPLIT_SEPARATORS = ["\n\n", "\n", "。", "？", "！", "；", "，", "、", " "]
+
+# 保护正则：以下模式整体保留（不被切碎），借鉴 WeKnora protected_regex
+# 注意：模式越具体优先级越高
+_PROTECTED_PATTERNS = [
+    re.compile(r"\[IMG:\s*[^\]]+\]"),  # docx_parser 内联图片占位
+    re.compile(r"!\[[^\]]*\]\([^)]+\)"),  # markdown 图片
+    re.compile(r"\[[^\]]+\]\([^)]+\)"),  # markdown 链接
+    re.compile(r"```[\s\S]*?```"),  # 代码块
+    # markdown 表格行（含分隔行）
+    re.compile(r"^[ ]*(?:\|[^|\n]*)+\|\s*$", re.MULTILINE),
+]
+
+# 旧常量名保留向后兼容（仅 _sliding_window_chunks 用，已废弃）
+SLIDING_WINDOW_THRESHOLD_CHARS = CHUNK_TARGET_SIZE  # >= 阈值才切多 chunk
+SLIDING_WINDOW_SIZE_CHARS = CHUNK_TARGET_SIZE
+SLIDING_WINDOW_OVERLAP_CHARS = CHUNK_OVERLAP_SIZE
 
 
 def _ensure_step_newlines(text: str) -> str:
@@ -190,6 +213,211 @@ def _table_to_text(table: Table) -> str:
     return "\n".join(lines).strip()
 
 
+def _split_text_recursive(
+    text: str,
+    *,
+    target_size: int = CHUNK_TARGET_SIZE,
+    separators: Optional[List[str]] = None,
+) -> List[str]:
+    """递归分隔符切分（借鉴 WeKnora splitter._split + protected 保护）。
+
+    策略：先扫描 _PROTECTED_PATTERNS（图片/表格/代码块）整段占位，再对普通文本
+    按 separators 顺序降级切分；最后还原 protected 段。Protected 段超 target_size
+    时仍整段保留（牺牲均匀性换语义完整，否则 markdown 表格切断会渲染错乱）。
+
+    Args:
+        text: 待切文本（可能含 [IMG: ...] 占位 / markdown / 表格）
+        target_size: 单段目标字符数
+        separators: 分隔符优先级序列（None 用默认 _SPLIT_SEPARATORS）
+
+    Returns:
+        splits: 按 size 切好的段落数组，拼接后 == text
+    """
+    if separators is None:
+        separators = _SPLIT_SEPARATORS
+
+    if not text:
+        return []
+    if len(text) <= target_size:
+        return [text]
+
+    # Step 1: 找出所有 protected 区间 [(start, end)]，按 start 升序、互不重叠
+    spans: List[tuple[int, int]] = []
+    for pat in _PROTECTED_PATTERNS:
+        for m in pat.finditer(text):
+            spans.append((m.start(), m.end()))
+    spans.sort(key=lambda x: (x[0], -x[1]))
+    # 去重叠：后一个 span 如果在前一个内部就丢弃
+    merged: List[tuple[int, int]] = []
+    for s, e in spans:
+        if merged and s < merged[-1][1]:
+            continue
+        merged.append((s, e))
+
+    # Step 2: 把 text 切成 "普通段 + protected 段 + 普通段 + ..." 序列
+    segments: List[tuple[str, bool]] = []  # (text_piece, is_protected)
+    cursor = 0
+    for s, e in merged:
+        if cursor < s:
+            segments.append((text[cursor:s], False))
+        segments.append((text[s:e], True))
+        cursor = e
+    if cursor < len(text):
+        segments.append((text[cursor:], False))
+
+    # Step 3: 对每个 segment：protected 整段保留；普通段按分隔符递归切
+    out: List[str] = []
+    for piece, is_prot in segments:
+        if is_prot or len(piece) <= target_size:
+            out.append(piece)
+        else:
+            out.extend(_split_plain_text(piece, target_size=target_size, separators=separators))
+    return out
+
+
+def _split_plain_text(
+    text: str,
+    *,
+    target_size: int,
+    separators: List[str],
+) -> List[str]:
+    """对纯文本（无 protected）按 separators 顺序降级切分。"""
+    if len(text) <= target_size:
+        return [text] if text else []
+
+    # 找第一个能把 text 切成 ≥2 段的分隔符
+    chosen_sep = None
+    for sep in separators:
+        if sep and sep in text:
+            chosen_sep = sep
+            break
+
+    if chosen_sep is None:
+        # 所有分隔符都不在 text 里，硬切字符
+        return [text[i : i + target_size] for i in range(0, len(text), target_size)]
+
+    # 按 chosen_sep 切分，保留分隔符在尾部（便于拼接还原）
+    parts = text.split(chosen_sep)
+    splits_with_sep: List[str] = []
+    for i, p in enumerate(parts):
+        if i < len(parts) - 1:
+            splits_with_sep.append(p + chosen_sep)
+        elif p:
+            splits_with_sep.append(p)
+
+    # 对单段仍超 size 的，用下一级分隔符递归
+    out: List[str] = []
+    next_seps = separators[separators.index(chosen_sep) + 1:]
+    for s in splits_with_sep:
+        if len(s) <= target_size:
+            out.append(s)
+        else:
+            out.extend(_split_plain_text(s, target_size=target_size, separators=next_seps))
+    return out
+
+
+def _split_lines_to_chunks(
+    parts: List[str],
+    imgs_per_part: List[List[str]],
+    *,
+    target_size: int = CHUNK_TARGET_SIZE,
+    overlap: int = CHUNK_OVERLAP_SIZE,
+) -> List[tuple[List[str], List[str]]]:
+    """Phase 11.2 细粒度切块（替代旧 _sliding_window_chunks）。
+
+    与旧版差异：
+      - 旧版按段落硬切；新版用递归分隔符切到 target_size 以下，避免段落过大
+      - target_size 从 800 → 400（默认）；overlap 100 → 80
+      - protected_patterns 保护 [IMG: ...] / markdown 图链 / 表格行 / 代码块
+
+    输入：
+        parts: 段落文本数组（不含 [IMG] 占位；图片单独在 imgs_per_part）
+        imgs_per_part: 每段对应的图片相对路径列表（与 parts 等长）
+        target_size: 单 chunk 目标字符数
+        overlap: 相邻 chunk 重叠字符数（仅文本，图片不重复以免召回两次）
+
+    返回：
+        [(chunk_text_lines, chunk_img_paths), ...]
+        chunk_text_lines 中可包含按图片顺序穿插的 "[IMG: path]" 占位行
+        chunk_img_paths 是去重后的图片相对路径列表
+    """
+    if len(parts) != len(imgs_per_part):
+        raise ValueError(
+            f"parts ({len(parts)}) and imgs_per_part ({len(imgs_per_part)}) must align"
+        )
+
+    # 先把 parts + imgs_per_part 还原成"段落 + 图片占位"交错的序列（一维 splits）
+    # 这样可以让 _split_text_recursive 一次切完，图片占位作为 protected 模式保留
+    flat_blocks: List[str] = []  # 文本块 or "[IMG: path]" 占位
+    for p, ips in zip(parts, imgs_per_part):
+        if p:
+            flat_blocks.append(p)
+        for img in ips:
+            flat_blocks.append(f"[IMG: {img}]")
+
+    if not flat_blocks:
+        return []
+
+    # 把 flat_blocks 用 "\n" 拼成大文本，递归切到 target_size 以下
+    full_text = "\n".join(flat_blocks)
+    splits = _split_text_recursive(full_text, target_size=target_size)
+
+    # 把切好的 splits 合并成 chunks（带 overlap）
+    out: List[tuple[List[str], List[str]]] = []
+    buf_text = ""
+    for s in splits:
+        if buf_text and len(buf_text) + len(s) > target_size:
+            # flush 当前 chunk
+            out.append(_chunk_from_text(buf_text))
+            # 计算 overlap：从 buf 末尾保留 ≤ overlap 字符（按句末切，不破句）
+            tail = _take_overlap_tail(buf_text, overlap)
+            buf_text = tail + s
+        else:
+            buf_text += s
+
+    if buf_text:
+        out.append(_chunk_from_text(buf_text))
+
+    return out
+
+
+def _chunk_from_text(text: str) -> tuple[List[str], List[str]]:
+    """把切好的纯文本（含 [IMG: ...] 占位行）转回 (lines, imgs) 元组。
+
+    lines: 按 "\n" 切分；保留 [IMG: ...] 行（pack_chunk 不会重复加）
+    imgs: 从文本中抽取所有 [IMG: ...] 路径，去重保序
+    """
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    imgs: List[str] = []
+    seen: set[str] = set()
+    for m in re.finditer(r"\[IMG:\s*([^\]]+)\]", text):
+        p = m.group(1).strip()
+        if p and p not in seen:
+            seen.add(p)
+            imgs.append(p)
+    return lines, imgs
+
+
+def _take_overlap_tail(text: str, overlap: int) -> str:
+    """从 text 末尾取约 overlap 字符的尾部，尽量在句末切（不破句）。
+
+    优先在 [。！？\n] 后断；找不到就硬切。返回的尾部用于拼到下个 chunk 开头。
+    Overlap 不复制图片占位（避免图片重复展示）。
+    """
+    if not text or overlap <= 0:
+        return ""
+    tail = text[-overlap:] if len(text) > overlap else text
+    # 找尾部第一个句末标点之后的位置作为切点
+    for sep in ("。", "！", "？", "\n"):
+        idx = tail.find(sep)
+        if idx >= 0 and idx < len(tail) - 1:
+            tail = tail[idx + len(sep):]
+            break
+    # 去掉 overlap 里的 [IMG: ...] 占位（避免下个 chunk 重复显示同图）
+    tail = re.sub(r"\[IMG:[^\]]+\]\n?", "", tail).strip()
+    return tail + ("\n" if tail and not tail.endswith("\n") else "")
+
+
 def _sliding_window_chunks(
     parts: List[str],
     imgs_per_part: List[List[str]],
@@ -197,62 +425,16 @@ def _sliding_window_chunks(
     size: int = SLIDING_WINDOW_SIZE_CHARS,
     overlap: int = SLIDING_WINDOW_OVERLAP_CHARS,
 ) -> List[tuple[List[str], List[str]]]:
+    """Phase 11.2 起：转调新的 _split_lines_to_chunks（递归分隔符 + protected）。
+
+    旧实现按段落硬切、单段超 size 也整段保留 → ifs_docs 单 chunk 高达 887 字。
+    新实现把同一段内的 ID-NN 子项也切到 target_size 以下，"计划人"等小子项
+    才能独立成 chunk 被 LLM 精准引用。
+
+    保留旧函数名，是因为 docx_parser 内部"无 STEP 无 Heading 兜底路径"
+    仍用此函数；改造范围限定在它的内部实现。
     """
-    Phase 8.0 兜底滑窗切分：按段落边界 + 字符长度切分，不在段落中间截断。
-
-    输入：
-        parts: 段落文本数组（已 strip，可能为空字符串占位以与 imgs_per_part 对齐）
-        imgs_per_part: 每段对应的图片相对路径列表（与 parts 等长）
-        size: 单 chunk 目标字符数（默认 800）
-        overlap: 相邻 chunk 重叠字符数（默认 100；仅文本，图片不重复）
-
-    返回：
-        [(chunk_text_lines, chunk_img_paths), ...]
-        - chunk_text_lines: 该 chunk 的段落文本数组（不含 [IMG: ...] 占位，由 pack_chunk 注入）
-        - chunk_img_paths: 该 chunk 归属的图片相对路径列表（去重在 pack_chunk 中处理）
-
-    设计要点：
-        - overlap 仅复制尾部段落文本到下个 buffer，不复制图片（避免同图召回两次）
-        - 单段超过 size 时仍整段保留，不切碎（牺牲均匀性换语义完整）
-        - parts 与 imgs_per_part 必须长度一致（调用方负责）
-    """
-    if len(parts) != len(imgs_per_part):
-        raise ValueError(
-            f"parts ({len(parts)}) and imgs_per_part ({len(imgs_per_part)}) must align"
-        )
-
-    out: List[tuple[List[str], List[str]]] = []
-    buf_lines: List[str] = []
-    buf_imgs: List[str] = []
-    buf_len = 0
-
-    for line, line_imgs in zip(parts, imgs_per_part):
-        line_len = len(line)
-        # 触发 flush 的条件：buffer 非空，且加上当前 part 后超出目标尺寸
-        if buf_lines and buf_len + line_len > size:
-            out.append((buf_lines[:], buf_imgs[:]))
-            # 计算 overlap 尾部段落（只复制文本，不复制图片）
-            # 规则：尾段单段长度必须 ≤ overlap 才会被复制；超大段不进入 tail，避免重复
-            tail: List[str] = []
-            tail_len = 0
-            for prev in reversed(buf_lines):
-                if len(prev) > overlap:
-                    break  # 单段就比 overlap 还长 → 不复制，避免重复
-                if tail_len + len(prev) > overlap and tail:
-                    break
-                tail.insert(0, prev)
-                tail_len += len(prev)
-            buf_lines = tail
-            buf_imgs = []
-            buf_len = tail_len
-        buf_lines.append(line)
-        buf_imgs.extend(line_imgs)
-        buf_len += line_len
-
-    if buf_lines or buf_imgs:
-        out.append((buf_lines, buf_imgs))
-
-    return out
+    return _split_lines_to_chunks(parts, imgs_per_part, target_size=size, overlap=overlap)
 
 
 _IMG_PLACEHOLDER_RE = re.compile(r"^\[IMG:\s*([^\]]+)\]$")
@@ -345,14 +527,11 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
     img_counter = 0
     counter_holder = [0]
 
-    def pack_chunk(cid: str, title: str, lines: List[str], imgs: List[str]) -> None:
-        # lines 是有序的字符串混合：普通文本行 / "[IMG: <相对路径>]" 内联占位
-        # imgs 是去重后的图片路径数组（用于 chunk["images"] 兼容字段）
-        body = "\n".join(x for x in lines if x).strip()
-        uimgs = list(dict.fromkeys(imgs))
+    def _emit_chunk(cid: str, title: str, body: str, uimgs: List[str]) -> None:
+        """实际向 chunks_out 追加一条记录（不再二次切分）。"""
         if not body and not uimgs:
             return
-        # 兜底：如果 lines 里没有 [IMG: ...] 占位（旧代码路径或表格内图片），
+        # 兜底：如果 body 没含 [IMG: ...] 占位（旧代码路径或表格内图片），
         # 把缺失的图片路径追加到末尾，保证 LLM 仍能看到（向后兼容）
         present = set(re.findall(r"\[IMG:\s*([^\]]+)\]", body))
         missing = [p for p in uimgs if p not in present]
@@ -360,12 +539,6 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
             tail = "\n".join(f"[IMG: {p}]" for p in missing)
             body = (body + "\n" + tail).strip()
 
-        # Phase 4 新 schema 字段（向后兼容版本）：
-        # - images 仍输出字符串数组：现有下游 (api/chat.py, services/tools/list_chunks.py)
-        #   假定字符串路径，保留兼容；新 parser (mineru/docling) 可直接输出对象数组，
-        #   Chunk.from_jsonl_dict 已能兼容两种格式
-        # - heading_path：当前 docx_parser 只维护单层运行标题 h_run
-        # - step_number：仅 STEP chunk 有值（intro/section chunk 为 None）
         is_step_chunk = cur_step is not None and cid == f"{doc_stem}_step_{cur_step}"
         step_number = cur_step if is_step_chunk else None
         heading_path = [h_run] if h_run else []
@@ -389,6 +562,42 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
                 "vector_id": None,
             }
         )
+
+    def pack_chunk(cid: str, title: str, lines: List[str], imgs: List[str]) -> None:
+        """Phase 11.2: 若 body 超过 CHUNK_TARGET_SIZE，按递归分隔符切成 _part_N。
+
+        - body 中已包含按位置穿插的 [IMG: ...] 占位行（来自 lines）
+        - body 较小时（≤ target_size）按旧行为生成单 chunk，cid 不加 _part_N
+        - body 过大时调用 _split_lines_to_chunks 切多份；每份用 cid + "_part_{N}"
+        """
+        body = "\n".join(x for x in lines if x).strip()
+        uimgs = list(dict.fromkeys(imgs))
+        if not body and not uimgs:
+            return
+
+        # 短内容：维持原行为（不加 _part_N 后缀，保持评测集 chunk_id 不变的边界）
+        if len(body) <= CHUNK_TARGET_SIZE:
+            _emit_chunk(cid, title, body, uimgs)
+            return
+
+        # 长内容：用 _split_lines_to_chunks 二次切分
+        # 输入：把 lines 重新拆分成 (parts, imgs_per_part) — 但 lines 已含 [IMG:]
+        # 占位，所以这里走 _split_intro_for_windows 的逆向：分文本/图片即可
+        parts, imgs_per_part = _split_intro_for_windows(lines, uimgs)
+        windows = _split_lines_to_chunks(
+            parts, imgs_per_part, target_size=CHUNK_TARGET_SIZE, overlap=CHUNK_OVERLAP_SIZE,
+        )
+        if len(windows) <= 1:
+            # 切分没产生多段（特殊情况，比如全是 protected content）→ 仍走单 chunk
+            _emit_chunk(cid, title, body, uimgs)
+            return
+
+        for idx, (sub_lines, sub_imgs) in enumerate(windows, start=1):
+            sub_body = "\n".join(x for x in sub_lines if x).strip()
+            if not sub_body and not sub_imgs:
+                continue
+            sub_cid = f"{cid}_part_{idx}"
+            _emit_chunk(sub_cid, title, sub_body, sub_imgs)
 
     # 标题切分计数器：无 STEP 文档遇到新标题时用此 ID 生成独立 chunk
     heading_chunk_idx = [0]
@@ -540,6 +749,9 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
 def parse_directory(raw_dir: Path, kb_root: Path) -> List[Dict[str, Any]]:
     chunks: List[Dict[str, Any]] = []
     for docx in sorted(raw_dir.glob("*.docx")):
+        # 跳过 Word 临时锁文件（"~$xxx.docx"），它们是 Office 打开时生成的小文件
+        if docx.name.startswith("~$"):
+            continue
         chunks.extend(parse_docx(docx, kb_root))
     return chunks
 

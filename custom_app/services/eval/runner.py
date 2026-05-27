@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 import subprocess
@@ -104,6 +105,53 @@ class EvalRunner:
             self._rag_runner.init()
         return self._rag_runner
 
+    def _expand_gold_for_part_chunks(self, runner: RagRunner) -> None:
+        """Phase 11.2: 评测集 gold_id 是 'section_X' 但新切块后变成
+        'section_X_part_1/_part_2/...'。把每条 gold 里的旧 id 扩展成所有
+        '_part_*' 变体，让 metrics 的集合交集自动算"任意 part 命中"。
+
+        判定：旧 id 不在 chunks.jsonl 但存在 '<旧id>_part_*' → 触发扩展。
+        旧 id 仍在（短 chunk 不切分）→ 不动。
+
+        Why: 避免修改评测集 jsonl 本身（可逆 + 不污染历史基线）。
+        How: 在 run() 开始时调用一次；幂等。
+        """
+        rows = getattr(runner, "_rows", None) or []
+        existing_ids = {str(r.get("id", "")) for r in rows if r.get("id")}
+        if not existing_ids:
+            return
+        # 为每个旧 gold_id 计算 '_part_*' 变体，EvalItem 是 frozen → 用 replace
+        new_items: list[EvalItem] = []
+        n_expanded = 0
+        for item in self._items:
+            expanded_ids: list[str] = []
+            item_touched = False
+            for gid in item.relevant_chunk_ids:
+                if gid in existing_ids:
+                    expanded_ids.append(gid)
+                    continue
+                prefix = f"{gid}_part_"
+                parts = sorted(eid for eid in existing_ids if eid.startswith(prefix))
+                if parts:
+                    expanded_ids.extend(parts)
+                    item_touched = True
+                else:
+                    # gold 既不在原 id 也无 _part_* 变体 → 保留原 id（评测算 miss）
+                    expanded_ids.append(gid)
+            if item_touched:
+                n_expanded += 1
+                new_items.append(
+                    dataclasses.replace(item, relevant_chunk_ids=tuple(expanded_ids))
+                )
+            else:
+                new_items.append(item)
+        self._items = new_items
+        if n_expanded:
+            _logger.info(
+                "expanded gold_chunk_ids for %d/%d items (Phase 11.2 _part_* matching)",
+                n_expanded, len(new_items),
+            )
+
     # ─────────────────────────────────────────────────────────
     # Core evaluation
     # ─────────────────────────────────────────────────────────
@@ -153,7 +201,15 @@ class EvalRunner:
         if strategy not in ("quick", "ircot"):
             raise ValueError(f"strategy must be 'quick' or 'ircot', got {strategy!r}")
 
-        # 应用 tag filter（用于跑 multi_step 子集等场景）
+        # IRCoT 必带生成
+        if strategy == "ircot":
+            with_generation = True
+
+        # 先起 runner（需要 _rows）然后扩展 gold（Phase 11.2 _part_* 匹配）
+        runner = self._ensure_runner()
+        self._expand_gold_for_part_chunks(runner)
+
+        # 应用 tag filter（用于跑 multi_step 子集等场景）—— 在 expand 之后再 filter
         items = self._items
         if tag_filter:
             items = [it for it in items if tag_filter in it.tags]
@@ -163,11 +219,6 @@ class EvalRunner:
                 )
             _logger.info("tag_filter=%s narrowed dataset to %d items", tag_filter, len(items))
 
-        # IRCoT 必带生成
-        if strategy == "ircot":
-            with_generation = True
-
-        runner = self._ensure_runner()
         gold_ids_list: list[list[str]] = []
         retrieved_ids_list: list[list[str]] = []
         gold_answers: list[list[str]] = []

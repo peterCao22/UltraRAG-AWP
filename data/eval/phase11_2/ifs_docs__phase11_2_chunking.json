@@ -1,0 +1,260 @@
+{
+  "kb_id": "ifs_docs",
+  "n_items": 61,
+  "retrieval_metrics": {
+    "recall@1": 0.23591654247391958,
+    "hit@1": 0.5901639344262295,
+    "ndcg@1": 0.5901639344262295,
+    "recall@5": 0.5812468951813214,
+    "hit@5": 0.9016393442622951,
+    "ndcg@5": 0.5483909859676477,
+    "recall@10": 0.5812468951813214,
+    "hit@10": 0.9016393442622951,
+    "ndcg@10": 0.5426853568818814,
+    "mrr": 0.726502732240437
+  },
+  "generation_metrics": {},
+  "per_tag_retrieval": {
+    "from_session": {
+      "recall@1": 0.23591654247391958,
+      "hit@1": 0.5901639344262295,
+      "ndcg@1": 0.5901639344262295,
+      "recall@5": 0.5812468951813214,
+      "hit@5": 0.9016393442622951,
+      "ndcg@5": 0.5483909859676477,
+      "recall@10": 0.5812468951813214,
+      "hit@10": 0.9016393442622951,
+      "ndcg@10": 0.5426853568818814,
+      "mrr": 0.726502732240437
+    },
+    "doc:IFSSOP": {
+      "recall@1": 0.0,
+      "hit@1": 0.0,
+      "ndcg@1": 0.0,
+      "recall@5": 0.6666666666666666,
+      "hit@5": 0.6666666666666666,
+      "ndcg@5": 0.420619835714305,
+      "recall@10": 0.6666666666666666,
+      "hit@10": 0.6666666666666666,
+      "ndcg@10": 0.420619835714305,
+      "mrr": 0.3333333333333333
+    },
+    "zh_query": {
+      "recall@1": 0.0984848484848485,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.5454545454545454,
+      "hit@5": 0.8333333333333334,
+      "ndcg@5": 0.5195585341066176,
+      "recall@10": 0.5454545454545454,
+      "hit@10": 0.8333333333333334,
+      "ndcg@10": 0.47951616415541265,
+      "mrr": 0.6666666666666666
+    },
+    "description_query": {
+      "recall@1": 0.0984848484848485,
+      "hit@1": 0.5,
+      "ndcg@1": 0.5,
+      "recall@5": 0.5454545454545454,
+      "hit@5": 0.8333333333333334,
+      "ndcg@5": 0.5195585341066176,
+      "recall@10": 0.5454545454545454,
+      "hit@10": 0.8333333333333334,
+      "ndcg@10": 0.47951616415541265,
+      "mrr": 0.6666666666666666
+    },
+    "passing": {
+      "recall@1": 0.1,
+      "hit@1": 0.4,
+      "ndcg@1": 0.4,
+      "recall@5": 0.6,
+      "hit@5": 0.8,
+      "ndcg@5": 0.486599931423844,
+      "recall@10": 0.6,
+      "hit@10": 0.8,
+      "ndcg@10": 0.486599931423844,
+      "mrr": 0.6
+    },
+    "doc:IFS 系统培训手册--库存管理和客户订单操作": {
+      "recall@1": 0.196969696969697,
+      "hit@1": 1.0,
+      "ndcg@1": 1.0,
+      "recall@5": 0.42424242424242425,
+      "hit@5": 1.0,
+      "ndcg@5": 0.6184972324989302,
+      "recall@10": 0.42424242424242425,
+      "hit@10": 1.0,
+      "ndcg@10": 0.5384124925965202,
+      "mrr": 1.0
+    }
+  },
+  "per_tag_generation": {},
+  "failures": [
+    {
+      "id": "eval_ifs_docs_001",
+      "query": "IFS客户端登录时提示500错误，是什么原因？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "IFSSOP_section_2_part_1",
+        "IFSSOP_section_2_part_2"
+      ],
+      "retrieved_chunk_ids": [
+        "IFS 系统培训手册--公司人员基础数据_section_2_part_3",
+        "IFSSOP_section_4",
+        "IFSSOP_section_6",
+        "IFS 系统培训手册--库存销售基础数据_section_1",
+        "IFSSOP_section_3"
+      ],
+      "gold_answer": "客户端登录提示500错误，是Oracle数据库服务的问题。需要依次：1）打开services.msc确认Oracle Windows服务名；2）在cmd中输入lsnrctl status确认监听服务；3）用sqlplus sys/oracle as sysdba连接后执行Startup启动数据库，再用Show pdbs确认是否open，如未open则执行ALTER PLUGGABLE DATABASE TEST OPEN。",
+      "predicted_answer": "",
+      "retrieve_ms": 5938,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ifs_docs_008",
+      "query": "IFS模块组件安装完毕后提示已安装相同应用程序，怎么解决？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "IFSSOP_section_5"
+      ],
+      "retrieved_chunk_ids": [
+        "IFS 系统培训手册--公司人员基础数据_section_2_part_3",
+        "IFSSOP_section_4",
+        "IFSSOP_section_1",
+        "IFSSOP_section_6",
+        "IFSSOP_section_3"
+      ],
+      "gold_answer": "删除清空IFS程序组件安装目录后重新下载组件即可。组件安装目录为C:\\Users\\Administrator\\AppData\\Local\\Apps，由于不确定具体是哪个控件，直接删除该目录下的2.0子目录。",
+      "predicted_answer": "",
+      "retrieve_ms": 5643,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ifs_docs_013",
+      "query": "IFS 404错误中，需要访问哪些服务器，操作文件路径是什么？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "IFSSOP_section_3"
+      ],
+      "retrieved_chunk_ids": [
+        "IFSSOP_section_4",
+        "IFS 系统培训手册--公司人员基础数据_section_2_part_3",
+        "IFSSOP_section_1",
+        "IFSSOP_section_6",
+        "IFSSOP_section_5"
+      ],
+      "gold_answer": "需要访问8.31中间层服务器（以及8.34、8.35），操作文件路径为D:\\wp_ext\\usprod，打开其中的mws-svr.cmd文件进行操作。",
+      "predicted_answer": "",
+      "retrieve_ms": 5151,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ifs_docs_044",
+      "query": "IFS库存管理和客户订单操作手册，使用前需要先完成哪些配置？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "IFS 系统培训手册--库存管理和客户订单操作_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "IFS 系统培训手册--库存管理和客户订单操作_section_2_part_3",
+        "IFS 系统培训手册--库存管理和客户订单操作_section_3_part_2",
+        "IFS 系统培训手册--库存销售基础数据_section_1",
+        "IFS 系统培训手册--库存销售基础数据_section_3_part_4",
+        "IFS 系统培训手册--库存销售基础数据_section_3_part_5"
+      ],
+      "gold_answer": "该手册的业务操作需要先完成【库存/销售基础数据】的设置后，才能进行操作。",
+      "predicted_answer": "",
+      "retrieve_ms": 6054,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ifs_docs_055",
+      "query": "IFS库存销售基础数据的操作，需要先完成哪些前置设置？",
+      "tags": [
+        "from_session"
+      ],
+      "gold_chunk_ids": [
+        "IFS 系统培训手册--库存销售基础数据_section_1"
+      ],
+      "retrieved_chunk_ids": [
+        "IFS 系统培训手册--库存销售基础数据_section_3_part_3",
+        "IFS 系统培训手册--公司人员基础数据_section_2_part_3",
+        "IFS 系统培训手册--库存销售基础数据_section_2_part_3",
+        "IFS 系统培训手册--库存销售基础数据_section_2_part_1",
+        "IFS 系统培训手册--库存销售基础数据_section_2_part_2"
+      ],
+      "gold_answer": "该文件的操作需要先完成【公司人员基础数据】相关的设置后，才能进行操作。",
+      "predicted_answer": "",
+      "retrieve_ms": 6150,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    },
+    {
+      "id": "eval_ifs_docs_new_003",
+      "query": "如何启动ifs数据库服务？",
+      "tags": [
+        "from_session",
+        "doc:IFSSOP",
+        "zh_query",
+        "description_query",
+        "oracle_startup",
+        "passing"
+      ],
+      "gold_chunk_ids": [
+        "IFSSOP_section_2_part_1",
+        "IFSSOP_section_2_part_2"
+      ],
+      "retrieved_chunk_ids": [
+        "IFS 系统培训手册--公司人员基础数据_section_2_part_3",
+        "IFS 系统培训手册--公司人员基础数据_section_2_part_1",
+        "IFSSOP_section_6",
+        "IFSSOP_section_3",
+        "IFS 系统培训手册--库存销售基础数据_section_1"
+      ],
+      "gold_answer": "启动 oracle 数据库：cmd 执行 set ORACLE_SID=TEST → sqlplus sys/oracle as sysdba → Startup → Show pdbs → 如未 read write 则 ALTER PLUGGABLE DATABASE TEST OPEN → exit",
+      "predicted_answer": "",
+      "retrieve_ms": 5350,
+      "generate_ms": null,
+      "failure_reason": [
+        "retrieval_miss"
+      ],
+      "f1": null
+    }
+  ],
+  "run_metadata": {
+    "timestamp_utc": "2026-05-27T22:24:23+00:00",
+    "git_sha": "470857b",
+    "kb_id": "ifs_docs",
+    "top_k": 10,
+    "with_generation": false,
+    "n_items": 61,
+    "strategy": "quick"
+  }
+}

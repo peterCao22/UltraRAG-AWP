@@ -234,6 +234,102 @@ class TestEvalRunnerDataset:
             runner.set_items(items)
 
 
+class TestExpandGoldForPartChunks:
+    """Phase 11.2: 评测集 gold 是 section_X，新切块后变成 section_X_part_*。
+    EvalRunner 必须在 run() 开始时把 gold 扩展成 _part_* 变体，让 metrics
+    的 set 交集自动算"任意 part 命中"。
+    """
+
+    def _make_runner_with_items(
+        self, kb: str, items: list[EvalItem], rows: list[dict],
+    ) -> tuple[EvalRunner, _StubRunner]:
+        """构造 EvalRunner + StubRunner，让 _rows 含给定的 chunk_ids。"""
+        stub = _StubRunner(
+            kb_id=kb,
+            query_to_chunk_ids={it.query: [] for it in items},
+        )
+        # 覆盖 _rows 让它含给定 chunk_id 列表
+        stub._rows = list(rows)
+        er = EvalRunner(kb, rag_runner=stub, top_k=5)
+        er.set_items(items)
+        return er, stub
+
+    def test_old_gold_id_expanded_to_part_variants(self) -> None:
+        item = EvalItem.from_dict(
+            {
+                "id": "q1", "kb_id": "ifs", "query": "Q",
+                "relevant_chunk_ids": ["doc_section_2"],
+                "gold_answer": "A",
+            }
+        )
+        rows = [
+            {"id": "doc_section_1"},
+            {"id": "doc_section_2_part_1"},
+            {"id": "doc_section_2_part_2"},
+            {"id": "doc_section_2_part_3"},
+            {"id": "doc_section_3"},
+        ]
+        er, stub = self._make_runner_with_items("ifs", [item], rows)
+        er._expand_gold_for_part_chunks(stub)
+        expanded = er._items[0].relevant_chunk_ids
+        assert set(expanded) == {
+            "doc_section_2_part_1",
+            "doc_section_2_part_2",
+            "doc_section_2_part_3",
+        }
+
+    def test_existing_gold_id_unchanged(self) -> None:
+        """gold 直接在 chunks 里 → 不扩展（短 chunk 不切的兼容场景）。"""
+        item = EvalItem.from_dict(
+            {
+                "id": "q1", "kb_id": "ifs", "query": "Q",
+                "relevant_chunk_ids": ["doc_section_3"],
+                "gold_answer": "A",
+            }
+        )
+        rows = [{"id": "doc_section_1"}, {"id": "doc_section_3"}]
+        er, stub = self._make_runner_with_items("ifs", [item], rows)
+        er._expand_gold_for_part_chunks(stub)
+        assert er._items[0].relevant_chunk_ids == ("doc_section_3",)
+
+    def test_gold_with_no_match_kept_as_is(self) -> None:
+        """gold 既不在 ids 里，也无 _part_* 变体 → 保留原 id（评测算 miss）。"""
+        item = EvalItem.from_dict(
+            {
+                "id": "q1", "kb_id": "ifs", "query": "Q",
+                "relevant_chunk_ids": ["doc_section_99"],
+                "gold_answer": "A",
+            }
+        )
+        rows = [{"id": "doc_section_1"}]
+        er, stub = self._make_runner_with_items("ifs", [item], rows)
+        er._expand_gold_for_part_chunks(stub)
+        assert er._items[0].relevant_chunk_ids == ("doc_section_99",)
+
+    def test_mixed_gold_ids_partially_expanded(self) -> None:
+        """同条 item 多个 gold：可命中的扩展，未命中的保留。"""
+        item = EvalItem.from_dict(
+            {
+                "id": "q1", "kb_id": "ifs", "query": "Q",
+                "relevant_chunk_ids": ["doc_section_2", "doc_section_5"],
+                "gold_answer": "A",
+            }
+        )
+        rows = [
+            {"id": "doc_section_2_part_1"},
+            {"id": "doc_section_2_part_2"},
+            {"id": "doc_section_5"},  # 短 chunk，未切
+        ]
+        er, stub = self._make_runner_with_items("ifs", [item], rows)
+        er._expand_gold_for_part_chunks(stub)
+        expanded = set(er._items[0].relevant_chunk_ids)
+        assert expanded == {
+            "doc_section_2_part_1",
+            "doc_section_2_part_2",
+            "doc_section_5",
+        }
+
+
 class TestExtractPlainAnswer:
     """Phase 11.1.D：F1 评测不应被图片 data URL 淹没。"""
 
