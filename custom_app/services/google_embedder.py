@@ -32,6 +32,17 @@ BATCH_SIZE = 20          # 保守批次，避免触发速率限制
 RATE_DELAY = 0.1         # 批次间延迟（秒）
 
 
+def _resolved_backend() -> str:
+    """Phase 11.1.C：embed backend 路由（gemini | local）。
+
+    优先级：env ULTRARAG_EMBED_BACKEND > 默认 gemini（向后兼容）。
+    """
+    v = (os.environ.get("ULTRARAG_EMBED_BACKEND") or "").strip().lower()
+    if v in ("gemini", "local"):
+        return v
+    return "gemini"
+
+
 def embed_texts(texts: List[str], task_type: str = "RETRIEVAL_DOCUMENT") -> np.ndarray:
     """
     批量将文本列表转换为向量矩阵。
@@ -42,7 +53,14 @@ def embed_texts(texts: List[str], task_type: str = "RETRIEVAL_DOCUMENT") -> np.n
 
     Returns:
         shape (N, EMBED_DIM) 的 float32 ndarray，已 L2 归一化
+
+    Phase 11.1.C：env ULTRARAG_EMBED_BACKEND=local 时路由到本地 Qwen3-Embedding。
     """
+    backend = _resolved_backend()
+    if backend == "local":
+        from custom_app.services import local_embedder
+        return local_embedder.embed_texts(texts, task_type=task_type)
+
     if not GOOGLE_API_KEY or GOOGLE_API_KEY.startswith("请填入"):
         raise ValueError("GOOGLE_API_KEY 未配置，请在 .env 文件中填入有效的 API Key")
 

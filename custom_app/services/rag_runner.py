@@ -454,21 +454,44 @@ class RagRunner:
         根据首轮命中与用户意图，决定要扩展为「全文」的 doc 集合。
 
         规则：
-        - 若命中里出现某 doc 的步骤块，则扩展该 doc（补全 STEP 1..N，避免向量漏召回中间步）。
-        - 若用户明显在问流程，则对命中中出现的、且语料里含步骤块的 doc 也扩展（避免只命中 intro）。
+        - 若命中里某 doc 的步骤块出现 **≥ 2 次或排在 top-3** —— 真正聚焦该 SOP，扩展。
+        - 若用户明显在问流程意图 → 对命中中的步骤块所在 doc 也扩展。
+        - 单个 step_N 在 top-4..N 位置出现 → **不扩展**（多半是 embedding 误命中）。
+          Phase 11.1.C 验证：Qwen3-Embedding 偶发将 BatteryChangeSequenceSOP_step_*
+          算成与各种 query 中等相关（mode collapse 风险），单条命中触发整本
+          扩展会污染 top-k；要求多步命中或靠前位置才扩展。
+
+        参数:
+            hit_ids: 第 1 轮 vector + rerank 后的命中行号列表（按相关性降序）
+            question: 用户问题（用于流程意图判定）
         """
-        docs_from_steps: Set[str] = set()
+        TOP_RANK_FOR_SINGLE_STEP = 3  # 单条 step_N 命中必须在 top-3 才扩展
+        MIN_STEPS_FOR_EXPAND = 2  # 否则要 ≥2 条 step_N 命中
+
+        doc_step_count: Dict[str, int] = {}
+        doc_first_step_rank: Dict[str, int] = {}
         docs_from_hits: Set[str] = set()
-        for i in hit_ids:
+        for rank, i in enumerate(hit_ids):
             if i < 0 or i >= len(self._rows):
                 continue
             row = self._rows[i]
             d = row.get("doc")
             if not d:
                 continue
-            docs_from_hits.add(str(d))
+            ds = str(d)
+            docs_from_hits.add(ds)
             if self._is_step_chunk_row(row):
-                docs_from_steps.add(str(d))
+                doc_step_count[ds] = doc_step_count.get(ds, 0) + 1
+                if ds not in doc_first_step_rank:
+                    doc_first_step_rank[ds] = rank
+
+        docs_from_steps: Set[str] = set()
+        for d, n in doc_step_count.items():
+            first_rank = doc_first_step_rank.get(d, 999)
+            # 多步命中 或 单步命中在 top-3 → 真正聚焦，扩展
+            if n >= MIN_STEPS_FOR_EXPAND or first_rank < TOP_RANK_FOR_SINGLE_STEP:
+                docs_from_steps.add(d)
+
         if docs_from_steps:
             return docs_from_steps
         if self._procedure_intent(question):

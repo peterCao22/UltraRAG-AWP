@@ -1659,7 +1659,8 @@ def kb_diagnostics(kb_id: str):
     if vector_backend == "qdrant":
         try:
             from custom_app.services.vectorstore.qdrant_store import QdrantVectorStore
-            store = QdrantVectorStore(kb_id=kb_id, embed_dim=768)
+            # size() 不依赖维度；不传 embed_dim 用默认（不会触发 collection 创建）
+            store = QdrantVectorStore(kb_id=kb_id)
             vector_count = int(store.size())
         except Exception as exc:  # noqa: BLE001
             vector_error = f"{type(exc).__name__}: {exc}"

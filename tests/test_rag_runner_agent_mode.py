@@ -11,6 +11,13 @@ from custom_app.services.rag_runner import RagRunner
 @pytest.fixture()
 def runner_rows():
     r = RagRunner.__new__(RagRunner)
+    # Phase 7.2.A logging 需 kb_id；Phase 8.2.2 hybrid 需 _bm25_store/_retrieval_cfg；
+    # Phase 11.1 修测试时统一补齐 stub 路径字段
+    r.kb_id = "test_kb"
+    r._chat_cfg = {"backend": "openai"}
+    r._bm25_store = None
+    r._bm25_load_error = None
+    r._retrieval_cfg = {}
     r._rows = [
         {"id": "d1_intro", "doc": "DocA", "title": "DocA | intro", "contents": "intro"},
         {"id": "d1_s1", "doc": "DocA", "title": "DocA | STEP 1", "contents": "step1"},
@@ -116,7 +123,14 @@ def test_build_result_merges_agent_meta(runner_rows):
     assert meta["degraded"] is False
 
 
-def test_quick_chat_stream_uses_non_streaming_generation(runner_rows):
+def test_quick_chat_stream_default_uses_streaming(runner_rows, monkeypatch):
+    """Phase 11.1.B：quick mode 默认改流式。
+
+    在 Phase 8 之前 quick 走非流式（注释提到 vLLM gateway 可能 hang）；
+    Phase 11.1.B 评估后改成默认流式，env ULTRARAG_DISABLE_STREAM=1 可强制非流式。
+    本测试验证 quick 默认走 _generate_stream，**不再调** _generate。
+    """
+    monkeypatch.delenv("ULTRARAG_DISABLE_STREAM", raising=False)
     r = runner_rows
     r._index = MagicMock()
     r._index.search.return_value = (None, np.array([[0]], dtype="int64"))
@@ -127,8 +141,8 @@ def test_quick_chat_stream_uses_non_streaming_generation(runner_rows):
     r._rerank_model = None
     r._rewrite_query = lambda q: q
     r._build_prompt = lambda q, ids: "prompt"
-    r._generate = MagicMock(return_value="raw answer")
-    r._generate_stream = MagicMock(side_effect=AssertionError("stream should not be used"))
+    r._generate = MagicMock(side_effect=AssertionError("non-stream should not be used by default"))
+    r._generate_stream = MagicMock(return_value=iter(["chunk1 ", "chunk2"]))
     r._build_result_from_raw = MagicMock(return_value={
         "answer": "display answer",
         "sources": [],
@@ -144,9 +158,14 @@ def test_quick_chat_stream_uses_non_streaming_generation(runner_rows):
     finally:
         rag_runner_mod.embed_query = old_embed
 
-    assert any(ev.get("type") == "chunk" and ev.get("content") == "display answer" for ev in events)
-    r._generate.assert_called_once_with("prompt")
-    r._generate_stream.assert_not_called()
+    # 流式 yield 的 chunk 应该出现
+    chunk_contents = [ev.get("content") for ev in events if ev.get("type") == "chunk"]
+    assert "chunk1 " in chunk_contents
+    assert "chunk2" in chunk_contents
+    # Phase 11.1.B 修复 E.3 bug：流式后不再 yield 完整 display_answer
+    assert "display answer" not in chunk_contents
+    r._generate_stream.assert_called_once_with("prompt")
+    r._generate.assert_not_called()
 
 
 def test_generation_backend_accepts_backend_alias(tmp_path):
