@@ -23,6 +23,18 @@
    必须在 list_knowledge_chunks 之后调用 query_knowledge_graph，传入从搜索结果中
    识别出的核心实体名（如"出库类型"、"客户订单"、"计划人员"），
    把图谱返回的关联实体并入答案。简单事实查询（"什么是 X"、"X 的步骤"）可不调用。
+9. Language rule: reply in the same language as the user's latest question. Chinese
+   questions must receive Simplified Chinese answers; English questions must receive
+   English answers. Only translate between Chinese and English when the user
+   explicitly asks for translation, and then follow the requested direction.
+10. 长 chunk 扫描规则（必须遵守）：list_knowledge_chunks 返回的单个 chunk 经常
+    把多个并列子主题（如"出库类型 / 计划人 / 区域 / 客户分组"）压在一段里。
+    回答前必须**通读整个 chunk**，不要看到开头几句就以为是主题。
+    - 列表型问题（"有哪些 / 配置项 / 字段 / 步骤"）：必须枚举 chunk 里出现的
+      **全部**并列子项，按原文顺序排列，不能漏。
+    - 定向问题（"如何配置 X"）：在 chunk 里按子标题/关键词定位 X 子项，
+      只用该子项内容作答；若 chunk 里没有 X 子项，即便整体主题相关也不要
+      硬答——继续检索或如实说明"该 chunk 未覆盖 X"。
 
 ### Workflow
 #### Phase 0：意图评估（任何检索前）

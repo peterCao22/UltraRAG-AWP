@@ -734,6 +734,7 @@ class RagRunner:
         answer: str,
         sources: List[Dict[str, Any]],
         answer_plain: str = "",
+        is_ircot: bool = False,
     ) -> List[Dict[str, Any]]:
         """
         按摘录顺序生成块：每个 chunk 一段译文，紧接着仅挂载该 chunk 原文中的图片（与正文严格同源性）。
@@ -742,6 +743,9 @@ class RagRunner:
             answer: 模型输出（含 <<<EXCERPT n>>> 为佳）。
             sources: 与 passages 顺序一致的证据列表。
             answer_plain: ``_compose_answer_text`` 结果；用于全局拒答时折叠展示。
+            is_ircot: True 时把 answer 当散文整体渲染，再附挂全部 sources 的图片
+                      （IRCoT 答案没有 <<<EXCERPT k>>> 分段标记，按 chunk 拆段会
+                      退化成"模型未按分段格式输出 …"+ chunk 原文，覆盖真实推理答案）。
         返回:
             图文交替块列表。
         """
@@ -754,6 +758,18 @@ class RagRunner:
         if sources and self._answer_declares_no_information(answer):
             collapse = self._no_information_display_text(answer, answer_plain)
             return [{"type": "text", "content": collapse}]
+
+        # IRCoT 散文路径：整段当 plain text 渲染。
+        # LLM 看到的 Excerpt 里 [IMG: ...] 已经被转成 ![](URL) markdown（见
+        # services/strategies/ircot.py:_build_passages_from_hits），ircot_sop.jinja
+        # 规则 #9 要求 LLM 把引用步骤后面紧跟的 ![](URL) 一起原样复制到答案。
+        # 所以这里**不再后挂图片**——LLM 答案 markdown 里已有图片占位，前端 marked
+        # 渲染时会按位展示；再后挂会变成"段内图 + 末尾图"两次。
+        if is_ircot:
+            text = (answer or "").strip()
+            if text:
+                blocks.append({"type": "text", "content": text})
+            return blocks
 
         parsed = self._parse_excerpt_sections(answer)
         for idx, src in enumerate(sources):
@@ -1859,11 +1875,19 @@ class RagRunner:
         final_k_cfg = prep["final_k_cfg"]
 
         sources = self._build_sources(hit_ids)
-        parsed_sections = self._parse_excerpt_sections(answer_raw)
-        answer_plain = self._compose_answer_text(
-            answer_raw, parsed_sections, len(sources)
+        # IRCoT 答案是散文（无 <<<EXCERPT k>>> 分段），直接当 plain text 渲染。
+        is_ircot = bool(prep.get("is_ircot_answer"))
+        if is_ircot:
+            parsed_sections: Dict[int, str] = {}
+            answer_plain = (answer_raw or "").strip()
+        else:
+            parsed_sections = self._parse_excerpt_sections(answer_raw)
+            answer_plain = self._compose_answer_text(
+                answer_raw, parsed_sections, len(sources)
+            )
+        answer_blocks = self._answer_to_blocks(
+            answer_raw, sources, answer_plain, is_ircot=is_ircot
         )
-        answer_blocks = self._answer_to_blocks(answer_raw, sources, answer_plain)
         has_inline_images = any(b.get("type") == "image" for b in answer_blocks)
         display_answer = answer_blocks_to_display_markdown(
             answer_blocks, answer_plain
@@ -2004,6 +2028,9 @@ class RagRunner:
             "effective_agent_mode": "quick",
             "degraded": False,
             "degrade_reason": None,
+            # IRCoT 答案是散文，没有 <<<EXCERPT k>>> 标记；
+            # 让 _build_result_from_raw 不要按 excerpt 分段、也不要拿 chunk excerpt 当 fallback 展示。
+            "is_ircot_answer": True,
         }
         # IRCoT 最终答案文本进 _build_result_from_raw 当 answer_raw
         result = self._build_result_from_raw(prep_like, ircot_out["answer"])

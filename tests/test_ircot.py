@@ -17,11 +17,58 @@ import pytest
 
 from custom_app.services.strategies.ircot import (
     _END_PATTERNS,
+    _build_passages_from_hits,
     _extract_final_answer,
     _first_sentence,
     _has_end_marker,
     chat_ircot,
 )
+
+
+class TestBuildPassagesFromHits:
+    """Phase 11.1 hotfix: IRCoT passage 必须保留图片占位（转 ![](URL) markdown），
+    LLM 才能按 ircot_sop.jinja 规则 #9 把图片穿插在引用步骤下面。"""
+
+    def test_inline_img_placeholder_converted_to_markdown(self) -> None:
+        rows = [
+            {
+                "id": "doc_section_1",
+                "contents": "步骤 1：点击保存。\n[IMG: images/IFS/img_001.png]\n步骤 2：验证。",
+            }
+        ]
+        out = _build_passages_from_hits(rows, [0])
+        assert len(out) == 1
+        assert out[0]["source_id"] == "doc_section_1"
+        # 占位转 markdown，URL 已编码
+        assert "![](/images/IFS/img_001.png)" in out[0]["contents"]
+        # 步骤文字仍在
+        assert "步骤 1：点击保存" in out[0]["contents"]
+        assert "步骤 2：验证" in out[0]["contents"]
+        # 不应残留原占位
+        assert "[IMG:" not in out[0]["contents"]
+
+    def test_chinese_path_url_encoded(self) -> None:
+        rows = [
+            {
+                "id": "doc",
+                "contents": "前言\n[IMG: images/IFS 系统培训手册/img_005.png]\n后续",
+            }
+        ]
+        out = _build_passages_from_hits(rows, [0])
+        # 空格 + 中文都被 URL 编码
+        assert "%20" in out[0]["contents"] or "IFS%20" in out[0]["contents"]
+        # 中文应被编码（%E7%B3%BB 是"系"的 UTF-8 编码开头）
+        assert "%E" in out[0]["contents"]
+
+    def test_no_img_placeholder_passes_through(self) -> None:
+        rows = [{"id": "doc", "contents": "纯文字 chunk，无图片"}]
+        out = _build_passages_from_hits(rows, [0])
+        assert out[0]["contents"] == "纯文字 chunk，无图片"
+
+    def test_invalid_hit_id_skipped(self) -> None:
+        rows = [{"id": "doc", "contents": "text"}]
+        out = _build_passages_from_hits(rows, [0, -1, 99])
+        assert len(out) == 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────

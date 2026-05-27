@@ -24,11 +24,14 @@ def _to_image_url(rel_path: str) -> str:
     return "/images/" + quote(s, safe="/")
 
 
-def _inline_img_to_markdown(text: str) -> str:
+def inline_img_to_markdown(text: str) -> str:
     """把 [IMG: 相对路径] 占位替换为 markdown ![](已编码 URL)，每张图独占一行。
 
     - 占位前后插入空行，让 marked 把图片解析为块级元素
     - URL 编码确保浏览器能正常加载（中文/空格都转 %xx）
+
+    公共 API：agent 工具（list_knowledge_chunks）和 IRCoT 策略复用，
+    保证两条路径给 LLM 的图文交错格式一致。
     """
     if not text or "[IMG:" not in text:
         return text
@@ -40,6 +43,10 @@ def _inline_img_to_markdown(text: str) -> str:
         return f"\n\n![]({url})\n\n"
 
     return _INLINE_IMG_RE.sub(_sub, text)
+
+
+# 向后兼容旧的内部名（其他地方暂未引用，保留方便意外回滚）
+_inline_img_to_markdown = inline_img_to_markdown
 
 
 class ListChunksTool:
@@ -89,7 +96,7 @@ class ListChunksTool:
             # 把 [IMG: ...] 内联占位替换为 markdown ![](已编码 URL)，
             # 让 LLM 看到的就是"步骤说明 → 图片 → 下一步骤"的真实顺序，
             # 不必自己挑哪张图配哪段文字。
-            rendered = _inline_img_to_markdown(raw_contents)
+            rendered = inline_img_to_markdown(raw_contents)
             result.append({
                 "id": row.get("id", ""),
                 "title": row.get("title", ""),

@@ -91,21 +91,26 @@ def _render_ircot_prompt(
 
 
 def _build_passages_from_hits(rows: list[dict], hit_ids: list[int]) -> list[dict[str, Any]]:
-    """从 RagRunner._rows + hit_ids 构造 prompt 用的 passages 列表。"""
+    """从 RagRunner._rows + hit_ids 构造 prompt 用的 passages 列表。
+
+    [IMG: 相对路径] 占位转成 markdown ![](已编码 URL)，让 LLM 答案时能
+    在对应段落下方原样保留图片，与 agent 路径（list_knowledge_chunks 工具）
+    渲染逻辑对齐。
+    """
+    # 局部导入避免循环依赖（services/tools 与 services/strategies 互不依赖）
+    from custom_app.services.tools.list_chunks import inline_img_to_markdown
+
     out = []
     for i in hit_ids:
         if i < 0 or i >= len(rows):
             continue
         row = rows[i]
         contents = (row.get("contents") or "").strip()
-        # 去掉 [IMG: ...] 行（IRCoT 推理不需要图片占位）
-        cleaned = "\n".join(
-            ln for ln in contents.splitlines() if not ln.strip().startswith("[IMG:")
-        )
+        rendered = inline_img_to_markdown(contents)
         out.append(
             {
                 "source_id": str(row.get("id", "")),
-                "contents": cleaned,
+                "contents": rendered,
             }
         )
     return out

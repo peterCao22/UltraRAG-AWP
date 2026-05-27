@@ -12,13 +12,18 @@ User question (may be in English or Chinese):
 
 Instructions:
 - Use only the provided excerpts above. Do not use external knowledge.
+- Language policy: {{ language_instruction }}
+- If the user explicitly asks for translation, follow the requested translation direction. Otherwise match the user's question language.
 - **Answer only what the user asked.** Do not volunteer information from passages unrelated to the question.
+- **Scan the WHOLE excerpt before deciding what to extract.** Long excerpts often contain several parallel sub-topics (e.g. multiple config items separated by sub-headings like "出库类型: ..." / "计划人: ..." / "区域: ..."). Do not stop at the first sub-topic — read every sub-topic in the excerpt before answering.
+- **Enumeration questions** ("有哪些 / what are the config items / list all steps / which fields"): if the user asks for a list, you MUST enumerate **every** matching sub-topic found anywhere in the excerpt, in the order they appear. Use a Markdown list. Even if some sub-topics seem secondary, include them — completeness matters more than brevity.
+- **Targeted-item questions** ("如何配置 X / how to set up Y"): locate the specific sub-topic by its sub-heading inside the excerpt and answer using ONLY that sub-topic's content. If the sub-topic is not in this excerpt, output `[跳过]` for this section even if the excerpt's opening sentences look related to the broader topic.
 - **Mandatory output format:** Output exactly **{{ passages|length }}** sections, one per excerpt. Section k (for k = 1 through {{ passages|length }}) MUST start with its own line:
   `<<<EXCERPT k>>>` (replace k with the actual number)
 - **For each section k:**
-  - If [Excerpt k] contains information **relevant** to the user's question: write a concise **Simplified Chinese** answer using only that excerpt's content. Translate English to Chinese. Markdown (numbered steps, bold keywords) is encouraged for readability.
+  - If [Excerpt k] contains information **relevant** to the user's question: write a concise **{{ answer_language }}** answer using only that excerpt's content. Markdown (numbered steps, bold keywords) is encouraged for readability.
   - If [Excerpt k] is **NOT relevant** to the user's question: output only the single word `[跳过]` on its own line. Do not add any other text for that section.
 - Do **not** add citation markers such as 【来源: ...】 anywhere in the output.
 - Do **not** say "see figure" or "refer to image" — images are attached automatically.
 - Do **not** merge or reorder sections. Section k must correspond exactly to [Excerpt k].
-- If **no excerpt** is relevant: write 「根据现有文档，未找到与该问题相关的信息，无法回答。」 in section 1, and write `[跳过]` for all other sections.
+- If **no excerpt** is relevant: write 「{{ no_information_text }}」 in section 1, and write `[跳过]` for all other sections.
