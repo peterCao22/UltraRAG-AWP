@@ -1457,6 +1457,35 @@ class RagRunner:
                 self._chat_cfg.get("base_url"),
             )
 
+        # Phase 11.1.A: reranker 启动预热
+        # 把 ~10s 的首次模型加载从"第 1 个用户问答时"提前到"Flask 启动时"，
+        # 避免用户首次提问等模型加载。失败降级（rerank 已有完整 fallback 逻辑）。
+        self._warmup_reranker()
+
+    def _warmup_reranker(self) -> None:
+        """Phase 11.1.A：在 init() 末尾触发一次 reranker 模型加载。
+
+        rerank 配置未启用 / 无 chunks / 加载失败 → 全部静默降级。
+        正常加载耗时 5-15 秒（取决于模型大小 + 设备），但首次问答从此不再等。
+        """
+        if not (self._rerank_cfg or {}).get("enabled", True):
+            return
+        if not self._rows:
+            return
+        t0 = time.perf_counter()
+        try:
+            model = self._ensure_rerank_model()
+        except Exception as e:  # noqa: BLE001 — 预热失败不阻塞 init
+            logger.warning("reranker warmup failed kb=%s: %s", self.kb_id, e)
+            return
+        if model is None:
+            return
+        warmup_ms = int((time.perf_counter() - t0) * 1000)
+        logger.info(
+            "reranker warmed up kb=%s device=%s elapsed_ms=%d",
+            self.kb_id, self._rerank_resolved_device, warmup_ms,
+        )
+
     def _apply_chat_model_override(self) -> None:
         """Phase 7.1：若调用方传入了 chat_model（admin 配置的行），用它覆盖
         _chat_cfg 的 backend/model_name/base_url/api_key，并构造 LLMAdapter。
@@ -2029,24 +2058,43 @@ class RagRunner:
         first_chunk = True
         t_first_chunk: Optional[float] = None
 
-        if normalized_mode == "quick":
-            # vLLM/OpenAI-compatible streaming can hang on some local gateways after
-            # the request is accepted. Quick mode favors reliability over token-level
-            # streaming, so use the non-streaming endpoint and emit one UI chunk.
+        # Phase 11.1.B：quick mode 默认改流式（首 token 体感大幅提升）。
+        # env ULTRARAG_DISABLE_STREAM=1 时 fallback 到非流式（应对某些 vLLM gateway
+        # 流式 hang 的特殊场景）。
+        # 同时修复 Phase 8 手工测试 E.3 发现的「回答重复 2 次」bug：
+        # 不再在 done 之前 yield 整段 display_answer chunk —— 前端 onDone 会用
+        # renderMarkdownContent 覆盖 onChunk 渲染的 textContent，无需重复推送。
+        disable_stream = os.environ.get(
+            "ULTRARAG_DISABLE_STREAM", ""
+        ).strip().lower() in ("1", "true", "yes")
+        use_stream = not disable_stream
+
+        if use_stream:
+            try:
+                for piece in self._generate_stream(prep["prompt_text"]):
+                    if first_chunk:
+                        t_first_chunk = time.perf_counter()
+                        first_chunk = False
+                    pieces.append(piece)
+                    yield {"type": "chunk", "content": piece}
+                answer_raw = "".join(pieces).strip()
+            except Exception as e:  # noqa: BLE001
+                # 流式失败 → 降级到非流式，保证可用性
+                logger.warning(
+                    "stream generation failed, fallback to non-stream: %s", e
+                )
+                pieces.clear()
+                answer_raw = self._generate(prep["prompt_text"]).strip()
+                t_first_chunk = time.perf_counter()
+        else:
             answer_raw = self._generate(prep["prompt_text"]).strip()
             t_first_chunk = time.perf_counter()
-        else:
-            for piece in self._generate_stream(prep["prompt_text"]):
-                if first_chunk:
-                    t_first_chunk = time.perf_counter()
-                    first_chunk = False
-                pieces.append(piece)
-                yield {"type": "chunk", "content": piece}
-            answer_raw = "".join(pieces).strip()
         t_gen_end = time.perf_counter()
         result = self._build_result_from_raw(prep, answer_raw)
         display_answer = str(result.get("answer") or "")
-        if normalized_mode == "quick" and display_answer:
+        # 非流式或流式失败 fallback 时，至少推一次 display_answer（含图片 data URL）让前端有内容
+        # 流式时 onDone 会重新渲染整段 Markdown（含图片），无需在此 yield 重复 chunk
+        if not pieces and display_answer:
             yield {"type": "chunk", "content": display_answer}
         sources = result.get("sources") or []
         if sources:
