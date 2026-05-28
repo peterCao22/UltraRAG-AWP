@@ -33,7 +33,11 @@ IMAGES_MARK = "\n[IMAGES]\n"
 
 # 判断用户是否在问「流程 / 步骤 / 更换」类问题，用于决定是否对同一 doc 做全量 SOP 扩展
 _PROCEDURE_INTENT_RE = re.compile(
-    r"步骤|流程|操作|更换|怎么|如何|怎样|SOP|procedure|steps?|how\s+to|sequence|battery|电池|换电|充电",
+    # 真正表达"我想看流程/步骤"的意图词；剔除领域名词（battery / 电池 / 充电）
+    # 否则任何含"battery"的 query（如"Alarm Block Battery Low"）都会被误判
+    # 为流程意图，触发整本 BatteryChangeSequenceSOP 扩展，挤掉真正相关的 chunk。
+    r"步骤|流程|操作|怎么|如何|怎样|顺序|过程|步骤是|"
+    r"procedure|steps?|how\s+to|sequence|process|workflow",
     re.IGNORECASE,
 )
 _STEP_IN_ID_RE = re.compile(r"_step_(\d+)", re.IGNORECASE)
@@ -467,10 +471,15 @@ class RagRunner:
         """
         TOP_RANK_FOR_SINGLE_STEP = 3  # 单条 step_N 命中必须在 top-3 才扩展
         MIN_STEPS_FOR_EXPAND = 2  # 否则要 ≥2 条 step_N 命中
+        # Phase 12.1.x: 若 top-3 含他人非 step 段（intro / section_*），
+        # 说明已有对手 SOP 排在前面，不应被 step 扩展覆盖
+        NON_STEP_GUARD_TOP_RANK = 3
 
         doc_step_count: Dict[str, int] = {}
         doc_first_step_rank: Dict[str, int] = {}
         docs_from_hits: Set[str] = set()
+        # 记录 top-N 内出现的「非 step 段所在 doc」
+        top_non_step_docs: Set[str] = set()
         for rank, i in enumerate(hit_ids):
             if i < 0 or i >= len(self._rows):
                 continue
@@ -480,17 +489,28 @@ class RagRunner:
                 continue
             ds = str(d)
             docs_from_hits.add(ds)
-            if self._is_step_chunk_row(row):
+            is_step = self._is_step_chunk_row(row)
+            if is_step:
                 doc_step_count[ds] = doc_step_count.get(ds, 0) + 1
                 if ds not in doc_first_step_rank:
                     doc_first_step_rank[ds] = rank
+            else:
+                if rank < NON_STEP_GUARD_TOP_RANK:
+                    top_non_step_docs.add(ds)
 
         docs_from_steps: Set[str] = set()
         for d, n in doc_step_count.items():
             first_rank = doc_first_step_rank.get(d, 999)
             # 多步命中 或 单步命中在 top-3 → 真正聚焦，扩展
-            if n >= MIN_STEPS_FOR_EXPAND or first_rank < TOP_RANK_FOR_SINGLE_STEP:
-                docs_from_steps.add(d)
+            if not (n >= MIN_STEPS_FOR_EXPAND or first_rank < TOP_RANK_FOR_SINGLE_STEP):
+                continue
+            # Phase 12.1.x: 若 top-3 已有"别家 SOP 的非 step 段"在前，
+            # 说明用户更可能想看那家 SOP（如 "Alarm Block Battery Low"
+            # 这种告警 SOP），别让 step 扩展把它挤出去。
+            other_top_sop = top_non_step_docs - {d}
+            if other_top_sop:
+                continue
+            docs_from_steps.add(d)
 
         if docs_from_steps:
             return docs_from_steps
@@ -1740,6 +1760,7 @@ class RagRunner:
         top_k: int | None = None,
         *,
         agent_mode: str = "quick",
+        history: List[Dict[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         """
         检索与 prompt 组装（与 `chat` 前半段一致），供同步生成与流式生成共用。
@@ -1748,9 +1769,12 @@ class RagRunner:
             question: 用户问题。
             top_k: 可选覆盖检索条数。
             agent_mode: ``quick`` | ``agent``；agent 时启用层 A 全文 chunk 扩展（见 `_expand_hit_ids`）。
+            history: 可选历史轮次（最旧→最新），用于 Phase 12.1 指代消解。
+                     None / 空 → 跳过指代消解。
         返回:
             dict: 含 q、rewritten_q、hit_ids、prompt_text、rerank_meta、expanded_docs、
-            recall_k、final_k、final_k_cfg 等下游 `_build_result_from_raw` 所需字段。
+            recall_k、final_k、final_k_cfg 等下游 `_build_result_from_raw` 所需字段；
+            Phase 12.1 起额外含 reference_resolution dict（applied=False 时也有占位）。
         """
         if self._index is None:
             raise RuntimeError("RagRunner not initialized. Call init() first.")
@@ -1759,6 +1783,12 @@ class RagRunner:
             raise ValueError("question is empty")
 
         requested_mode = self._normalize_agent_mode(agent_mode)
+
+        # Phase 12.1: 指代消解。命中后用改写后的 query 走后续检索流程。
+        from custom_app.services.reference_resolver import resolve_references
+        ref_result = resolve_references(q, history)
+        if ref_result.applied:
+            q = ref_result.rewritten_query  # 替换 query 进入后续 rewrite + embed
 
         rewritten_q = self._rewrite_query(q)
         q_vec = embed_query(rewritten_q).astype("float32").reshape(1, -1)
@@ -1852,6 +1882,7 @@ class RagRunner:
             "final_k_cfg": final_k_cfg,
             "requested_agent_mode": requested_mode,
             "effective_agent_mode": effective_mode,
+            "reference_resolution": ref_result.to_meta(),
             "degraded": degraded,
             "degrade_reason": degrade_reason,
         }
@@ -1965,6 +1996,7 @@ class RagRunner:
         top_k: int | None = None,
         *,
         max_loops: int = 2,
+        history: List[Dict[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         """
         Phase 8.3 深度推理（IRCoT）：多轮检索 + 推理链。
@@ -1981,20 +2013,27 @@ class RagRunner:
             question: 用户问题。
             top_k: 第 1 轮 top_k；缺省取 self._top_k。
             max_loops: 最大轮数。
+            history: 可选历史轮次（最旧→最新），Phase 12.1 指代消解输入。
 
         返回:
             Dict[str, Any]: 兼容 ``chat()`` 的结构（answer / sources / meta）。
             额外字段：
                 meta.ircot_strategy = True
                 meta.n_loops、meta.n_chunks_seen、meta.total_ms、meta.early_stopped
+                meta.reference_resolution（Phase 12.1 指代消解结果）
                 thoughts: list[str]（所有轮的思考链，供前端展示推理过程）
         """
         from custom_app.services.strategies.ircot import chat_ircot as _chat_ircot
 
+        # Phase 12.1: IRCoT 进入前做一次指代消解
+        from custom_app.services.reference_resolver import resolve_references
+        ref_result = resolve_references(question, history)
+        effective_question = ref_result.rewritten_query if ref_result.applied else question
+
         first_k = int(top_k) if top_k is not None else int(self._top_k)
         ircot_out = _chat_ircot(
             self,
-            question,
+            effective_question,
             max_loops=max_loops,
             first_round_top_k=first_k,
             next_round_top_k=max(3, first_k // 2),
@@ -2037,6 +2076,8 @@ class RagRunner:
         # 注入 IRCoT 专属 meta
         meta_out = dict(result.get("meta") or {})
         meta_out.update(ircot_out.get("meta") or {})
+        # Phase 12.1: 把指代消解结果挂在 meta 里给前端
+        meta_out["reference_resolution"] = ref_result.to_meta()
         result["meta"] = meta_out
         # 思考链给前端展示
         result["thoughts"] = ircot_out.get("thoughts") or []
@@ -2122,6 +2163,7 @@ class RagRunner:
         *,
         agent_mode: str = "quick",
         profile: bool = False,
+        history: List[Dict[str, Any]] | None = None,
     ) -> Iterator[Dict[str, Any]]:
         """
         以 SSE 事件字典序列的形式输出单轮问答结果。
@@ -2138,9 +2180,12 @@ class RagRunner:
             agent_mode: ``quick`` | ``agent``；agent 为层 A 全文扩展，无法扩展时 ``meta`` 内含降级标记。
             profile: 为 True 时在 ``type=meta`` 事件中附加 ``phase_timings_ms``（毫秒），
                 用于 Phase P 端到端延迟排查（prepare / 首 token / 生成总时长）。
+            history: 可选已落库历史轮次（最旧→最新），Phase 12.1 指代消解输入。
 
         返回:
             Iterator[Dict[str, Any]]: 每条为 {"type": ..., ...} 的事件字典。
+            Phase 12.1 起，若指代消解 applied=True，会在 status 后先发一条
+            ``{"type": "reference_resolution", ...}`` 事件给前端可视化展示。
 
         异常:
             与 chat() 相同（如未 init、问题为空等）。
@@ -2157,8 +2202,15 @@ class RagRunner:
         )
         yield {"type": "status", "content": "正在检索并生成回答…"}
         t_prep_begin = time.perf_counter()
-        prep = self._prepare_chat_context(question, top_k, agent_mode=normalized_mode)
+        prep = self._prepare_chat_context(
+            question, top_k, agent_mode=normalized_mode, history=history,
+        )
         t_prep_end = time.perf_counter()
+
+        # Phase 12.1: 若指代消解采纳了改写，先发事件告诉前端
+        ref_meta = prep.get("reference_resolution") or {}
+        if ref_meta.get("applied"):
+            yield {"type": "reference_resolution", **ref_meta}
 
         # ── 阶段 A：agent 模式发射模拟推理步骤 SSE（接口与阶段 B ReAct 完全兼容）──
         if normalized_mode == "agent" and not prep.get("degraded"):

@@ -468,12 +468,26 @@ def chat_stream():
                     kb_id, ircot_max_loops, model_id,
                 )
                 runner = _get_runner(kb_id, model_id, agent_id, agent_mode="quick")
+                # Phase 12.1: 拉历史给 IRCoT 做指代消解
+                ircot_history: list = []
+                if session_id_opt:
+                    try:
+                        ircot_history = list_messages_for_agent(session_id_opt)
+                    except Exception:
+                        logger.exception(
+                            "list_messages_for_agent failed (ircot), proceeding without history"
+                        )
 
                 def _ircot_to_sse():
                     yield {"type": "status", "content": f"深度思考模式：将多轮检索，最多 {ircot_max_loops} 轮…"}
                     result = runner.chat_ircot(
                         question=question, top_k=top_k, max_loops=ircot_max_loops,
+                        history=ircot_history,
                     )
+                    # Phase 12.1: 指代消解若采纳，先发事件给前端可视化
+                    ref_meta = (result.get("meta") or {}).get("reference_resolution") or {}
+                    if ref_meta.get("applied"):
+                        yield {"type": "reference_resolution", **ref_meta}
                     # 把每轮思考作为 thought 事件依次推（前端可视化推理过程）
                     for i, thought in enumerate(result.get("thoughts") or [], start=1):
                         yield {
@@ -502,8 +516,18 @@ def chat_stream():
                     kb_id, agent_mode, model_id, agent_id,
                 )
                 runner = _get_runner(kb_id, model_id, agent_id, agent_mode=agent_mode)
+                # Phase 12.1: quick 路径也拉历史给指代消解用
+                quick_history: list = []
+                if session_id_opt:
+                    try:
+                        quick_history = list_messages_for_agent(session_id_opt)
+                    except Exception:
+                        logger.exception(
+                            "list_messages_for_agent failed (quick), proceeding without history"
+                        )
                 event_iter = runner.chat_stream(
-                    question=question, top_k=top_k, agent_mode=agent_mode, profile=profile
+                    question=question, top_k=top_k, agent_mode=agent_mode,
+                    profile=profile, history=quick_history,
                 )
             for event in event_iter:
                 et = event.get("type")

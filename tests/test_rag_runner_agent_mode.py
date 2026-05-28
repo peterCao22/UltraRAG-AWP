@@ -100,6 +100,89 @@ def test_prepare_agent_degraded_when_no_doc_on_hits(runner_rows, monkeypatch):
     assert prep["effective_agent_mode"] == "quick"
 
 
+def test_prepare_phase12_1_reference_resolution_applied(runner_rows, monkeypatch):
+    """Phase 12.1: history + 含指代 query → 走 resolve_references，prep 含 reference_resolution。
+
+    mock resolve_references 为 applied=True；验证：
+      1. q 被替换为改写后的 query 进入 embed
+      2. 返回 dict 含 reference_resolution.applied=True
+    """
+    r = runner_rows
+    r._index = MagicMock()
+    r._index.search.return_value = (None, np.array([[0]], dtype="int64"))
+    r._top_k = 8
+    r._recall_top_k = 4
+    r._final_top_k = 0
+    r._rerank_cfg = {}
+    r._rerank_model = None
+
+    captured_embed_text: list[str] = []
+    def fake_embed(text):
+        captured_embed_text.append(text)
+        return np.zeros((1, 4), dtype="float32")
+    monkeypatch.setattr(
+        "custom_app.services.rag_runner.embed_query", fake_embed,
+    )
+    monkeypatch.setattr(r, "_build_prompt", lambda q, ids: "prompt")
+    r._rewrite_query = lambda q: q
+
+    # mock resolve_references 直接返回采纳的改写结果
+    from custom_app.services.reference_resolver import ResolutionResult
+    fake_result = ResolutionResult(
+        applied=True,
+        original_query="第 2 个怎么操作？",
+        rewritten_query="急停按钮如何检查",
+        confidence=0.92,
+        resolved=[{"reference": "第 2 个", "meaning": "急停按钮"}],
+        ms=120,
+        model="claude-haiku-4-5-20251001",
+    )
+    monkeypatch.setattr(
+        "custom_app.services.reference_resolver.resolve_references",
+        lambda q, h: fake_result,
+    )
+
+    history = [
+        {"role": "user", "content": "AGV 启动前要做什么"},
+        {"role": "assistant", "content": "1. 检查电池 2. 检查急停 3. 检查导航"},
+    ]
+    prep = r._prepare_chat_context(
+        "第 2 个怎么操作？", agent_mode="quick", history=history,
+    )
+
+    # 改写后的 query 应进入 embed
+    assert captured_embed_text == ["急停按钮如何检查"]
+    # prep 含指代消解 meta
+    ref = prep["reference_resolution"]
+    assert ref["applied"] is True
+    assert ref["rewritten_query"] == "急停按钮如何检查"
+    assert ref["confidence"] == 0.92
+
+
+def test_prepare_phase12_1_no_history_no_resolution(runner_rows, monkeypatch):
+    """无 history 时 reference_resolution.applied=False，原 query 不变。"""
+    r = runner_rows
+    r._index = MagicMock()
+    r._index.search.return_value = (None, np.array([[0]], dtype="int64"))
+    r._top_k = 8
+    r._recall_top_k = 4
+    r._final_top_k = 0
+    r._rerank_cfg = {}
+    r._rerank_model = None
+    r._rewrite_query = lambda q: q
+
+    monkeypatch.setattr(
+        "custom_app.services.rag_runner.embed_query",
+        lambda q: np.zeros((1, 4), dtype="float32"),
+    )
+    monkeypatch.setattr(r, "_build_prompt", lambda q, ids: "prompt")
+
+    prep = r._prepare_chat_context("它怎么操作？", agent_mode="quick")  # 没传 history
+    ref = prep["reference_resolution"]
+    assert ref["applied"] is False
+    assert ref["skip_reason"] == "no_history"
+
+
 def test_build_result_merges_agent_meta(runner_rows):
     r = runner_rows
     prep = {
@@ -211,3 +294,82 @@ sampling_params:
         rag_runner_mod.faiss = old_faiss
 
     assert r._chat_cfg["backend"] == "gemini"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 12.1.x：_docs_to_expand 防御性规则
+#
+# 旧 bug：
+#   - _PROCEDURE_INTENT_RE 包含 "battery / 电池 / 换电 / 充电"，使任何含此词的
+#     query（如 "Alarm Block Battery Low"）都判为流程意图，再加 _docs_to_expand
+#     的 "≥2 步" 路径，让 BatteryChangeSequenceSOP 整本上位、把对的告警 SOP
+#     挤出 top-10。
+#   - 修：把领域名词从 _PROCEDURE_INTENT_RE 剔除；并在 _docs_to_expand 加
+#     "top-3 含他人 SOP 的非 step 段则不扩展" 的防御规则。
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _make_expand_rows():
+    """构造 8 行：含 Alarm SOP 的 section + BatteryChange 的 11 个 step。"""
+    return [
+        {"id": "Alarm Block Battery Low SOP_section_1",
+         "doc": "Alarm Block Battery Low SOP",
+         "title": "Alarm Block Battery Low SOP",
+         "contents": "ID 34: Alarm Block Battery Low"},
+        {"id": "Alarm Block Battery Low SOP_section_2",
+         "doc": "Alarm Block Battery Low SOP",
+         "title": "To resolve the issue",
+         "contents": "Raise the battery block..."},
+    ] + [
+        {"id": f"BatteryChangeSequenceSOP_step_{n}",
+         "doc": "BatteryChangeSequenceSOP",
+         "title": f"BatteryChangeSequenceSOP | STEP {n}",
+         "contents": f"STEP {n}: ..."}
+        for n in range(1, 12)
+    ]
+
+
+def test_procedure_intent_no_longer_matches_domain_nouns():
+    """旧版含 'battery'/'电池'/'充电' 误判流程意图；新版不该匹配。"""
+    assert RagRunner._procedure_intent("Alarm Block Battery Low") is False
+    assert RagRunner._procedure_intent("电池告警") is False
+    assert RagRunner._procedure_intent("battery block is lowered") is False
+    assert RagRunner._procedure_intent("AGV battery alarm") is False
+    # 真正的流程意图词仍应识别
+    assert RagRunner._procedure_intent("AGV 怎么换电池") is True
+    assert RagRunner._procedure_intent("battery replacement steps") is True
+    assert RagRunner._procedure_intent("更换电池流程") is True
+    assert RagRunner._procedure_intent("操作步骤是什么") is True
+
+
+def test_docs_to_expand_skips_when_other_sop_in_top3():
+    """top-3 含别家 SOP 的非 step 段 → 不扩展，避免覆盖告警 SOP。"""
+    r = RagRunner.__new__(RagRunner)
+    r._rows = _make_expand_rows()
+    # 命中：top-3 是 Alarm 的 section（非 step），4-13 是 BatteryChange 多个 step
+    # 没修前会因 step 数 ≥ 2 触发 BatteryChangeSequenceSOP 扩展
+    hit_ids = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    docs = r._docs_to_expand(hit_ids, "Battery Block Battery Low")
+    # 应不扩展：因为 top-3 有别家 SOP（Alarm Block Battery Low SOP）的非 step 段
+    assert docs == set()
+
+
+def test_docs_to_expand_still_works_for_clear_procedure_query():
+    """显式问换电步骤时仍应扩展（修过头会 break 这种正确场景）。"""
+    r = RagRunner.__new__(RagRunner)
+    r._rows = _make_expand_rows()
+    # 命中：只有 BatteryChangeSequenceSOP 的 step 块
+    hit_ids = [2, 3, 4, 5, 6, 7, 8]  # 全是 step
+    docs = r._docs_to_expand(hit_ids, "AGV 怎么换电池")
+    assert docs == {"BatteryChangeSequenceSOP"}
+
+
+def test_docs_to_expand_single_step_at_top1_still_expands_without_competitor():
+    """单条 step 在 top-1 且没有其他 SOP 竞争 → 仍可扩展。"""
+    r = RagRunner.__new__(RagRunner)
+    r._rows = _make_expand_rows()
+    # 仅命中 1 个 step 在 #1，没有其他非 step doc
+    hit_ids = [2]
+    docs = r._docs_to_expand(hit_ids, "Battery Change Step 1")
+    # 单步在 top-3 且没有别家 SOP → 应扩展
+    assert docs == {"BatteryChangeSequenceSOP"}

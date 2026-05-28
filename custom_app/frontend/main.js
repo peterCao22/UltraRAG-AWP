@@ -16,6 +16,7 @@ import {
   renderTextContent,
 } from './components/chatMessage.js'
 import { buildSourcesPanel } from './components/sourcePanel.js'
+import { buildReferenceResolutionBanner } from './components/referenceResolutionBanner.js'
 import { Toast } from './components/toast.js'
 import { openConfirmModal } from './components/confirmModal.js'
 import { sendChatMessage } from './services/chatApi.js'
@@ -1221,6 +1222,15 @@ export function initChatApp({
           reasoning.thought(formatThoughtSnippet(ev))
           scrollMessageListToBottom()
         },
+        // Phase 12.1: 指代消解结果。在 article 顶部展示"系统理解为：..."灰色提示。
+        onReferenceResolution: (ev) => {
+          if (!ev?.applied) return
+          const banner = buildReferenceResolutionBanner(ev)
+          if (banner) {
+            aiMessage.article.prepend(banner)
+            scrollMessageListToBottom()
+          }
+        },
         onToolStart: (ev) => {
           const label = ev?.hint || ev?.name || String(ev?.tool_name ?? '?')
           reasoning.toolCall(label)
@@ -1358,6 +1368,20 @@ export function initChatApp({
       return
     }
     state.pendingSend = sendCurrentMessage()
+  })
+
+  // Phase 12.1: 指代消解修正按钮 → 把改写后的 query 填回输入框，光标聚焦
+  elements.messageList.addEventListener('reference-resolution-correct-request', (event) => {
+    const detail = event?.detail ?? {}
+    const seed = String(detail.rewritten || detail.original || '').trim()
+    if (!seed) return
+    elements.input.value = seed
+    updateCharCount()
+    elements.input.focus()
+    const len = seed.length
+    if (typeof elements.input.setSelectionRange === 'function') {
+      elements.input.setSelectionRange(len, len)
+    }
   })
 
   renderWelcome()

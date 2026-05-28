@@ -1,0 +1,39 @@
+你是技术问答助手。用户在与系统对话，最新一轮可能含指代（"它/第 2 个/继续"等）。
+你的任务：把指代消解成具体内容，输出**改写后的检索 query**。
+
+【对话历史】
+{{ history_text }}
+
+【最新用户问题】
+{{ question }}
+
+输出严格 JSON（无代码块包裹、无解释）：
+{"rewritten_query": "...", "confidence": 0.0-1.0, "resolved": [{"reference": "第 2 个", "meaning": "急停按钮"}]}
+
+规则：
+1. 改写后的 query 应是**独立、完整、可检索**的（不再含代词）
+2. 若历史不足以消解指代，rewritten_query 直接复用原 query，confidence < 0.5
+3. confidence 反映你对消解结果的把握，低于 0.7 视为不确定
+4. 保留原 query 的领域术语（如 AGV、SOP、IFS、Planners 等）
+5. 中文 query 输出中文，英文 query 输出英文
+
+示例 1（中文指代）：
+历史：
+用户: AGV 启动前要做什么？
+助手: 1. 检查电池 2. 检查急停按钮 3. 检查导航传感器
+问题: 第 2 个怎么操作？
+输出: {"rewritten_query": "急停按钮如何检查", "confidence": 0.95, "resolved": [{"reference": "第 2 个", "meaning": "急停按钮"}]}
+
+示例 2（双重指代）：
+历史:
+用户: 急停按钮如何检查
+助手: 检查按钮是否能正常按下/弹起，并测试触发后是否切断电源
+问题: 那它需要多久检查一次？
+输出: {"rewritten_query": "急停按钮多久检查一次", "confidence": 0.9, "resolved": [{"reference": "它", "meaning": "急停按钮"}]}
+
+示例 3（历史不足）：
+历史:
+用户: 你好
+助手: 您好，请问需要什么帮助？
+问题: 它怎么操作？
+输出: {"rewritten_query": "它怎么操作？", "confidence": 0.3, "resolved": []}

@@ -60,6 +60,12 @@ function dispatchSseEvent(event, state, handlers) {
     return
   }
 
+  // Phase 12.1: 指代消解结果（rag_runner.chat_stream / chat_ircot 命中时下发）
+  if (event.type === 'reference_resolution') {
+    handlers.onReferenceResolution?.(event)
+    return
+  }
+
   if (event.type === 'tool_call' || event.type === 'tool_start') {
     handlers.onToolStart?.(event)
     return
@@ -120,6 +126,10 @@ export async function sendChatMessage({
   onThought,
   onToolStart,
   onToolResult,
+  /** Phase 12.1: 指代消解结果。Event 形状：
+   *  { type: 'reference_resolution', applied, original_query, rewritten_query,
+   *    confidence, resolved, ms, model } */
+  onReferenceResolution,
   onChunk,
   onSources,
   onDone,
@@ -132,6 +142,7 @@ export async function sendChatMessage({
     onThought,
     onToolStart,
     onToolResult,
+    onReferenceResolution,
     onChunk,
     onSources,
     onDone,
