@@ -1244,13 +1244,20 @@ class RagRunner:
         if not q:
             return q
 
+        # Phase 12.1.x: 改写器 prompt 中性化（剔除 'AGV' / 'battery replacement'
+        # 等领域专用词，避免对非 AGV KB 的 query 注入 AGV 语境偏见）。
         rewrite_prompt = (
             "You are a query rewriter for technical retrieval.\n"
             "Rewrite the user question into ONE concise search query.\n"
             "Rules:\n"
             "- Keep original intent and key constraints.\n"
-            "- Keep AGV domain terms and technical nouns.\n"
-            "- For SOP/procedure questions, keep words like steps, procedure, sequence, battery replacement if relevant.\n"
+            "- Preserve technical domain terms, proper nouns, error/alarm IDs, "
+            "module/component names, and acronyms exactly as they appear.\n"
+            "- For procedure questions, keep words like steps, procedure, "
+            "sequence, workflow, configuration, setup if relevant.\n"
+            "- Do not introduce domain assumptions or terms not present in the "
+            "original query (do not add product/system names the user did not "
+            "write).\n"
             "- Do not answer the question.\n"
             "- Output only the rewritten query text.\n\n"
             f"User question: {q}"

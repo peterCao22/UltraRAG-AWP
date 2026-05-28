@@ -373,3 +373,48 @@ def test_docs_to_expand_single_step_at_top1_still_expands_without_competitor():
     docs = r._docs_to_expand(hit_ids, "Battery Change Step 1")
     # 单步在 top-3 且没有别家 SOP → 应扩展
     assert docs == {"BatteryChangeSequenceSOP"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 12.1.x: _rewrite_query prompt 中性化（不再注入 AGV 领域偏见）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestRewriteQueryPromptNeutrality:
+    """改写器 prompt 必须中立：所有 KB 的 query 都走它，不能注入 AGV 语境。"""
+
+    def _capture_prompt(self, monkeypatch) -> str:
+        """劫持 self._generate 抓 prompt 文本，返回原 question 即可（_rewrite_query
+        只用 _generate 返回值做 sanity check）。"""
+        r = RagRunner.__new__(RagRunner)
+        captured = {}
+
+        def fake_generate(prompt: str) -> str:
+            captured["prompt"] = prompt
+            return "rewritten"
+        r._generate = fake_generate
+        r._rewrite_query("如何配置 Planners")
+        return captured["prompt"]
+
+    def test_prompt_does_not_mention_agv(self, monkeypatch):
+        """不应出现 'AGV' 字眼。"""
+        prompt = self._capture_prompt(monkeypatch)
+        assert "AGV" not in prompt, \
+            "_rewrite_query prompt 不应注入 AGV 领域语境（影响 ifs_docs 等非 AGV KB）"
+
+    def test_prompt_does_not_mention_battery_replacement(self, monkeypatch):
+        """不应出现具体领域示例 'battery replacement'。"""
+        prompt = self._capture_prompt(monkeypatch)
+        assert "battery replacement" not in prompt.lower()
+
+    def test_prompt_keeps_neutral_procedure_guidance(self, monkeypatch):
+        """通用的 'steps / procedure / workflow' 指引仍在。"""
+        prompt = self._capture_prompt(monkeypatch).lower()
+        # 至少包含通用流程意图词的提示
+        assert "steps" in prompt or "procedure" in prompt or "workflow" in prompt
+
+    def test_prompt_warns_against_introducing_domain_assumptions(self, monkeypatch):
+        """新增反向约束：不要凭空添加领域假设。"""
+        prompt = self._capture_prompt(monkeypatch).lower()
+        # 应明确告诉模型不要乱加假设
+        assert "do not introduce" in prompt or "do not add" in prompt
