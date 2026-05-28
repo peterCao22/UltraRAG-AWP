@@ -106,6 +106,29 @@ ifs_docs 暴露了一个 **额外维度**：即便都是 sop_docx，**结构也�
 
 按 chunk 结构自动检测比依赖 `kb.type` 标签更可靠。
 
+### 3.4 进一步打脸：连 agv_demo 内部也不全是 STEP（2026-05-28 用户提出）
+
+用户翻看 raw 文档后发现：agv_demo 共 20 份 docx，**只有 1 份**
+（`BatteryChangeSequenceSOP.docx`）真正是 STEP 流程型。其余 19 份是
+故障告警 SOP（"Alarm Block Battery Low / Cannot Enter System /
+E-Stop / Loop Emergency / Master Link Down"等），结构上是
+"intro + 1-3 section"，**没有 STEP**。
+
+实测分布：
+
+| 文档结构 | 数量 | 例子 |
+|---|---|---|
+| STEP-heavy（≥5 STEP） | **1** | BatteryChangeSequenceSOP（11 STEP）|
+| section 型 | 19 | 其余全部告警 SOP |
+
+**含义**：
+
+- 当前 SOP 扩展机制实际上只对 **5% 的 agv_demo 文档**生效
+- "AGV = STEP 型 SOP" 是错误的简化；**只有特定流程文档**才是
+- 重构方向不是 per-KB，而是 **per-doc 自动探测**
+- WeKnora 邻居扩展（Layer 1）对 19 份告警 SOP **正好合适**——它们
+  本来就是 "短 intro + 几个 section"，命中短 chunk 时补邻居最有用
+
 ---
 
 ## 四、重构方案
@@ -132,24 +155,37 @@ def _expand_short_chunks_with_neighbors(
     """对 content < min_len 的命中按前后邻居链补足语境。"""
 ```
 
-**Layer 2 — STEP 全文扩展**（仅当 `kb.type=sop_docx` 且 chunk 含 STEP 结构）：
+**Layer 2 — STEP 全文扩展**（per-doc 探测，仅对真正的 STEP-heavy 文档生效）：
 
-保留现有 `_docs_to_expand` / `_expand_hit_ids` 逻辑，但用"门卫"包住，
-只在真正符合条件的 KB 上启用。
+保留现有 `_docs_to_expand` / `_expand_hit_ids` 逻辑，但加 **per-doc**
+门卫——只对真正含 ≥N 个 STEP 块的文档生效。这样：
+
+- BatteryChangeSequenceSOP（11 STEP）→ 走 Layer 2
+- agv_demo 其余 19 份告警 SOP（0 STEP）→ 走 Layer 1
+- ifs_docs / 未来任何新 KB → 同上自动适配
 
 ```python
 # 在 _prepare_chat_context 入口（伪代码）
-if self._has_step_structure():   # 自动探测，不依赖 kb.type 标签
-    expanded_docs = self._docs_to_expand(hit_ids, q)
+# init() 时预计算 doc → step_count 映射
+step_heavy_docs = self._step_heavy_docs()  # {doc_id: step_count >= 5}
+
+# Layer 2: 仅对真正 STEP-heavy 的命中 doc 走整本扩展
+hit_step_heavy_docs = {self._rows[i]['doc'] for i in hit_ids} & step_heavy_docs
+if hit_step_heavy_docs:
+    expanded_docs = self._docs_to_expand(hit_ids, q,
+                                         allow_only=hit_step_heavy_docs)
     hit_ids = self._expand_hit_ids(hit_ids, q, expanded_docs)
-hit_ids = self._expand_short_chunks_with_neighbors(hit_ids)  # 通用 Layer
+
+# Layer 1: 短 chunk 邻居扩展（对所有命中都跑）
+hit_ids = self._expand_short_chunks_with_neighbors(hit_ids)
 ```
 
 **前置**：
 
 - chunks.jsonl 需要 `prev_chunk_id` / `next_chunk_id` 字段（docx_parser 重切时加）
-- 实现 `_has_step_structure()` 自动探测（扫 `_rows` 看是否有匹配 STEP 正则）
-- 新 KB 不用人工分类，靠 chunk 结构和邻居链自动适配
+- `RagRunner.init()` 预计算 `_step_heavy_docs`（扫一遍 `_rows`，统计每个 doc 的
+  STEP 块数；≥ 阈值的进入集合，阈值建议 5）
+- 不需要任何 KB 类型标签或人工分类
 
 **好处**：
 
@@ -226,11 +262,18 @@ sop_step_expand:
 - [ ] docx_parser 重切时为每个 chunk 写入 `prev_chunk_id` / `next_chunk_id`
 - [ ] 重建 agv_demo / ifs_docs 的 chunks.jsonl 和 Qdrant collection
 - [ ] 实现 `_expand_short_chunks_with_neighbors`（Layer 1，借鉴 WeKnora `merge_expand.go`）
-- [ ] 实现 `_has_step_structure()` 自动探测（Layer 2 门卫）
+- [ ] `RagRunner.init()` 预计算 `_step_heavy_docs` 集合（per-doc 探测，阈值 ≥ 5 STEP）
+- [ ] `_docs_to_expand` 加 `allow_only` 参数，仅在 step-heavy doc 上扩展（Layer 2 门卫）
 - [ ] `_prepare_chat_context` 入口加双层调用
-- [ ] 单测：含 STEP → 走 Layer 2；无 STEP 但有短 chunk → 走 Layer 1；超长 chunk → 跳过
-- [ ] 邻居链跨 doc 边界防御测试
-- [ ] 跑 agv_demo 评测确认 Hit@5 不退化
+- [ ] 单测：
+  - [ ] doc 含 ≥5 STEP → 命中后走 Layer 2 整本扩展
+  - [ ] doc 无 STEP（如 Alarm Block Battery Low SOP）→ 不走 Layer 2
+  - [ ] 短 chunk → 走 Layer 1 邻居扩展
+  - [ ] 长 chunk → Layer 1 跳过
+  - [ ] 邻居链跨 doc 边界防御（PreChunkID 指向别家 doc 时丢弃）
+- [ ] 跑 agv_demo 评测确认：
+  - [ ] BatteryChangeSequenceSOP 类换电问题 Hit@5 不退化
+  - [ ] 其余 19 份告警 SOP 类问题 Hit@5 应**上涨**（不再被 STEP 扩展挤占）
 - [ ] 跑 ifs_docs 评测确认 Hit@5 仍 ≥ 1.00（应略涨：短 chunk 补足后语境更全）
 - [ ] 用 gen_test KB 跑一遍确认正常
 - [ ] 更新 rag_runner.py 模块 docstring：移除 "AGV 场景" 字样
