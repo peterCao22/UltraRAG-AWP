@@ -68,20 +68,43 @@ ifs_docs 评测 Hit@5=1.00（Phase 11.2）—— 不是因为它配置对，而�
 ### 3.1 用户需求（2026-05-28 明确）
 
 > "可针对 SOP 类的一种特定方式，非 SOP 的普通方式。我们的 KB 上传分类就做了这两种区分。"
+> 修订（2026-05-28 同日）：
+> "并不是要取消所有扩展，只是不要被这些专用的硬编码给带偏了"
 
 **翻译成技术语言**：
 
-- 复用现有 `kb.type` 字段，**按 type 分流 RAG 行为**
-- `sop_docx` 类：走 SOP 扩展机制（_docs_to_expand / _expand_hit_ids / STEP 解析）
-- `general` 类：跳过所有 SOP 扩展，纯 RRF + rerank 输出
+- 保留扩展能力，但去掉**领域硬编码**（STEP 正则 / battery 词典 / 整本 SOP 拉取）
+- 把扩展分成 **2 层**：通用邻居扩展（所有 KB）+ SOP 全文扩展（仅 sop_docx 且含 STEP）
 
-### 3.2 进一步发现
+### 3.2 WeKnora 参考实现（值得借鉴）
+
+`d:\Peter2025\myCursor\WeKnora\internal\application\service\chat_pipeline\merge_expand.go`：
+
+```go
+// expandShortContextWithNeighbors
+const minLen = 350  // 太短的 chunk 触发扩展
+const maxLen = 850  // 合并后字数上限
+```
+
+**核心机制**（完全通用、零领域知识）：
+1. 遍历 retrieved chunks，挑出 content < 350 字的"短 chunk"作为扩展目标
+2. 用 chunk 自身的 `PreChunkID` / `NextChunkID` 链拉前后邻居
+3. 严格按 `KnowledgeID`（doc 边界）限制，不跨文档
+4. 双向迭代扩展直到合并后 ≥ 350 或没有更多邻居或达到 850 上限
+5. `concatNoOverlap` 处理重叠拼接，避免重复
+
+**关键优势**：
+- **0 硬编码**：不识别 STEP / battery / SOP 任何领域词
+- **0 KB 类型依赖**：所有 KB 都用同一套，按 chunk 结构决定
+- **目标精准**：只补"短 chunk"的语境，不会把整本文档灌进 context
+
+### 3.3 进一步发现
 
 ifs_docs 暴露了一个 **额外维度**：即便都是 sop_docx，**结构也不同**——
 - agv_demo 是"STEP 1/2/3 步骤型 SOP"
-- ifs_docs 是"章节型操作手册"
+- ifs_docs 是"章节型操作手册"（section_N_part_M）
 
-可能需要细化为 3 类，或者用 **chunk 结构自动检测**而非依赖 type 字段。
+按 chunk 结构自动检测比依赖 `kb.type` 标签更可靠。
 
 ---
 
@@ -89,95 +112,126 @@ ifs_docs 暴露了一个 **额外维度**：即便都是 sop_docx，**结构也�
 
 ### 4.1 设计选项（按工作量从小到大）
 
-#### Option A：纯 type-based 分流（最简单，1-2 天）
+#### Option A：双层扩展架构（推荐，借鉴 WeKnora，3-5 天）
+
+**Layer 1 — 通用邻居扩展**（所有 KB 都启用）：
+
+借鉴 WeKnora `expandShortContextWithNeighbors`。短 chunk（< 350 字）触发，
+按 chunk 自身的前后链拉邻居补语境，扩展到 350-850 字。**零硬编码、
+零领域知识**。
 
 ```python
-# 在 _prepare_chat_context 入口
-if self._kb_type == KB_TYPE_SOP_DOCX and self._has_step_chunks():
-    # 走 SOP 扩展机制
+# 新增方法（无 KB 类型依赖）
+def _expand_short_chunks_with_neighbors(
+    self,
+    hit_ids: list[int],
+    *,
+    min_len: int = 350,
+    max_len: int = 850,
+) -> list[int]:
+    """对 content < min_len 的命中按前后邻居链补足语境。"""
+```
+
+**Layer 2 — STEP 全文扩展**（仅当 `kb.type=sop_docx` 且 chunk 含 STEP 结构）：
+
+保留现有 `_docs_to_expand` / `_expand_hit_ids` 逻辑，但用"门卫"包住，
+只在真正符合条件的 KB 上启用。
+
+```python
+# 在 _prepare_chat_context 入口（伪代码）
+if self._has_step_structure():   # 自动探测，不依赖 kb.type 标签
     expanded_docs = self._docs_to_expand(hit_ids, q)
     hit_ids = self._expand_hit_ids(hit_ids, q, expanded_docs)
-# 否则：纯 RRF + rerank 结果直接返回
+hit_ids = self._expand_short_chunks_with_neighbors(hit_ids)  # 通用 Layer
 ```
 
 **前置**：
-- RagRunner.init() 时拉 `kb.type` 字段存到 `self._kb_type`
-- 新增 `_has_step_chunks()` 自动探测（扫一遍 _rows 看是否有 _step_N）
+
+- chunks.jsonl 需要 `prev_chunk_id` / `next_chunk_id` 字段（docx_parser 重切时加）
+- 实现 `_has_step_structure()` 自动探测（扫 `_rows` 看是否有匹配 STEP 正则）
+- 新 KB 不用人工分类，靠 chunk 结构和邻居链自动适配
 
 **好处**：
-- ifs_docs 自动跳过扩展（`_has_step_chunks()=False`）
-- 新 KB 不用人工分类，靠 chunk 结构自动判断
 
-**风险**：低。所有现在的硬编码逻辑**继续保留**但被"门卫"包住，agv_demo 行为不变。
+- ifs_docs / agv_demo / 未来任何 KB 都能享受通用的语境补充
+- STEP 文档保留现有"整本拉取"能力，但行为更精准
+- 与 WeKnora 设计对齐，便于未来迁移参考
+
+**风险**：
+
+- chunks.jsonl schema 升级 → 需要重建所有 KB 的索引
+- 邻居链跨 doc 边界要严格防御（避免拉到无关 chunk）
 
 #### Option B：servers/retriever/parameter.yaml 配置化（中等，3-5 天）
 
+仅在确实需要 per-KB 微调时再升级到 Option B。可与 Option A 叠加。
+
 ```yaml
-sop_expansion:
-  enabled: true                   # 全局开关
-  per_kb_overrides:               # 可按 kb_id 覆盖
+short_chunk_expand:
+  enabled: true
+  min_len: 350
+  max_len: 850
+sop_step_expand:
+  enabled: true
+  per_kb_overrides:
     agv_demo:
-      enabled: true
-      step_pattern: '_step_(\d+)'
       min_steps_for_expand: 2
       top_rank_for_single_step: 3
-    ifs_docs:
-      enabled: false              # 显式关闭
 ```
-
-**好处**：完全数据驱动，运维可调
-**风险**：配置膨胀，需要新加 admin 界面
 
 #### Option C：策略模式重构（大改造，1-2 周）
 
-每个 `kb.type` 对应一个 `RetrievalStrategy` 类：
-- `SopExpansionStrategy`（agv-style，含 STEP 扩展）
-- `SectionedManualStrategy`（ifs-style，section 全文）
-- `GeneralRetrievalStrategy`（纯 RRF + rerank）
-
-**好处**：未来加新 type 只加新类，不动主流程
-**风险**：过度设计；可能 YAGNI
+每个 `kb.type` 对应一个 `RetrievalStrategy` 类。Option A 充分满足时不必走 C。
 
 ### 4.2 推荐路径
 
-**Phase 11.3 或 12.2 时实施 Option A**（最简单，立刻消除"运气"）。
-如果未来需要 per-KB 精调，再升级到 Option B。
-Option C 留到第 4 个 KB 类型出现时再考虑。
+**Phase 11.3 或 12.2 时实施 Option A**（双层扩展架构）。
+- Layer 1 通用邻居扩展立刻消除 ifs_docs 的"运气"依赖
+- Layer 2 STEP 全文扩展用门卫保住 agv_demo 行为
+- 如未来需要 per-KB 微调再叠加 Option B
 
 ---
 
-## 五、_rewrite_query 中性化（优先级最高的快速修复）
+## 五、_rewrite_query 中性化（已完成）
 
-L1252-1253 当前 prompt：
+**状态**：✅ 已实施（commit `75ee17c`，2026-05-28）。
+
+旧 prompt：
 
 ```python
 "- Keep AGV domain terms and technical nouns.\n"
 "- For SOP/procedure questions, keep words like steps, procedure, sequence, battery replacement if relevant.\n"
 ```
 
-**问题**：所有 KB 的 query 都被注入 AGV 语境（"battery replacement"），ifs_docs 的"客户订单"query 都会被改写器加 AGV 偏见。
-
-**修复**（5 分钟可以做）：
+新 prompt：
 
 ```python
-"- Keep technical domain terms and proper nouns from the original query.\n"
-"- For SOP/procedure questions, keep words like steps, procedure, sequence, workflow if relevant.\n"
+"- Preserve technical domain terms, proper nouns, error/alarm IDs, "
+"module/component names, and acronyms exactly as they appear.\n"
+"- For procedure questions, keep words like steps, procedure, "
+"sequence, workflow, configuration, setup if relevant.\n"
+"- Do not introduce domain assumptions or terms not present in the "
+"original query (do not add product/system names the user did not write).\n"
 ```
 
-去掉 "AGV" 和 "battery replacement" 即可。可单独 PR，不依赖其他重构。
+`tests/test_rag_runner_agent_mode.py::TestRewriteQueryPromptNeutrality`
+4 测全过。
 
 ---
 
 ## 六、实施清单（未来某 sprint）
 
-实施 Option A 时的 checklist：
+实施 Option A（双层扩展架构）时的 checklist：
 
-- [ ] RagRunner.init() 接收并保存 kb.type
-- [ ] 实现 `_has_step_chunks()` 自动探测
-- [ ] `_prepare_chat_context` 入口加分流逻辑
-- [ ] 单测：sop_docx + step → 走扩展；sop_docx + 无 step → 跳过；general → 跳过
+- [ ] docx_parser 重切时为每个 chunk 写入 `prev_chunk_id` / `next_chunk_id`
+- [ ] 重建 agv_demo / ifs_docs 的 chunks.jsonl 和 Qdrant collection
+- [ ] 实现 `_expand_short_chunks_with_neighbors`（Layer 1，借鉴 WeKnora `merge_expand.go`）
+- [ ] 实现 `_has_step_structure()` 自动探测（Layer 2 门卫）
+- [ ] `_prepare_chat_context` 入口加双层调用
+- [ ] 单测：含 STEP → 走 Layer 2；无 STEP 但有短 chunk → 走 Layer 1；超长 chunk → 跳过
+- [ ] 邻居链跨 doc 边界防御测试
 - [ ] 跑 agv_demo 评测确认 Hit@5 不退化
-- [ ] 跑 ifs_docs 评测确认 Hit@5 仍 1.00
+- [ ] 跑 ifs_docs 评测确认 Hit@5 仍 ≥ 1.00（应略涨：短 chunk 补足后语境更全）
 - [ ] 用 gen_test KB 跑一遍确认正常
 - [ ] 更新 rag_runner.py 模块 docstring：移除 "AGV 场景" 字样
 
