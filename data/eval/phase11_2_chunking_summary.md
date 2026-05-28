@@ -130,10 +130,28 @@ Qwen3-Reranker-8B 在以下条件叠加时不可靠：
 
 ---
 
-## 五、下一步：agv_demo
+## 五、agv_demo：无需 Phase 11.2 改造
 
-agv_demo 评测集 130 题，主要是 SOP STEP 类问题，与 ifs_docs 不同：
-- 大部分 chunk 是 STEP_N（通常 < 400 字本就独立）
-- 切块影响面小，但仍可能受益于"非 STEP 段落 + 兜底滑窗"路径的细粒度
+跑 docx_parser 重解析 agv_demo（56 chunks），结果**与旧版文本完全一致**——所有 chunk 本来就 ≤ 400 字（top-10 size 全在 367 以下，STEP 切分自动细粒度），新切块逻辑对它**无 op**。
 
-需要单独跑评测看是否同样持平/上涨。
+结论：
+- agv_demo chunk_id 命名不变（无 `_part_N` 后缀生成）
+- 不需要重跑 contextual chunking
+- 不需要重建 Qdrant collection
+- Phase 11.1.D 在 agv_demo 上的指标继续有效，无回归
+
+**Phase 11.2 切块改造仅对 ifs_docs 这种"非 STEP 长 chunk 文档"有显著收益**。后续如果接入新的非 SOP 类文档，会自动享受细粒度切块。
+
+---
+
+## 六、人工验证（ifs_docs 三种模式）
+
+用户重启 Flask 后用前端测试 "在'库存基础数据'设置界面中，具体的配置项有哪些。其中选择计划人，要如何配置？"：
+
+| 模式 | 结果 |
+|---|---|
+| 快速问答 | ✅ 完整列出 5 个配置项 + 计划人步骤 |
+| 智能推理（ReAct agent）| ✅ 推理链可见，多轮工具调用，结果正确 |
+| 深度思考（IRCoT）| ✅ 推理步骤可见，图片穿插对应步骤下，结果正确 |
+
+确认 Phase 11.2 收官。
