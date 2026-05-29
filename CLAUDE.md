@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🎯 新会话第一件事：读 Backlog
+
+> **新会话启动时务必先读 [`docs/TODO_BACKLOG.md`](docs/TODO_BACKLOG.md)**。
+> 它列出所有待办任务、当前优先级、对应方案文档链接。读完这一份就能直接选任务开干，不需要问"上次做到哪了"。
+>
+> 关键技术债：[`docs/TECH_DEBT_RAG_RUNNER_HARDCODE.md`](docs/TECH_DEBT_RAG_RUNNER_HARDCODE.md)（rag_runner.py 硬编码重构的 WeKnora 双层方案）
+
 ## Development Commands
 
 ### Environment Setup
