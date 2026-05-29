@@ -25,6 +25,10 @@ def runner_rows():
         {"id": "d2_only", "doc": "DocB", "title": "DocB | x", "contents": "other"},
         {"id": "no_doc", "doc": "", "title": "orphan", "contents": "x"},
     ]
+    # Phase 11.3：双层扩展默认 stub（fixture 行数不足 STEP_HEAVY_DOC_THRESHOLD=5，
+    # 故 _step_heavy_docs 为空集；Layer 1 邻居索引按 fixture 推断）
+    r._id_to_row = {str(row["id"]): i for i, row in enumerate(r._rows)}
+    r._step_heavy_docs = set()
     return r
 
 

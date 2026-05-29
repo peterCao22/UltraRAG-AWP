@@ -42,6 +42,13 @@ _PROCEDURE_INTENT_RE = re.compile(
 )
 _STEP_IN_ID_RE = re.compile(r"_step_(\d+)", re.IGNORECASE)
 _STEP_IN_TITLE_RE = re.compile(r"STEP\s*(\d+)", re.IGNORECASE)
+
+# Phase 11.3：双层扩展常量（WeKnora merge_expand.go 借鉴）
+# Layer 1（通用邻居）：短 chunk 长度阈值 + 合并上限
+NEIGHBOR_EXPAND_MIN_LEN = 350
+NEIGHBOR_EXPAND_MAX_LEN = 850
+# Layer 2（STEP 全文）门卫：doc 内 STEP 块数 ≥ 该阈值才允许整本扩展
+STEP_HEAVY_DOC_THRESHOLD = 5
 _EXCERPT_DELIM_RE = re.compile(
     r"^<<<\s*EXCERPT\s*(\d+)\s*>>>\s*$", re.MULTILINE
 )
@@ -181,6 +188,11 @@ class RagRunner:
         self._bm25_store = None
         self._bm25_load_error: Optional[str] = None
         self._retrieval_cfg: Dict[str, Any] = {}
+        # Phase 11.3 双层扩展（WeKnora 借鉴 + per-doc 门卫，方案 docs/TECH_DEBT_RAG_RUNNER_HARDCODE.md）
+        # _id_to_row：chunk_id 字符串 → _rows 行号；Layer 1 邻居链按 chunk_id 反查时用
+        # _step_heavy_docs：含 ≥ STEP_HEAVY_THRESHOLD 个 STEP 块的 doc 集合，Layer 2 门卫
+        self._id_to_row: Dict[str, int] = {}
+        self._step_heavy_docs: Set[str] = set()
 
     # ──────────────────────────────────────────────────────────────
     # Phase 8.2.2：双路检索（vector + BM25 + RRF）
@@ -451,8 +463,137 @@ class RagRunner:
                 out.add(ds)
         return out
 
+    def _build_id_to_row_index(self) -> Dict[str, int]:
+        """构造 chunk_id 字符串 → _rows 行号映射；空 id 不收录。"""
+        out: Dict[str, int] = {}
+        for i, row in enumerate(self._rows):
+            cid = str(row.get("id", "")).strip()
+            if cid:
+                out[cid] = i
+        return out
+
+    def _compute_step_heavy_docs(self) -> Set[str]:
+        """扫描 _rows 统计 per-doc STEP 块数；≥ STEP_HEAVY_DOC_THRESHOLD 的 doc 进入门卫集合。
+
+        per-doc 探测（不依赖 KB type 标签）：方案文档 §三.4 实测发现
+        agv_demo 20 份 docx 里只有 BatteryChangeSequenceSOP（11 STEP）
+        真正是 STEP 流程型；其余 19 份是告警 SOP，零 STEP。
+        """
+        per_doc_count: Dict[str, int] = {}
+        for row in self._rows:
+            if not self._is_step_chunk_row(row):
+                continue
+            doc = str(row.get("doc", "") or "").strip()
+            if not doc:
+                continue
+            per_doc_count[doc] = per_doc_count.get(doc, 0) + 1
+        return {d for d, n in per_doc_count.items() if n >= STEP_HEAVY_DOC_THRESHOLD}
+
+    def _expand_short_chunks_with_neighbors(
+        self,
+        hit_ids: List[int],
+        *,
+        min_len: int = NEIGHBOR_EXPAND_MIN_LEN,
+        max_len: int = NEIGHBOR_EXPAND_MAX_LEN,
+    ) -> List[int]:
+        """Layer 1：对短 chunk（content < min_len）按 prev/next_chunk_id 链补足语境。
+
+        借鉴 WeKnora ``merge_expand.go::expandShortContextWithNeighbors``。
+        与原版差异：
+            - WeKnora 是远程 chunk 仓库，需要 ListChunksByID；这里 _rows 全在内存
+            - 通过 _id_to_row 把字符串 chunk_id 反查为行号
+            - 严格 doc 边界：邻居 row 的 doc 字段必须与 base 一致才纳入
+            - 仅在原命中列表尾部追加新邻居（保持原顺序与排名），不重写 base 内容
+
+        参数:
+            hit_ids: 已 rerank + 可选 Layer 2 扩展后的命中行号列表
+            min_len: 触发扩展的短 chunk 长度阈值（默认 350）
+            max_len: 单条 base + 邻居合并后的语境字符数上限（默认 850）
+
+        返回:
+            扩展后的 hit_ids（原命中 + 新追加的邻居 row），保持去重 + 原始顺序。
+        """
+        if not hit_ids:
+            return list(hit_ids)
+
+        seen: Set[int] = set(hit_ids)
+        appended: List[int] = []
+
+        for base_idx in hit_ids:
+            if base_idx < 0 or base_idx >= len(self._rows):
+                continue
+            base_row = self._rows[base_idx]
+            base_contents = str(base_row.get("contents", "") or "")
+            if len(base_contents) >= min_len:
+                continue
+            base_doc = str(base_row.get("doc", "") or "")
+            merged_len = len(base_contents)
+
+            prev_cursor = str(base_row.get("prev_chunk_id", "") or "")
+            next_cursor = str(base_row.get("next_chunk_id", "") or "")
+
+            # 双向迭代：交替向前 / 向后取邻居，直到达到 min_len 或合并超过 max_len 或链尽
+            while merged_len < min_len and (prev_cursor or next_cursor):
+                added_this_round = False
+
+                if prev_cursor:
+                    prev_idx = self._id_to_row.get(prev_cursor)
+                    if prev_idx is None:
+                        prev_cursor = ""
+                    else:
+                        prev_row = self._rows[prev_idx]
+                        if str(prev_row.get("doc", "") or "") != base_doc:
+                            # 跨 doc 边界：链断开（防御性，不应发生因为 parser 按 doc 切链）
+                            prev_cursor = ""
+                        else:
+                            prev_len = len(str(prev_row.get("contents", "") or ""))
+                            if merged_len + prev_len > max_len:
+                                prev_cursor = ""
+                            else:
+                                if prev_idx not in seen:
+                                    seen.add(prev_idx)
+                                    appended.append(prev_idx)
+                                merged_len += prev_len
+                                prev_cursor = str(prev_row.get("prev_chunk_id", "") or "")
+                                added_this_round = True
+
+                if merged_len >= min_len:
+                    break
+
+                if next_cursor:
+                    next_idx = self._id_to_row.get(next_cursor)
+                    if next_idx is None:
+                        next_cursor = ""
+                    else:
+                        next_row = self._rows[next_idx]
+                        if str(next_row.get("doc", "") or "") != base_doc:
+                            next_cursor = ""
+                        else:
+                            next_len = len(str(next_row.get("contents", "") or ""))
+                            if merged_len + next_len > max_len:
+                                next_cursor = ""
+                            else:
+                                if next_idx not in seen:
+                                    seen.add(next_idx)
+                                    appended.append(next_idx)
+                                merged_len += next_len
+                                next_cursor = str(next_row.get("next_chunk_id", "") or "")
+                                added_this_round = True
+
+                if not added_this_round:
+                    break
+
+        if appended:
+            logger.info(
+                "Layer1 neighbor_expand kb=%s base=%d appended=%d",
+                self.kb_id, len(hit_ids), len(appended),
+            )
+        return list(hit_ids) + appended
+
     def _docs_to_expand(
-        self, hit_ids: List[int], question: str
+        self, hit_ids: List[int], question: str,
+        *,
+        allow_only: Optional[Set[str]] = None,
     ) -> Set[str]:
         """
         根据首轮命中与用户意图，决定要扩展为「全文」的 doc 集合。
@@ -465,9 +606,15 @@ class RagRunner:
           算成与各种 query 中等相关（mode collapse 风险），单条命中触发整本
           扩展会污染 top-k；要求多步命中或靠前位置才扩展。
 
+        Phase 11.3 Layer 2 门卫（per-doc 探测）：
+        - allow_only 非 None 时，候选 doc 集合预先与 allow_only 取交集
+        - 用于把 STEP 整本扩展限制在真正"STEP-heavy"的 doc 上，避免对零 STEP doc
+          意外触发（虽然现有正则已隐式过滤，门卫显式表达意图、便于以后调阈值）
+
         参数:
             hit_ids: 第 1 轮 vector + rerank 后的命中行号列表（按相关性降序）
             question: 用户问题（用于流程意图判定）
+            allow_only: 可选门卫集合；非空时返回值必须是它的子集
         """
         TOP_RANK_FOR_SINGLE_STEP = 3  # 单条 step_N 命中必须在 top-3 才扩展
         MIN_STEPS_FOR_EXPAND = 2  # 否则要 ≥2 条 step_N 命中
@@ -512,8 +659,14 @@ class RagRunner:
                 continue
             docs_from_steps.add(d)
 
+        def _apply_gate(candidate: Set[str]) -> Set[str]:
+            """Phase 11.3 门卫：allow_only 非 None 时只保留交集（per-doc STEP-heavy）。"""
+            if allow_only is None:
+                return candidate
+            return candidate & allow_only
+
         if docs_from_steps:
-            return docs_from_steps
+            return _apply_gate(docs_from_steps)
         if self._procedure_intent(question):
             out: Set[str] = set()
             for d in docs_from_hits:
@@ -522,7 +675,7 @@ class RagRunner:
                     for r in self._rows
                 ):
                     out.add(d)
-            return out
+            return _apply_gate(out)
         return set()
 
     def _doc_first_seen_order(self, hit_ids: List[int]) -> List[str]:
@@ -609,9 +762,14 @@ class RagRunner:
         if mode not in ("quick", "agent"):
             mode = "quick"
         if mode == "agent":
+            # agent 模式：全文深读不受 step-heavy 门卫限制（用户主动触发深度推理）
             expand_docs = self._docs_for_agent_deep_read(hit_ids)
         else:
-            expand_docs = self._docs_to_expand(hit_ids, question)
+            # quick 模式（Layer 2）：仅允许真正含 ≥ STEP_HEAVY_DOC_THRESHOLD 个
+            # STEP 块的 doc 触发整本扩展；其余 doc 走 Layer 1 邻居补语境
+            expand_docs = self._docs_to_expand(
+                hit_ids, question, allow_only=self._step_heavy_docs
+            )
         if not expand_docs:
             return list(hit_ids), []
         expand_docs = self._narrow_expand_docs(hit_ids, expand_docs)
@@ -1485,6 +1643,19 @@ class RagRunner:
             for line in corpus_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
+        # Phase 11.3 双层扩展索引：
+        #   _id_to_row     —— Layer 1 邻居链按 chunk_id 反查行号
+        #   _step_heavy_docs —— Layer 2 门卫：仅含 ≥ STEP_HEAVY_DOC_THRESHOLD 个
+        #                       STEP 块的 doc 允许触发整本扩展（per-doc 探测，
+        #                       agv_demo 20 份 docx 实测只 1 份满足）
+        self._id_to_row = self._build_id_to_row_index()
+        self._step_heavy_docs = self._compute_step_heavy_docs()
+        logger.info(
+            "rag_runner kb=%s step_heavy_docs=%d/%d",
+            self.kb_id,
+            len(self._step_heavy_docs),
+            len({str(r.get("doc", "")) for r in self._rows if r.get("doc")}),
+        )
         # Phase 5.1.3：通过 VectorStore 工厂按 backend 选择存储后端
         # YAML vector_backend > env ULTRARAG_VECTOR_BACKEND > 默认 faiss
         from custom_app.services.vectorstore import (
@@ -1864,6 +2035,9 @@ class RagRunner:
         hit_ids, expanded_docs = self._expand_hit_ids(
             hit_ids, q, agent_mode=requested_mode
         )
+        # Phase 11.3 Layer 1（通用邻居扩展）：对短 chunk 按 prev/next_chunk_id 链补足语境
+        # 对所有 KB 一视同仁、零领域硬编码；放在 Layer 2 之后，作用于最终命中列表
+        hit_ids = self._expand_short_chunks_with_neighbors(hit_ids)
         final_k = len(hit_ids)
         prompt_text = self._build_prompt(q, hit_ids)
         effective_mode = (

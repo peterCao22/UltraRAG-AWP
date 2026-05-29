@@ -234,6 +234,10 @@ def _parse_stage(kb: dict, raw_dir: Path, kb_root: Path, chunks_path: Path) -> N
     chunks = parse_files(kb_type, raw_files, kb_root, kb_id=kb.get("kb_id", ""))
     # parse_files 返回 list[Chunk]；write_chunks_jsonl 期望 list[dict]
     chunk_dicts = [c.to_jsonl_dict() for c in chunks]
+    # 注入 prev_chunk_id / next_chunk_id（doc 内邻居链，Layer 1 邻居扩展前置依赖）
+    # docx_parser 路径在 parse_directory 内已注入；general 路径在此处补齐
+    from custom_app.services.docx_parser import link_neighbors_in_place
+    link_neighbors_in_place(chunk_dicts)
     write_chunks_jsonl(chunk_dicts, chunks_path)
 
 

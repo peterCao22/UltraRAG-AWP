@@ -743,7 +743,40 @@ def parse_docx(docx_path: Path, kb_root: Path) -> List[Dict[str, Any]]:
             cur_imgs,
         )
 
+    # 注入 prev_chunk_id / next_chunk_id（doc 内邻居链）
+    # 单 doc 调用场景下也保证邻居字段齐全；parse_directory 末尾会再跑一次（幂等）
+    link_neighbors_in_place(chunks_out)
     return chunks_out
+
+
+def link_neighbors_in_place(chunks: List[Dict[str, Any]]) -> None:
+    """为 chunks 列表注入 prev_chunk_id / next_chunk_id 字段（doc 内串链）。
+
+    设计要点（对齐 WeKnora merge_expand.go 的邻居模型）：
+        - 按 ``doc`` 字段分组，每组内按出现顺序两两相连
+        - 首/尾 chunk 对应字段为空字符串（语义：无邻居）
+        - 严格 doc 边界：跨 doc 不连接（防御性，避免 Layer 1 邻居扩展拉到无关 chunk）
+        - 缺 doc 字段的 chunk 单独成组（自身视为孤立 doc）
+
+    参数:
+        chunks: 由 ``parse_docx`` 或 ``parse_directory`` 产出的 chunk 列表，原地修改。
+    """
+    if not chunks:
+        return
+
+    # 按 doc 分组保持出现顺序（dict 保序）
+    by_doc: Dict[str, List[Dict[str, Any]]] = {}
+    for ch in chunks:
+        doc_key = str(ch.get("doc") or "")
+        by_doc.setdefault(doc_key, []).append(ch)
+
+    for group in by_doc.values():
+        n = len(group)
+        for idx, ch in enumerate(group):
+            prev_id = str(group[idx - 1].get("id", "")) if idx > 0 else ""
+            next_id = str(group[idx + 1].get("id", "")) if idx < n - 1 else ""
+            ch["prev_chunk_id"] = prev_id
+            ch["next_chunk_id"] = next_id
 
 
 def parse_directory(raw_dir: Path, kb_root: Path) -> List[Dict[str, Any]]:
@@ -753,6 +786,7 @@ def parse_directory(raw_dir: Path, kb_root: Path) -> List[Dict[str, Any]]:
         if docx.name.startswith("~$"):
             continue
         chunks.extend(parse_docx(docx, kb_root))
+    link_neighbors_in_place(chunks)
     return chunks
 
 
