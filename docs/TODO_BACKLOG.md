@@ -59,7 +59,8 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 ### 关键运维提示
 
 - ANTHROPIC_API_KEY 2026-05-29 已 rotate，旧 key (`tZ...xZZ-AAA`) 已失效
-- 上次撞 spend cap 原因未完全查清（Flask 只贡献 4 万 token，但 Console 显示 3500 万），rotate 后观察 1-2 天
+- 5/28 撞 spend cap 根因已查清：**其他 API 项目占用**（非本 RAG 系统）。已修复其
+  他 API 后未再复发；Phase 11.1.6 配额计量任务因此取消（见 §四.3）
 - bge-reranker 改远程后释放本机显存 ~3-5 GB
 - 默认对话模型在 admin 后台 chat_models 表里是 **Claude Sonnet 4.6**（不是 Opus，避免高额费用）
 
@@ -75,7 +76,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 |---|---|---|---|
 | ~~1~~ | ~~rag_runner.py 硬编码重构（WeKnora 双层扩展）~~ ✅ 2026-05-29 commit `58143b7` | — | §四.1 |
 | ~~2~~ | ~~Phase 12.2 Session Memory~~ ✅ 2026-06-01 commit `1467047` | — | §四.2 |
-| 3 | Phase 11.1.6 Rate Limiting + 配额计量 | 3-4 天 | §四.3 |
+| ~~3~~ | ~~Phase 11.1.6 Rate Limiting + 配额计量~~ ❌ 2026-06-01 用户决定不做（5/28 spend cap 根因是其他 API 而非本 RAG 系统；改完其他 API 后未复发） | — | §四.3 |
 
 ### 🟡 中优先级（按需做）
 
@@ -172,11 +173,15 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 
 ---
 
-### §四.3 🔴 Phase 11.1.6 Rate Limiting + 配额计量
+### §四.3 ❌ Phase 11.1.6 Rate Limiting + 配额计量（已取消，2026-06-01）
 
-**目标**：防止单用户刷爆配额；统计每 tenant 的 LLM 调用。
+**取消原因**：2026-06-01 用户排查确认 5/28 spend cap 根因是**其他 API 项目**（非本
+RAG 系统）。改完其他 API 的限额设置后未再复发，本系统不再需要单独做配额计量。
+未来若 RAG 调用量级上升或多租户场景上线，再回头评估。
 
-**为什么做**：2026-05-28 撞 Anthropic spend cap（$100 → 100% used），key 已 rotate 但根因未完全查清。这个能直接挡住未来再发生。
+**~~目标~~**：~~防止单用户刷爆配额；统计每 tenant 的 LLM 调用。~~
+
+**~~为什么做~~**：~~2026-05-28 撞 Anthropic spend cap（$100 → 100% used），key 已 rotate 但根因未完全查清。这个能直接挡住未来再发生。~~
 
 **功能**：
 - per-tenant / per-user 每分钟 / 每小时 / 每天 调用上限
