@@ -989,13 +989,23 @@ class RagRunner:
                     )
         return blocks
 
-    def _build_prompt(self, question: str, ids: List[int]) -> str:
+    def _build_prompt(
+        self,
+        question: str,
+        ids: List[int],
+        *,
+        prior_summary: str = "",
+        recent_turns: List[Dict[str, Any]] | None = None,
+    ) -> str:
         """
         按模板渲染最终 prompt 文本。
 
         参数:
             question: 用户问题。
             ids: 检索命中行号列表。
+            prior_summary: Phase 12.2 摘要文本；非空时拼入模板 prior_summary 段。
+            recent_turns: Phase 12.2 最近 K 轮原始对话（最旧→最新），每项含
+                role_label + content；空 / None 时不渲染对话历史段。
         返回:
             str: 渲染后的提示词文本。
         """
@@ -1025,6 +1035,8 @@ class RagRunner:
             answer_language=policy.language,
             language_instruction=policy.instruction,
             no_information_text=policy.no_information_text,
+            prior_summary=(prior_summary or "").strip(),
+            recent_turns=recent_turns or [],
         )
 
     def _gemini_rest_base(self) -> str:
@@ -1939,6 +1951,7 @@ class RagRunner:
         *,
         agent_mode: str = "quick",
         history: List[Dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> Dict[str, Any]:
         """
         检索与 prompt 组装（与 `chat` 前半段一致），供同步生成与流式生成共用。
@@ -1947,12 +1960,15 @@ class RagRunner:
             question: 用户问题。
             top_k: 可选覆盖检索条数。
             agent_mode: ``quick`` | ``agent``；agent 时启用层 A 全文 chunk 扩展（见 `_expand_hit_ids`）。
-            history: 可选历史轮次（最旧→最新），用于 Phase 12.1 指代消解。
-                     None / 空 → 跳过指代消解。
+            history: 可选历史轮次（最旧→最新），用于 Phase 12.1 指代消解
+                     和 Phase 12.2 拼最近 K 轮到 prompt。
+                     None / 空 → 跳过两者。
+            session_id: 可选 session id；Phase 12.2 用它读 kb_sessions.summary
+                     作为长会话浓缩上下文。None / 空 → 跳过 summary 注入。
         返回:
             dict: 含 q、rewritten_q、hit_ids、prompt_text、rerank_meta、expanded_docs、
             recall_k、final_k、final_k_cfg 等下游 `_build_result_from_raw` 所需字段；
-            Phase 12.1 起额外含 reference_resolution dict（applied=False 时也有占位）。
+            Phase 12.1 起含 reference_resolution dict；Phase 12.2 起含 session_memory dict。
         """
         if self._index is None:
             raise RuntimeError("RagRunner not initialized. Call init() first.")
@@ -2039,7 +2055,47 @@ class RagRunner:
         # 对所有 KB 一视同仁、零领域硬编码；放在 Layer 2 之后，作用于最终命中列表
         hit_ids = self._expand_short_chunks_with_neighbors(hit_ids)
         final_k = len(hit_ids)
-        prompt_text = self._build_prompt(q, hit_ids)
+
+        # Phase 12.2：长会话记忆 — 拼 [summary] + [最近 K 轮] 进 prompt
+        # session_id 非空时读 kb_sessions.summary；history 非空时截最近 K 轮
+        prior_summary = ""
+        recent_turns_for_prompt: List[Dict[str, Any]] = []
+        memory_meta: Dict[str, Any] = {
+            "summary_chars": 0, "recent_k": 0, "session_id": session_id or "",
+        }
+        if session_id:
+            try:
+                from custom_app.services import session_memory
+                prior_summary = session_memory.get_summary_for_prompt(session_id)
+                memory_meta["summary_chars"] = len(prior_summary)
+            except Exception as e:  # noqa: BLE001 — DB 故障不阻塞主对话
+                logger.warning(
+                    "session_memory load failed session=%s: %s", session_id, e,
+                )
+        if history:
+            from custom_app.services import session_memory  # 单独 try 不污染上面
+            try:
+                recent_k = session_memory.get_recent_k()
+            except Exception:  # noqa: BLE001
+                recent_k = 6
+            tail = history[-recent_k:] if recent_k > 0 else []
+            for turn in tail:
+                role = (turn.get("role") or "").strip()
+                content = (turn.get("content") or "").strip()
+                if not content:
+                    continue
+                role_label = {"user": "User", "assistant": "Assistant"}.get(role, role)
+                recent_turns_for_prompt.append({
+                    "role_label": role_label,
+                    "content": content[:1500],  # 单条硬截断防超长
+                })
+            memory_meta["recent_k"] = len(recent_turns_for_prompt)
+
+        prompt_text = self._build_prompt(
+            q, hit_ids,
+            prior_summary=prior_summary,
+            recent_turns=recent_turns_for_prompt,
+        )
         effective_mode = (
             "agent"
             if (requested_mode == "agent" and bool(expanded_docs))
@@ -2064,6 +2120,7 @@ class RagRunner:
             "requested_agent_mode": requested_mode,
             "effective_agent_mode": effective_mode,
             "reference_resolution": ref_result.to_meta(),
+            "session_memory": memory_meta,
             "degraded": degraded,
             "degrade_reason": degrade_reason,
         }
@@ -2149,6 +2206,8 @@ class RagRunner:
         top_k: int | None = None,
         *,
         agent_mode: str = "quick",
+        history: List[Dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> Dict[str, Any]:
         """
         单轮问答主流程：
@@ -2158,6 +2217,8 @@ class RagRunner:
             question: 用户输入问题。
             top_k: 可选覆盖默认检索条数；为 None 时使用配置值。
             agent_mode: ``quick`` | ``agent``；与流式接口语义一致（层 A / 降级 meta）。
+            history: 可选历史轮次（最旧→最新），Phase 12.1 / 12.2 输入。
+            session_id: 可选 session id，Phase 12.2 长会话摘要拼 prompt 用。
         返回:
             Dict[str, Any]: 含 answer、answer_blocks、sources。
             answer 为展示用 Markdown（由 answer_blocks 拼接，含 data URL 插图，与中文步骤同屏）；
@@ -2167,7 +2228,10 @@ class RagRunner:
             RuntimeError: 未初始化索引时抛出。
             ValueError: 问题为空时抛出。
         """
-        prep = self._prepare_chat_context(question, top_k, agent_mode=agent_mode)
+        prep = self._prepare_chat_context(
+            question, top_k, agent_mode=agent_mode,
+            history=history, session_id=session_id,
+        )
         answer_raw = self._generate(prep["prompt_text"])
         return self._build_result_from_raw(prep, answer_raw)
 
@@ -2345,6 +2409,7 @@ class RagRunner:
         agent_mode: str = "quick",
         profile: bool = False,
         history: List[Dict[str, Any]] | None = None,
+        session_id: str | None = None,
     ) -> Iterator[Dict[str, Any]]:
         """
         以 SSE 事件字典序列的形式输出单轮问答结果。
@@ -2384,7 +2449,8 @@ class RagRunner:
         yield {"type": "status", "content": "正在检索并生成回答…"}
         t_prep_begin = time.perf_counter()
         prep = self._prepare_chat_context(
-            question, top_k, agent_mode=normalized_mode, history=history,
+            question, top_k, agent_mode=normalized_mode,
+            history=history, session_id=session_id,
         )
         t_prep_end = time.perf_counter()
 

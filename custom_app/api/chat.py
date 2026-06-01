@@ -423,6 +423,8 @@ def chat_stream():
         # 仅 agent 模式收集；quick 模式 reasoning_events 保持空，落库为 {}
         reasoning_events: list[dict] = []
         reasoning_meta: dict = {}
+        # Phase 12.2: done 事件 yield 完毕后再触发 session memory 摘要（防阻塞 SSE）
+        _should_summarize = False
         try:
             # 在加载 FAISS/语料之前先发 SSE，避免客户端长时间 0 字节（误以为卡死）。
             yield (
@@ -458,7 +460,8 @@ def chat_stream():
                     except Exception:
                         logger.exception("list_messages_for_agent failed, proceeding without history")
                 event_iter = runner.chat_stream(
-                    question=question, top_k=top_k, profile=profile, history=history
+                    question=question, top_k=top_k, profile=profile,
+                    history=history, session_id=session_id_opt,
                 )
             elif mode == "deep_reasoning":
                 # Phase 8.3 IRCoT 路径：非流式调用包装成 SSE。
@@ -528,6 +531,7 @@ def chat_stream():
                 event_iter = runner.chat_stream(
                     question=question, top_k=top_k, agent_mode=agent_mode,
                     profile=profile, history=quick_history,
+                    session_id=session_id_opt,
                 )
             for event in event_iter:
                 et = event.get("type")
@@ -567,9 +571,30 @@ def chat_stream():
                             )
                         except Exception:
                             logger.exception("append_chat_turn failed")
+                        # Phase 12.2: 标记 done 后跑 session memory 摘要
+                        # 真正调用放到循环外（done 已 yield 给客户端，避免阻塞前端体感）
+                        _should_summarize = True
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            # Phase 12.2: done 事件已全部 yield 完，此处同步触发摘要
+            # 失败仅记日志（不再向客户端 yield 错误，避免污染流末尾）
+            if _should_summarize and session_id_opt:
+                try:
+                    from custom_app.services.session_memory import maybe_summarize
+                    mem_result = maybe_summarize(session_id_opt)
+                    if mem_result.applied:
+                        logger.info(
+                            "session_memory updated session=%s chars=%d "
+                            "facts=%d ms=%d",
+                            session_id_opt,
+                            len(mem_result.summary),
+                            len(mem_result.facts),
+                            mem_result.ms,
+                        )
+                except Exception:
+                    logger.exception("maybe_summarize failed")
 
     return Response(
         stream_with_context(generate()),

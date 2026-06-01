@@ -157,3 +157,59 @@ class SessionRepository:
         with self._provider.connect() as conn:
             cur = conn.execute(adapt_sql(sql, self._provider), (session_id,))
             return fetch_all_as_dicts(cur)
+
+    # ------------------------------------------------------------------
+    # Phase 12.2 Session Memory：摘要状态读写
+    # ------------------------------------------------------------------
+
+    def get_summary_state(self, session_id: str) -> Optional[dict[str, Any]]:
+        """读取摘要状态（summary 文本 + 上次摘要时的 max msg_id + 时间戳）。
+
+        返回:
+            {"summary": str, "summary_at_msg_id": int, "summary_updated_at": str}
+            或 None（session 不存在）
+        """
+        sql = (
+            "SELECT summary, summary_at_msg_id, summary_updated_at "
+            "FROM kb_sessions WHERE session_id = ?"
+        )
+        with self._provider.connect() as conn:
+            cur = conn.execute(adapt_sql(sql, self._provider), (session_id,))
+            return fetch_one_as_dict(cur)
+
+    def update_summary(
+        self,
+        session_id: str,
+        *,
+        summary: str,
+        summary_at_msg_id: int,
+        summary_updated_at: str,
+    ) -> None:
+        """覆盖式更新摘要状态。
+
+        参数:
+            summary:              新的 200 字摘要文本（已截断）
+            summary_at_msg_id:    本次摘要覆盖到的最后一条 message.id
+            summary_updated_at:   ISO 时间戳，调试/审计用
+        """
+        sql = (
+            "UPDATE kb_sessions "
+            "SET summary = ?, summary_at_msg_id = ?, summary_updated_at = ? "
+            "WHERE session_id = ?"
+        )
+        with self._provider.connect() as conn:
+            conn.execute(
+                adapt_sql(sql, self._provider),
+                (summary, int(summary_at_msg_id), summary_updated_at, session_id),
+            )
+
+    def max_message_id(self, session_id: str) -> int:
+        """返回 session 内 max(message.id)；空 session 返回 0。"""
+        sql = (
+            "SELECT COALESCE(MAX(id), 0) AS max_id "
+            "FROM kb_session_messages WHERE session_id = ?"
+        )
+        with self._provider.connect() as conn:
+            cur = conn.execute(adapt_sql(sql, self._provider), (session_id,))
+            row = fetch_one_as_dict(cur) or {}
+            return int(row.get("max_id") or 0)

@@ -116,7 +116,10 @@ def init_db() -> None:
               title TEXT NOT NULL DEFAULT '',
               agent_mode TEXT NOT NULL DEFAULT 'quick',
               created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL
+              updated_at TEXT NOT NULL,
+              summary TEXT NOT NULL DEFAULT '',
+              summary_at_msg_id INTEGER NOT NULL DEFAULT 0,
+              summary_updated_at TEXT NOT NULL DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_kb_sessions_kb_updated
@@ -267,6 +270,26 @@ def init_db() -> None:
                 "ALTER TABLE kg_relations ADD COLUMN doc_id TEXT DEFAULT ''"
             )
 
+        # Phase 12.2 迁移：kb_sessions 加 summary / summary_at_msg_id / summary_updated_at
+        # 与 Postgres 端 postgres_provider.py 的 DDL 对齐；老库零感升级。
+        # 用途：长会话摘要 — 每 N 轮压缩为 200 字摘要，下次 chat 时拼进 prompt。
+        cur = conn.execute("PRAGMA table_info(kb_sessions)")
+        sess_cols = {row["name"] for row in cur.fetchall()}
+        if "summary" not in sess_cols:
+            conn.execute(
+                "ALTER TABLE kb_sessions ADD COLUMN summary TEXT NOT NULL DEFAULT ''"
+            )
+        if "summary_at_msg_id" not in sess_cols:
+            conn.execute(
+                "ALTER TABLE kb_sessions "
+                "ADD COLUMN summary_at_msg_id INTEGER NOT NULL DEFAULT 0"
+            )
+        if "summary_updated_at" not in sess_cols:
+            conn.execute(
+                "ALTER TABLE kb_sessions "
+                "ADD COLUMN summary_updated_at TEXT NOT NULL DEFAULT ''"
+            )
+
         # Phase 7.2.A 种子数据：插入两个内置 agent（已存在则跳过）。
         # 与 Postgres 端 apply_phase7_2_a_migration.py 的种子逻辑保持一致。
         _seed_builtin_agents(conn)
@@ -280,6 +303,9 @@ _AGV_SOP_SYSTEM_PROMPT = (
     "with Simplified Chinese for all narrative and procedural text "
     "(translate English SOP excerpts faithfully). "
     "Do not reply in English to Chinese questions.\n"
+    "When the user's question is in English and does not explicitly ask for translation, "
+    "answer in English and do not translate the answer into Chinese.\n"
+    "If the user explicitly asks for translation, follow the requested translation direction.\n"
     "Never omit procedural steps or safety items from those excerpts "
     "(faithful translation / rephrasing only).\n"
     "If information is missing from the excerpts, state clearly that the documentation "

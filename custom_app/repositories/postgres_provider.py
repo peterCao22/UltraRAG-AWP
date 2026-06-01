@@ -191,13 +191,21 @@ CREATE INDEX IF NOT EXISTS idx_role_kb_perm
   ON role_kb_permissions (role_id, kb_id);
 
 CREATE TABLE IF NOT EXISTS kb_sessions (
-  session_id TEXT NOT NULL PRIMARY KEY,
-  kb_id      TEXT NOT NULL,
-  title      TEXT NOT NULL DEFAULT '',
-  agent_mode TEXT NOT NULL DEFAULT 'quick',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  session_id          TEXT NOT NULL PRIMARY KEY,
+  kb_id               TEXT NOT NULL,
+  title               TEXT NOT NULL DEFAULT '',
+  agent_mode          TEXT NOT NULL DEFAULT 'quick',
+  created_at          TEXT NOT NULL,
+  updated_at          TEXT NOT NULL,
+  summary             TEXT NOT NULL DEFAULT '',
+  summary_at_msg_id   INTEGER NOT NULL DEFAULT 0,
+  summary_updated_at  TEXT NOT NULL DEFAULT ''
 );
+
+-- Phase 12.2 老库升级：已存在的 kb_sessions 表补三列（IF NOT EXISTS Postgres 9.6+）
+ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';
+ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS summary_at_msg_id INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS summary_updated_at TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_kb_sessions_kb_updated
   ON kb_sessions (kb_id, updated_at);
@@ -296,7 +304,7 @@ CREATE TABLE IF NOT EXISTS kg_relations (
   relation_type TEXT NOT NULL,
   description   TEXT DEFAULT '',
   strength      INTEGER DEFAULT 5,
-  -- Phase 6.2: per-document scope; old rows get '' via migration script.
+  -- Phase 6.2 per-document scope, old rows get '' via migration script
   doc_id        TEXT DEFAULT '',
   created_at    TEXT NOT NULL
 );

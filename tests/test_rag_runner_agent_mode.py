@@ -97,7 +97,7 @@ def test_prepare_agent_degraded_when_no_doc_on_hits(runner_rows, monkeypatch):
         "custom_app.services.rag_runner.embed_query",
         lambda q: np.zeros((1, 4), dtype="float32"),
     )
-    monkeypatch.setattr(r, "_build_prompt", lambda q, ids: "prompt")
+    monkeypatch.setattr(r, "_build_prompt", lambda q, ids, **_kw: "prompt")
 
     prep = r._prepare_chat_context("hi", agent_mode="agent")
     assert prep["degraded"] is True
@@ -127,7 +127,7 @@ def test_prepare_phase12_1_reference_resolution_applied(runner_rows, monkeypatch
     monkeypatch.setattr(
         "custom_app.services.rag_runner.embed_query", fake_embed,
     )
-    monkeypatch.setattr(r, "_build_prompt", lambda q, ids: "prompt")
+    monkeypatch.setattr(r, "_build_prompt", lambda q, ids, **_kw: "prompt")
     r._rewrite_query = lambda q: q
 
     # mock resolve_references 直接返回采纳的改写结果
@@ -179,7 +179,7 @@ def test_prepare_phase12_1_no_history_no_resolution(runner_rows, monkeypatch):
         "custom_app.services.rag_runner.embed_query",
         lambda q: np.zeros((1, 4), dtype="float32"),
     )
-    monkeypatch.setattr(r, "_build_prompt", lambda q, ids: "prompt")
+    monkeypatch.setattr(r, "_build_prompt", lambda q, ids, **_kw: "prompt")
 
     prep = r._prepare_chat_context("它怎么操作？", agent_mode="quick")  # 没传 history
     ref = prep["reference_resolution"]
@@ -227,7 +227,7 @@ def test_quick_chat_stream_default_uses_streaming(runner_rows, monkeypatch):
     r._rerank_cfg = {}
     r._rerank_model = None
     r._rewrite_query = lambda q: q
-    r._build_prompt = lambda q, ids: "prompt"
+    r._build_prompt = lambda q, ids, **_kw: "prompt"
     r._generate = MagicMock(side_effect=AssertionError("non-stream should not be used by default"))
     r._generate_stream = MagicMock(return_value=iter(["chunk1 ", "chunk2"]))
     r._build_result_from_raw = MagicMock(return_value={

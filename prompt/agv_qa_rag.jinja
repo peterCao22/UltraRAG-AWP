@@ -1,3 +1,22 @@
+{% if prior_summary or recent_turns %}
+You are continuing an ongoing conversation. The user's new question may reference
+information from earlier turns. Read the prior context below, but **answer the new
+question primarily using the SOP excerpts that follow**.
+
+{% if prior_summary %}
+[Prior conversation summary]
+{{ prior_summary }}
+
+{% endif %}
+{% if recent_turns %}
+[Recent dialogue turns — oldest to newest]
+{% for t in recent_turns %}
+{{ t.role_label }}: {{ t.content }}
+{% endfor %}
+
+{% endif %}
+---
+{% endif %}
 The following excerpts are from SOP/knowledge-base documents. Each has a unique identifier (source_id).
 
 {% for psg in passages %}
