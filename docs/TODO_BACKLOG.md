@@ -41,6 +41,9 @@ Phase 11.3 双层扩展：
   ├─ Layer 2（STEP 全文）：仅 step_heavy_docs（≥5 STEP）触发，agv_demo 20 doc 中 1 个
   └─ Layer 1（通用邻居）：短 chunk < 350 字按 prev/next_chunk_id 链补到 350-850
   ↓
+Phase 12.2 prompt 拼接：[summary] + [最近 6 轮 history] + [检索段] + 当前 query
+  └─ done 后异步：每 10 条 message 触发 maybe_summarize（Claude Haiku 4.5）
+  ↓
 LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备选）
 ```
 
@@ -71,7 +74,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 | # | 任务 | 工时 | 跳到详细卡 |
 |---|---|---|---|
 | ~~1~~ | ~~rag_runner.py 硬编码重构（WeKnora 双层扩展）~~ ✅ 2026-05-29 commit `58143b7` | — | §四.1 |
-| 2 | Phase 12.2 Session Memory | 1 周 | §四.2 |
+| ~~2~~ | ~~Phase 12.2 Session Memory~~ ✅ 2026-06-01 commit `1467047` | — | §四.2 |
 | 3 | Phase 11.1.6 Rate Limiting + 配额计量 | 3-4 天 | §四.3 |
 
 ### 🟡 中优先级（按需做）
@@ -109,6 +112,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `1467047` | feat(phase12.2): Session Memory（长会话摘要）+ 主对话 history-in-prompt；多轮 80 条 Hit@5 0.9250→0.9250 不回归 | 2026-06-01 |
 | `58143b7` | feat(phase11.3): rag_runner 双层扩展（WeKnora 邻居 + per-doc STEP 门卫）；agv_demo Hit@5 0.8923→0.9000 | 2026-05-29 |
 | `85996c0` | docs(env): bge-reranker URL 提示需带 /v1 | 2026-05-29 |
 | `bd0c8d5` | docs(tech-debt): 修订探测粒度为 per-doc | 2026-05-28 |
