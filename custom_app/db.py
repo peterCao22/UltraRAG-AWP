@@ -226,6 +226,26 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_kg_rel_kb ON kg_relations(kb_id);
             CREATE INDEX IF NOT EXISTS idx_kg_rel_source ON kg_relations(source_id);
             CREATE INDEX IF NOT EXISTS idx_kg_rel_target ON kg_relations(target_id);
+
+            -- Phase 11.1.2（最小版）：审计日志 — 仅记问答事件
+            -- 用途：合规追溯 + 给 Phase 12.x 评测提供真实多轮对话数据源
+            -- 设计约束：只允许 INSERT；UPDATE/DELETE 不暴露 Repository 接口
+            CREATE TABLE IF NOT EXISTS audit_logs (
+              id          INTEGER PRIMARY KEY AUTOINCREMENT,
+              ts          TEXT NOT NULL,
+              tenant_id   TEXT NOT NULL DEFAULT 'default',
+              session_id  TEXT NOT NULL DEFAULT '',
+              kb_id       TEXT NOT NULL DEFAULT '',
+              event_type  TEXT NOT NULL,
+              query       TEXT NOT NULL DEFAULT '',
+              answer      TEXT NOT NULL DEFAULT '',
+              chunk_ids   TEXT NOT NULL DEFAULT '[]',
+              meta        TEXT NOT NULL DEFAULT '{}'
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_audit_kb_ts ON audit_logs (kb_id, ts);
+            CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs (session_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_logs (event_type);
             """
         )
 

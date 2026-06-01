@@ -425,6 +425,10 @@ def chat_stream():
         reasoning_meta: dict = {}
         # Phase 12.2: done 事件 yield 完毕后再触发 session memory 摘要（防阻塞 SSE）
         _should_summarize = False
+        # Phase 11.1.2（最小版）：累计本轮命中的 chunk_id，done 后写审计
+        qa_chunk_ids: list[str] = []
+        qa_meta: dict = {}
+        _should_audit = False
         try:
             # 在加载 FAISS/语料之前先发 SSE，避免客户端长时间 0 字节（误以为卡死）。
             yield (
@@ -540,6 +544,16 @@ def chat_stream():
                 elif et in ("thought", "tool_call", "tool_result") and agent_mode == "agent":
                     # 累积推理痕迹用于会话历史回放（不含原始 chunk 文本）
                     reasoning_events.append(_compact_reasoning_event(event))
+                elif et == "sources":
+                    # Phase 11.1.2: 抓 chunk_ids 用于 audit；不影响事件转发
+                    srcs = event.get("sources") or []
+                    if isinstance(srcs, list):
+                        for s in srcs:
+                            if not isinstance(s, dict):
+                                continue
+                            cid = str(s.get("source_id") or "").strip()
+                            if cid and cid not in qa_chunk_ids:
+                                qa_chunk_ids.append(cid)
                 elif et == "done":
                     fa = event.get("answer")
                     if isinstance(fa, str) and fa.strip():
@@ -574,10 +588,34 @@ def chat_stream():
                         # Phase 12.2: 标记 done 后跑 session memory 摘要
                         # 真正调用放到循环外（done 已 yield 给客户端，避免阻塞前端体感）
                         _should_summarize = True
+                    # Phase 11.1.2: done 后写 qa 审计（无 session_id 也写，反映匿名提问）
+                    if question:
+                        qa_meta = {
+                            "agent_mode": agent_mode,
+                            "effective_agent_mode": reasoning_meta.get("effective_agent_mode"),
+                            "retrieval_source_count": (meta or {}).get("retrieval_source_count"),
+                            "no_answer_from_documents": (meta or {}).get("no_answer_from_documents", False),
+                        }
+                        _should_audit = True
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)}, ensure_ascii=False)}\n\n"
         finally:
+            # Phase 11.1.2: done 后写 qa 审计（done 已 yield，不阻塞前端）
+            # 即使 session_id 为空也记录（覆盖匿名 /api/chat/markdown 入口）
+            if _should_audit and question:
+                try:
+                    from custom_app.services.audit_log import log_qa
+                    log_qa(
+                        kb_id=kb_id,
+                        session_id=session_id_opt,
+                        query=question,
+                        answer=final_answer or "".join(accumulated).strip(),
+                        chunk_ids=qa_chunk_ids,
+                        extra_meta=qa_meta,
+                    )
+                except Exception:
+                    logger.exception("audit_log.log_qa failed")
             # Phase 12.2: done 事件已全部 yield 完，此处同步触发摘要
             # 失败仅记日志（不再向客户端 yield 错误，避免污染流末尾）
             if _should_summarize and session_id_opt:

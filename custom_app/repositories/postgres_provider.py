@@ -312,6 +312,25 @@ CREATE TABLE IF NOT EXISTS kg_relations (
 CREATE INDEX IF NOT EXISTS idx_kg_rel_kb ON kg_relations(kb_id);
 CREATE INDEX IF NOT EXISTS idx_kg_rel_source ON kg_relations(source_id);
 CREATE INDEX IF NOT EXISTS idx_kg_rel_target ON kg_relations(target_id);
+
+-- Phase 11.1.2 minimal audit log: append-only QA event store.
+-- Purpose: compliance trail + ground-truth data source for Phase 12.x evals.
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id          SERIAL PRIMARY KEY,
+  ts          TEXT NOT NULL,
+  tenant_id   TEXT NOT NULL DEFAULT 'default',
+  session_id  TEXT NOT NULL DEFAULT '',
+  kb_id       TEXT NOT NULL DEFAULT '',
+  event_type  TEXT NOT NULL,
+  query       TEXT NOT NULL DEFAULT '',
+  answer      TEXT NOT NULL DEFAULT '',
+  chunk_ids   TEXT NOT NULL DEFAULT '[]',
+  meta        TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_kb_ts ON audit_logs (kb_id, ts);
+CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs (session_id);
+CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_logs (event_type);
 """
 
 
