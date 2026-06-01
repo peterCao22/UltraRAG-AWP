@@ -44,7 +44,13 @@ Phase 11.3 双层扩展：
 Phase 12.2 prompt 拼接：[summary] + [最近 6 轮 history] + [检索段] + 当前 query
   └─ done 后异步：每 10 条 message 触发 maybe_summarize（Claude Haiku 4.5）
   ↓
+Phase 12.3 反问判定（零 LLM，并行）：
+  rerank top_score < 0.30 或 top-5 跨 ≥2 doc → yield clarification SSE 事件
+  ↓
 LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备选）
+  ↓
+Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_ids
+  + clarification meta，append-only）
 ```
 
 ### KB 状态
@@ -83,7 +89,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 | # | 任务 | 工时 | 跳到详细卡 |
 |---|---|---|---|
 | ~~4~~ | ~~Phase 11.1.2 审计日志~~ ✅ 2026-06-01 commit `f9685ec`（**最小版**：仅 QA 事件 append-only；admin UI / 认证打点 / 数据操作打点延期） | — | §四.4 |
-| 5 | Phase 12.3 Clarification（主动反问） | 1 周 | §四.5 |
+| ~~5~~ | ~~Phase 12.3 Clarification（主动反问）~~ ✅ 2026-06-01 commit `38e857b`（零 LLM 实现：rerank 低分 + 跨域 doc 双触发器） | — | §四.5 |
 | 6 | Phase 12.4 Multi-turn Agent 状态优化 | 1-2 周 | §四.6 |
 | 7 | Phase 11.1.5 Query 意图理解 | 3-4 天 | §四.7 |
 | 8 | Phase 11.1.3 FAQ 库 | 1-1.5 周 | §四.8 |
@@ -113,6 +119,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `38e857b` | feat(phase12.3): Clarification 反问 — rerank 低分 + 跨域 doc 双触发器；零 LLM；17 单测 | 2026-06-01 |
 | `f9685ec` | feat(phase11.1.2-min): 审计日志最小实现 — 仅记 QA 事件，append-only；10 单测全过 | 2026-06-01 |
 | `1467047` | feat(phase12.2): Session Memory（长会话摘要）+ 主对话 history-in-prompt；多轮 80 条 Hit@5 0.9250→0.9250 不回归 | 2026-06-01 |
 | `58143b7` | feat(phase11.3): rag_runner 双层扩展（WeKnora 邻居 + per-doc STEP 门卫）；agv_demo Hit@5 0.8923→0.9000 | 2026-05-29 |
@@ -216,28 +223,31 @@ RAG 系统）。改完其他 API 的限额设置后未再复发，本系统不�
 
 ---
 
-### §四.5 🟡 Phase 12.3 Clarification（主动反问）
+### §四.5 ✅ Phase 12.3 Clarification（2026-06-01 commit `38e857b`）
 
-**目标**：query 模糊时反问澄清，不瞎答。
+**实际落地**：零 LLM 调用，双触发器并发判定
+- ✅ 触发器 1：rerank top_score < `ULTRARAG_CLARIFICATION_SCORE_THRESHOLD`（默认 0.30）
+- ✅ 触发器 2：top-5 命中 ≥ `ULTRARAG_CLARIFICATION_MIN_CROSS_DOCS`（默认 2）个不同 doc
+- ✅ 反问选项从命中 doc 名提取（剥 ' SOP' 后缀、下划线变空格、≤50 字截断）
+- ✅ 反问与生成**并行**：SSE 事件流 `status → clarification → status → chunk* → meta → done`
+- ✅ 审计：clarification meta 进 `audit_logs.meta`，供后续采纳率统计
 
-**触发条件**：
-- 检索 top-k 命中分数都 < 阈值
-- 命中多个明显不同主题的 chunk（跨域）
-- 意图分类（11.1.5）置信度低
+**已决定不依赖 11.1.5**：检索分数 + 跨域 doc 两个稳健信号已够用；
+未来 11.1.5 落地后可作为第 3 个触发器叠加。
 
-**示例**：
-```
-用户: 怎么充电？
-系统: 你是问 AGV 充电还是 IFS 系统中的充电流程？
-用户: AGV
-系统: [继续走 RAG]
-```
+**env 调阈值**：
+- `ULTRARAG_CLARIFICATION_ENABLED=0` 全局关
+- `ULTRARAG_CLARIFICATION_SCORE_THRESHOLD=0.5` 更保守阈值
+- `ULTRARAG_CLARIFICATION_MAX_OPTIONS=2` 最多展示 2 个选项
 
-**前置依赖**：11.1.5 Query 意图理解（提供置信度信号）
+**Smoke 结果**（agv_demo "怎么处理？"）：
+- 触发：`cross_domain:4docs + low_score:0.033<0.300`
+- 选项：`['Flexi Case', 'Right Arm FTC', 'Load Unit Not Found']`
+- 不阻塞主流程，正常生成答案
 
-**关键风险**：反问太频繁烦人 → 默认保守阈值 + 统计采纳率
-
-**详见**：[docs/Phase12/README.md](Phase12/README.md) §二.12.3
+**风险监控**（部署后注意）：
+- 反问太频繁 → 用户烦 / 实际触发率检查（从 audit_logs 跑 `WHERE meta::jsonb->'clarification'->>'triggered'='true'`）
+- 跨域 doc 命中是误报（实际不该跨域）→ 调高 score_threshold
 
 ---
 
