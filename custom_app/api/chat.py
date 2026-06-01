@@ -554,6 +554,15 @@ def chat_stream():
                             cid = str(s.get("source_id") or "").strip()
                             if cid and cid not in qa_chunk_ids:
                                 qa_chunk_ids.append(cid)
+                elif et == "clarification":
+                    # Phase 12.3: 反问事件存进 audit meta（不另开 event_type）
+                    # 留 trigger_reasons / top_score / cross_docs 用于后续统计
+                    qa_meta["clarification"] = {
+                        "triggered": True,
+                        "trigger_reasons": event.get("trigger_reasons") or [],
+                        "top_score": event.get("top_score"),
+                        "cross_docs": event.get("cross_docs") or [],
+                    }
                 elif et == "done":
                     fa = event.get("answer")
                     if isinstance(fa, str) and fa.strip():

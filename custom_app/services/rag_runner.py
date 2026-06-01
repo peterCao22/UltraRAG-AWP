@@ -1595,14 +1595,19 @@ class RagRunner:
             info["rerank_ms"] = int((time.perf_counter() - t0) * 1000)
             return hit_ids, info
         reranked = [int(item["row_idx"]) for item in ranked]
+        # Phase 12.3：留 top score 给 clarification 判定使用（低于阈值触发反问）
+        scores = [float(item.get("score") or 0.0) for item in ranked]
         info["rerank_applied"] = True
         info["rerank_ms"] = int((time.perf_counter() - t0) * 1000)
         info["rerank_device"] = self._rerank_resolved_device
+        info["rerank_top_score"] = scores[0] if scores else 0.0
+        info["rerank_scores"] = scores  # 完整列表给 clarification 用；不进前端 meta
         logger.info(
-            "rag_rerank applied device=%s ms=%s n=%s",
+            "rag_rerank applied device=%s ms=%s n=%s top_score=%.4f",
             info["rerank_device"],
             info["rerank_ms"],
             len(reranked),
+            info["rerank_top_score"],
         )
         return reranked, info
 
@@ -2458,6 +2463,21 @@ class RagRunner:
         ref_meta = prep.get("reference_resolution") or {}
         if ref_meta.get("applied"):
             yield {"type": "reference_resolution", **ref_meta}
+
+        # Phase 12.3：检索结果模糊时发反问事件（与生成并行，不阻塞主流程）
+        # 触发条件：rerank 低分 或 跨多个 doc；零 LLM 调用
+        try:
+            from custom_app.services.clarification import propose_clarification
+            clar = propose_clarification(
+                question=prep.get("q", question),
+                hit_ids=prep.get("hit_ids") or [],
+                rows=self._rows,
+                rerank_meta=prep.get("rerank_meta") or {},
+            )
+            if clar.triggered:
+                yield {"type": "clarification", **clar.to_meta()}
+        except Exception as e:  # noqa: BLE001 — clarification 失败不阻塞主对话
+            logger.warning("clarification proposal failed: %s", e)
 
         # ── 阶段 A：agent 模式发射模拟推理步骤 SSE（接口与阶段 B ReAct 完全兼容）──
         if normalized_mode == "agent" and not prep.get("degraded"):
