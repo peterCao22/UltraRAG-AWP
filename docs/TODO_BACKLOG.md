@@ -82,7 +82,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 
 | # | 任务 | 工时 | 跳到详细卡 |
 |---|---|---|---|
-| 4 | Phase 11.1.2 审计日志（who-when-what） | 3-4 天 | §四.4 |
+| ~~4~~ | ~~Phase 11.1.2 审计日志~~ ✅ 2026-06-01 commit `f9685ec`（**最小版**：仅 QA 事件 append-only；admin UI / 认证打点 / 数据操作打点延期） | — | §四.4 |
 | 5 | Phase 12.3 Clarification（主动反问） | 1 周 | §四.5 |
 | 6 | Phase 12.4 Multi-turn Agent 状态优化 | 1-2 周 | §四.6 |
 | 7 | Phase 11.1.5 Query 意图理解 | 3-4 天 | §四.7 |
@@ -113,6 +113,7 @@ LLM 生成（按 admin chat_models 路由：Sonnet 4.6 默认 / Haiku / Opus 备
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `f9685ec` | feat(phase11.1.2-min): 审计日志最小实现 — 仅记 QA 事件，append-only；10 单测全过 | 2026-06-01 |
 | `1467047` | feat(phase12.2): Session Memory（长会话摘要）+ 主对话 history-in-prompt；多轮 80 条 Hit@5 0.9250→0.9250 不回归 | 2026-06-01 |
 | `58143b7` | feat(phase11.3): rag_runner 双层扩展（WeKnora 邻居 + per-doc STEP 门卫）；agv_demo Hit@5 0.8923→0.9000 | 2026-05-29 |
 | `85996c0` | docs(env): bge-reranker URL 提示需带 /v1 | 2026-05-29 |
@@ -193,19 +194,25 @@ RAG 系统）。改完其他 API 的限额设置后未再复发，本系统不�
 
 ---
 
-### §四.4 🟡 Phase 11.1.2 审计日志（who-when-what）
+### §四.4 ✅ Phase 11.1.2 审计日志（最小版 2026-06-01 commit `f9685ec`）
 
-**目标**：合规追溯链；同时为 Phase 12 评测提供数据源。
+**实际落地范围**（用户决定降级到 MVP）：
+- ✅ Postgres / SQLite `audit_logs` 表，append-only（Repository 不暴露 update/delete）
+- ✅ 仅记 `event_type='qa'`：query + answer + chunk_ids + meta（agent_mode / latency 等）
+- ✅ chat.py done 后 finally 同步写入，失败静默降级不阻塞主链路
+- ✅ 10 单测覆盖：append / 失败降级 / 过滤 / 不存在 update/delete 接口
 
-**记录范围**：认证（登录/登出/失败/Token 刷新）、数据操作（KB CRUD / Document / Chunk / KG）、问答（query + retrieved chunks + answer 摘要）、共享变更、配置变更
+**已延期到未来需要时再做**：
+- ❌ 认证打点（登录/登出/失败/Token 刷新）
+- ❌ 数据操作打点（KB CRUD / Document / Chunk / KG）
+- ❌ 共享变更 / 配置变更打点
+- ❌ Admin UI 查询界面 + CSV 导出
+- ❌ 文件冷备 `logs/audit.YYYY-MM-DD.log`
+- ❌ 保留期硬约束（6 个月清理脚本）
 
-**存储**：Postgres `audit_logs` 表 + 镜像到 `logs/audit.YYYY-MM-DD.log` 冷备
+**触发再做的信号**：合规审计要求出现 / 多租户上线 / 客户索要使用记录
 
-**保留**：法规建议 ≥6 个月
-
-**Admin UI**：按 tenant/user/时间/事件类型过滤 + 导出 CSV
-
-**详见**：[docs/Phase11/PHASE_11_1_PLAN.md](Phase11/PHASE_11_1_PLAN.md) §11.1.2
+**完整方案残留**：[docs/Phase11/PHASE_11_1_PLAN.md](Phase11/PHASE_11_1_PLAN.md) §11.1.2
 
 ---
 
