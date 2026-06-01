@@ -2451,6 +2451,40 @@ class RagRunner:
             normalized_mode,
             chat_backend,
         )
+        # Phase 11.1.5：意图分类（规则优先 + Haiku 兜底）
+        # 非知识问答类（chitchat / help / data_query）→ 短路模板回复，跳过检索/生成
+        # 失败时降级到 knowledge（走 RAG），主流程绝不阻塞
+        try:
+            from custom_app.services.intent import (
+                INTENT_KNOWLEDGE,
+                classify_intent,
+                get_canned_response,
+            )
+            intent_result = classify_intent(question)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("intent classify failed, fallback to knowledge: %s", e)
+            intent_result = None
+
+        if intent_result is not None and intent_result.intent != INTENT_KNOWLEDGE:
+            canned = get_canned_response(intent_result.intent)
+            if canned:
+                # 短路模板回复：模拟最小 SSE 流，与 RAG 路径前端契约一致
+                yield {"type": "intent", **intent_result.to_meta()}
+                yield {"type": "status", "content": "正在生成回答…"}
+                yield {"type": "chunk", "content": canned}
+                yield {
+                    "type": "meta",
+                    "kb_id": self.kb_id,
+                    "meta": {
+                        "intent": intent_result.intent,
+                        "intent_confidence": round(intent_result.confidence, 3),
+                        "intent_source": intent_result.source,
+                        "short_circuited": True,
+                    },
+                }
+                yield {"type": "done", "answer": canned}
+                return
+
         yield {"type": "status", "content": "正在检索并生成回答…"}
         t_prep_begin = time.perf_counter()
         prep = self._prepare_chat_context(
@@ -2458,6 +2492,9 @@ class RagRunner:
             history=history, session_id=session_id,
         )
         t_prep_end = time.perf_counter()
+        # Phase 11.1.5：把 intent meta 透出去供 audit / 前端记录
+        if intent_result is not None:
+            prep["intent_meta"] = intent_result.to_meta()
 
         # Phase 12.1: 若指代消解采纳了改写，先发事件告诉前端
         ref_meta = prep.get("reference_resolution") or {}

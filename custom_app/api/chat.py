@@ -563,6 +563,14 @@ def chat_stream():
                         "top_score": event.get("top_score"),
                         "cross_docs": event.get("cross_docs") or [],
                     }
+                elif et == "intent":
+                    # Phase 11.1.5: 意图分类结果存进 audit meta
+                    qa_meta["intent"] = {
+                        "intent": event.get("intent"),
+                        "confidence": event.get("confidence"),
+                        "source": event.get("source"),
+                        "ms": event.get("ms"),
+                    }
                 elif et == "done":
                     fa = event.get("answer")
                     if isinstance(fa, str) and fa.strip():
