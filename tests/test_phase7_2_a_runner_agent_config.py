@@ -61,7 +61,7 @@ class TestRagRunnerAgentConfigOverride:
         )
         r._apply_agent_config_override()
         assert "agv_demo" in r._chat_cfg["system_prompt"]
-        assert "Chinese (Simplified)" in r._chat_cfg["system_prompt"]
+        assert "match the user's latest question" in r._chat_cfg["system_prompt"]
 
     def test_agent_config_temperature_max_tokens_override(self):
         r = self._make_runner(
