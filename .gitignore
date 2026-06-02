@@ -1,6 +1,9 @@
 # macOS system files
 .DS_Store
 
+# Microsoft Word lock files (created when a .docx is open in Word)
+~$*
+
 # Python cache and temporary files
 __pycache__/
 *.pyc

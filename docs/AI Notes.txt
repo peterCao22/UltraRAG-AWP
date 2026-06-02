@@ -1,0 +1,110 @@
+BATTERY CHANGE SEQUENCE
+how do i change the agv battery? ----- Good answer
+how can i change a battery on the agv ----- Good answer
+我该如何更换 AGV 的电池？ ----- 很好的回答 - Asked in chinese
+
+ALARM BLOCK BATTERY LOW ALARM
+How do  fix alarm block battery low alarm? ---- Good answer
+how do i fix ID 34 alarm? ---- Bad answer (didn't give the step on how to fix the alarm)
+我该如何修复电池报警模块的低电量报警功能？ ---- 很好的回答 - Asked in chinese
+我该如何解决 34 号报警？ ---- 糟糕的回答（未列出修复警报的步骤）- Asked in chinese
+
+CANNOT ENTER SYSTEM ALARM
+How do i fix the alarm cannot enter system? ---- Good answer
+我该如何解决报警系统无法进入的问题？ ---- 糟糕的回答（未列出修复警报的步骤） - Asked in chinese
+
+ERROR POSITION LIFT TABLE ALARM
+how do i fix the alarm error position lift table? ---- Good answer
+how do i fix alarm id 17? ---- Good answer
+我该如何修复升降台的位置报警故障？ ---- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 17？ 很好的回答 - Asked in chinese
+
+ERROR UDC PRESENCE ALARM
+how do i fix error UDC presence alarm? ----- Good answer
+how do i fix alarm id 27? ----- Good answer
+我该如何修复 UDC 存在告警错误？ ---- 回答错误（它简要概述了如何修复警报，但没有列出具体步骤) - Asked in chinese
+我该如何修复报警 ID 27？ ----- 很好的回答 - Asked in chinese
+
+E-STOP BUTTON ACTIVE ALARM
+how do i fix the estop button active alarm? ----- Good answer
+how do i fix alarm id 01? ----- Good answer
+我该如何解决急停按钮激活的报警？ ---- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 01？ ---- 很好的回答 - Asked in chinese
+
+FLEXI PLS CASE ALARM
+How do i fix the flexi pls case alarm? ---- Bad answer (gave a small overview of the alarm no steps on how to fix it)
+how do i fix alarm id 56? ----- Good answer
+我该如何解决 Flexi PLS 机箱报警问题？ ---- 回答错误（概述了警报情况，但没有列出修复警报的步骤）- Asked in chinese
+我该如何修复报警 ID 56？ ----- 很好的回答 - Asked in chinese
+
+FLEXI DOUBLE PH ALARM
+how do i fix the flexi double ph alarm? ---- Bad answer (gave a small overview of the alarm no steps on how to fix it)
+how do i fix alarm id 58? ---- Bad answer (gave a small overview of the alarm no steps on how to fix it)
+我该如何解决 Flexi 双重 pH 报警问题？ ----- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 58？ ----可接受的答案（它概述了问题，并由此引出了解决问题的方案）- Asked in chinese
+
+FLEXI MOC ALARM
+how do i fix the flexi MOC alarm? ---- Bad answer (didn't list the steps on how to fix the alarm)
+how do i fix alarm ID 53? ---- Bad answer (didn't list the steps on how to fix the alarm)
+我该如何解决 Flexi MOC 告警？---- 回答错误（没有上市修复警报的步骤）- Asked in chinese
+我该如何修复报警 ID 53？---- 回答错误（没有上市修复警报的步骤）- Asked in chinese
+
+FLEXI MODULE STATUS ALARM
+how do i fix the flexi module status alarm? ---- Bad answer (gave an overview of the alarm but didn't list the steps to fix it)
+how do i fix alarm id 57? ----- Good answer
+我该如何解决 Flexi 模块的状态告警？ ---- 回答不佳（概述了警报情况，但没有列出修复步骤）- Asked in chinese
+我该如何修复报警 ID 57？ ----- 很好的回答 - Asked in chinese
+
+FRONT PLS ALARM
+How do i fix the front PLS alarm? ----- Good answer
+how do i fix alarm id 02 ----- Good answer
+我该如何解决前置 PLS 报警？ ----- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 02？ ----- 很好的回答 - Asked in chinese
+
+INSERTING ALARM (This isn't an alarm it is more a sequence of things to do in order for the AGV to be put back on the driving path)
+
+LEFT ARM FTC ALARM
+how do you fix the alarm left side ftc alarm? ----- Good answer (But this only works for the old style AGVs 1-5)
+How do I fix alarm ID 18?  ----- Good answer (But this only works for the old style AGVs 1-5)
+请问如何修复左侧 FTC 报警？ ----- 很好的回答（但这仅适用于旧款 AGV 1-5）- Asked in chinese
+我该如何修复报警 ID 18？ ----- 很好的回答（但这仅适用于旧款 AGV 1-5）- Asked in chinese
+
+RIGHT ARM FTC ALARM
+how do you fix the alarm right side ftc alarm? ----- Good answer (But this only works for the old style AGVs 1-5)
+How do I fix alarm ID 18? ----- Good answer (But this only works for the old style AGVs 1-5)
+请问如何修复右侧 FTC 报警？ ----- 很好的回答（但这仅适用于旧款 AGV 1-5）- Asked in chinese
+我该如何修复报警 ID 18？ ----- 很好的回答（但这仅适用于旧款 AGV 1-5）- Asked in chinese
+
+LOAD UNIT NOT FOUND ALARM
+how do i fix the load unit not found alarm? ---- Bad answer (didn't list the steps on how to fix the alarm)
+how do i fix alarm id 21? ---- Bad answer (didn't list the steps on how to fix the alarm)
+我该如何解决“加载单元未找到”的报警？ ---- 回答错误（没有列出修复警报的步骤 - Asked in chinese
+如何修复报警 ID 21？ ---- 回答错误（没有列出修复警报的步骤) - Asked in chinese
+
+LOOP EMERGENCY NOT ONLINE ALARM
+how do i fix the loop emergency not online alarm? ----- Good answer
+how do i fix alarm id 62? ----- Good answer
+我该如何修复“Loop 紧急离线”警报？ ----- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 62？ ----- 很好的回答 - Asked in chinese
+
+MASTER LINK DOWN ALARM
+how do i fix the master link down alarm? ----- Good answer
+how do i fix alarm id 16? ----- Good answer
+我该如何解决“主链路断开”告警？ ----- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 16？ ----- 很好的回答 - Asked in chinese
+
+NAVIGATION ALARM
+how do i fix the navigation alarm? ----- Good answer
+how do i fix alarm id 14? ---- Bad answer (Listed the correct alarm at the top but gave the steps on how to fix MASTER LINK DOWN alarm id 16)
+我该如何修复导航警报？ ----- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 14？---- 错误回答（虽然在开头列出了正确的告警，但给出的却是解决“MASTER LINK DOWN”告警（ID 16）的步骤）- Asked in chinese
+
+PH BOX PRESENCE UDC ALARM
+how do i fix ph box presence udc alarm? ----- Good answer
+我该如何解决 PH Box 的“Presence UDC”报警？ ----- 很好的回答 - Asked in chinese
+
+REAR PLS ALARM
+how do i fix the rear pls alarm? ----- Good answer
+how do i fix alarm id 22? ----- Good answer
+我该如何修复后部 PLS 报警？ ----- 很好的回答 - Asked in chinese
+我该如何修复报警 ID 22？ ----- 很好的回答 - Asked in chinese
