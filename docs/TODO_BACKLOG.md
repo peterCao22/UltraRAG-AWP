@@ -94,7 +94,7 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 |---|---|---|---|
 | ~~4~~ | ~~Phase 11.1.2 审计日志~~ ✅ 2026-06-01 commit `f9685ec`（**最小版**：仅 QA 事件 append-only；admin UI / 认证打点 / 数据操作打点延期） | — | §四.4 |
 | ~~5~~ | ~~Phase 12.3 Clarification（主动反问）~~ ✅ 2026-06-01 commit `38e857b`（零 LLM 实现：rerank 低分 + 跨域 doc 双触发器） | — | §四.5 |
-| 6 | Phase 12.4 Multi-turn Agent 状态优化 | 1-2 周 | §四.6 |
+| ~~6~~ | ~~Phase 12.4 Multi-turn Agent 状态优化~~ ✅ 2026-06-02 commit `6348e5c`（选项 B：Haiku 摘要工作记忆 + SSE 推理链可视化） | — | §四.6 |
 | ~~7~~ | ~~Phase 11.1.5 Query 意图理解~~ ✅ 2026-06-01 commit `d55a638`（规则 + Haiku 混合；闲聊/帮助短路 = 0 token） | — | §四.7 |
 | 8 | Phase 11.1.3 FAQ 库 | 1-1.5 周 | §四.8 |
 
@@ -123,6 +123,7 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `6348e5c` | feat(phase12.4): Agent Scratchpad — Haiku 摘要工作记忆 + SSE 推理链可视化；23 单测 | 2026-06-02 |
 | `d55a638` | feat(phase11.1.5): Query 意图分类 — 规则 + Haiku 混合；闲聊/帮助短路 = 0 token；36 单测 | 2026-06-02 |
 | `38e857b` | feat(phase12.3): Clarification 反问 — rerank 低分 + 跨域 doc 双触发器；零 LLM；17 单测 | 2026-06-01 |
 | `f9685ec` | feat(phase11.1.2-min): 审计日志最小实现 — 仅记 QA 事件，append-only；10 单测全过 | 2026-06-01 |
@@ -256,19 +257,33 @@ RAG 系统）。改完其他 API 的限额设置后未再复发，本系统不�
 
 ---
 
-### §四.6 🟡 Phase 12.4 Multi-turn Agent 状态优化
+### §四.6 ✅ Phase 12.4 Agent Scratchpad（2026-06-02 commit `6348e5c`）
 
-**目标**：Agent 模式下跨工具调用的上下文保持。
+**选项 B 落地**：Haiku 摘要工作记忆 + SSE 推理链可视化（折中方案）
+- ✅ 每个 tool_result 调 Haiku 压成 1-2 条 fact 推入 scratchpad
+- ✅ messages 数组中最近 1 轮 tool 保留 raw，更早改写为占位
+- ✅ system_prompt 拼"已知事实摘要"段供 LLM 决策时看
+- ✅ FIFO 上限 10 条（超过删最早）
+- ✅ 失败一律降级：LLM 失败 / parse 失败 → agent 主流程不阻塞
+- ✅ SSE 增量事件 `scratchpad_update`，前端可动画展示推理链演进
+- ✅ done meta.scratchpad 全量统计同步进 audit_logs.meta
+- ⏭ 选项 C 的 consolidator（合并相似条目）暂不实现，FIFO 已够
 
-**问题**：Agent 调 `knowledge_search` 找到 chunk A，再调 `query_kg` 找到实体 B；第三轮 Agent 决策时 A 和 B 之间的关系丢失。
+**env 调阈值**：
+- `ULTRARAG_SCRATCHPAD_ENABLED=0` 全局关
+- `ULTRARAG_SCRATCHPAD_MAX_FACTS=5` 更保守上限
+- `ULTRARAG_SCRATCHPAD_KEEP_LATEST_N=2` 保留最近 2 轮 raw
 
-**方案**：
-- Agent 工作记忆结构：每次工具调用后把结果摘要存 session-level scratchpad
-- LLM 决策时 prompt 加 scratchpad 段
-- 工具调用历史可视化（用户能看到推理链）
-- 定期 consolidate scratchpad（合并相似条目，防膨胀）
+**Smoke 结果**（agv_demo agent 复合 query "Alarm 16 是什么？处理？角色？"）：
+- 6 轮 tool 调用，2 次 `scratchpad_update` 事件触发
+- Anthropic 配额限制 → 自动 Gemini fallback
+- 偶发 parse_error 安全吞掉，agent 正常生成 Master Link Down SOP 答案
+- 总结：facts_count=2, total_calls=9, total_summarize_ms=50428
 
-**参考**：WeKnora `internal/agent/memory/consolidator.go`
+**风险监控**（部署后注意）：
+- agent 调用量小：本期场景不该撞 max_iterations=12，scratchpad 上限 10 够用
+- scratchpad LLM 偶发 parse_error：当前 Gemini 3.1 输出有时不严格 JSON，
+  容错 parse 兜底；可加更严的 JSON-only system prompt
 
 ---
 
