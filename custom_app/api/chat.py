@@ -571,6 +571,10 @@ def chat_stream():
                         "source": event.get("source"),
                         "ms": event.get("ms"),
                     }
+                elif et == "scratchpad_update":
+                    # Phase 12.4: scratchpad 增量事件透传给前端可视化
+                    # 不直接存 audit；done 事件 meta.scratchpad 已含全量统计
+                    pass
                 elif et == "done":
                     fa = event.get("answer")
                     if isinstance(fa, str) and fa.strip():
@@ -583,6 +587,15 @@ def chat_stream():
                             "iterations": meta.get("iterations"),
                             "effective_agent_mode": meta.get("effective_agent_mode"),
                         }
+                        # Phase 12.4: scratchpad 统计存进 audit meta
+                        sp = meta.get("scratchpad") or {}
+                        if isinstance(sp, dict) and sp.get("size") is not None:
+                            qa_meta["scratchpad"] = {
+                                "size": sp.get("size", 0),
+                                "total_calls": sp.get("total_calls", 0),
+                                "total_summarize_ms": sp.get("total_summarize_ms", 0),
+                                "facts": sp.get("facts") or [],
+                            }
                     if session_id_opt and question:
                         reasoning_payload = None
                         if agent_mode == "agent" and (reasoning_events or reasoning_meta):

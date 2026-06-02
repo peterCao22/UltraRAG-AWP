@@ -769,6 +769,17 @@ class AgentRunner:
         # 前端仍能从 sources 块看到引用图片。
         cited_chunk_ids: List[str] = []
         seen_chunk_ids: set = set()
+        # Phase 12.4 Agent Scratchpad（工作记忆）
+        # 每个 tool_result 用 Haiku 摘要成 1-2 条 fact 推入；下一轮 LLM 看摘要 + 最近 1 轮 raw
+        from custom_app.services.agent_scratchpad import (
+            AgentScratchpad,
+            is_enabled as scratchpad_enabled,
+            render_for_system_prompt,
+            rewrite_old_tool_messages_in_place,
+            summarize_and_push,
+        )
+        scratchpad = AgentScratchpad()
+        use_scratchpad = scratchpad_enabled()
 
         try:
             while iteration < self.max_iterations:
@@ -779,6 +790,13 @@ class AgentRunner:
                 # 不修改基础 prompt，只在调用前拼接，避免污染 self.* 状态。
                 exec_note = self._format_executed_calls_note(executed_calls)
                 effective_system_prompt = system_prompt + exec_note if exec_note else system_prompt
+                # Phase 12.4: 拼 scratchpad 已知事实段（空 scratchpad 时返回空串不拼）
+                if use_scratchpad:
+                    facts_block = render_for_system_prompt(scratchpad)
+                    if facts_block:
+                        effective_system_prompt = (
+                            effective_system_prompt + "\n\n" + facts_block
+                        )
 
                 # ── THINK ──────────────────────────────────
                 llm_result = self._llm_call(
@@ -943,6 +961,34 @@ class AgentRunner:
                         "content": tool_content_payload,
                     })
 
+                    # Phase 12.4 Scratchpad：把本次 tool_result 摘要进工作记忆
+                    # 然后把更早的 tool messages 内容置换为占位（最近 1 轮保留 raw）
+                    # 失败时降级：不写 scratchpad、不改写 messages，继续 raw 路径
+                    if use_scratchpad:
+                        try:
+                            new_facts = summarize_and_push(
+                                scratchpad,
+                                tool_name=tool_name,
+                                args=args,
+                                result=result,
+                                iteration=iteration,
+                            )
+                            if new_facts:
+                                # 改写更早的 tool messages（KEEP_LATEST_N=1 默认）
+                                n_rewritten = rewrite_old_tool_messages_in_place(messages)
+                                yield {
+                                    "type": "scratchpad_update",
+                                    "iteration": iteration,
+                                    "new_facts": new_facts,
+                                    "all_facts": list(scratchpad.facts),
+                                    "size": len(scratchpad.facts),
+                                    "rewritten_count": n_rewritten,
+                                }
+                        except Exception as e:  # noqa: BLE001
+                            logger.warning(
+                                "scratchpad summarize_and_push failed: %s", e,
+                            )
+
                 if stop_loop:
                     break
 
@@ -1016,5 +1062,8 @@ class AgentRunner:
             "meta": {
                 "effective_agent_mode": "agent",
                 "iterations": iteration,
+                "scratchpad": scratchpad.to_meta() if use_scratchpad else {
+                    "enabled": False,
+                },
             },
         }
