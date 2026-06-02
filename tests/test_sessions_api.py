@@ -5,12 +5,51 @@ import pytest
 from custom_app.services.session_store import _make_session_title
 
 
+# 测试用的 KB ID（与文件内 test_* 函数中硬编码的对应）
+# 远程 Postgres 后端下文件系统隔离无效，需 teardown 显式清理
+_TEST_KB_IDS = ("kb1", "kb2", "kb3", "kb_stream")
+
+
+def _cleanup_test_kb_sessions() -> None:
+    """删除测试用 kb_id 下的所有 session + messages（远程 DB 后端用）。
+
+    本地 SQLite 走 isolated_env 的 chdir(tmp_path) 已天然隔离，此函数无效；
+    远程 Postgres 必须显式清理避免测试间互相污染（本次 push 前发现 kb1
+    残留导致 test_create_list_sessions 一直失败）。
+    """
+    try:
+        from custom_app.repositories.base import get_default_provider
+        provider = get_default_provider()
+    except Exception:
+        return  # 后端不可用就算了，不要让 teardown 拖垮测试
+    placeholders = ", ".join(["%s" if provider.placeholder == "%s" else "?"] * len(_TEST_KB_IDS))
+    try:
+        with provider.connect() as conn:
+            # 先删子表（messages），再删父表（sessions）
+            conn.execute(
+                f"DELETE FROM kb_session_messages WHERE session_id IN ("
+                f"  SELECT session_id FROM kb_sessions WHERE kb_id IN ({placeholders})"
+                f")",
+                _TEST_KB_IDS,
+            )
+            conn.execute(
+                f"DELETE FROM kb_sessions WHERE kb_id IN ({placeholders})",
+                _TEST_KB_IDS,
+            )
+    except Exception:
+        pass  # 清理失败不影响测试结果（最坏情况下次测试断言会发现）
+
+
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "db").mkdir()
     (tmp_path / "data" / "kb").mkdir(parents=True)
+    # setup: 先清理可能的历史残留
+    _cleanup_test_kb_sessions()
     yield tmp_path
+    # teardown: 测试结束后清理本次创建的
+    _cleanup_test_kb_sessions()
 
 
 @pytest.fixture()
