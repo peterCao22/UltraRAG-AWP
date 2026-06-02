@@ -22,6 +22,7 @@ function renderChatShell({ withSessionList = false } = {}) {
         <button type="button" data-role="sidebar-toggle">☰</button>
       </header>
       <button type="button" data-role="new-chat">+ 新建对话</button>
+      <button type="button" data-role="search-chat">搜索聊天</button>
       <select id="kb-select" data-role="kb-select"></select>
       <section data-role="message-list"></section>
       <select data-role="agent-select">
@@ -904,6 +905,127 @@ describe('initChatApp', () => {
 
     expect(root.querySelectorAll('[data-role="reasoning-steps"]').length).toBe(0)
     window.location.hash = ''
+  })
+
+  it('renders compact session titles and opens bulk management from row menu', async () => {
+    const root = renderChatShell({ withSessionList: true })
+    const sessionApi = {
+      getSession: vi.fn(),
+      listSessions: vi.fn().mockResolvedValue([
+        {
+          session_id: 's_long',
+          kb_id: 'agv_demo',
+          title: 'What alarm ID is triggered when there is an obstruction in the AGV right arm?',
+        },
+        { session_id: 's_cn', kb_id: 'agv_demo', title: '更换 AGV 电池的步骤' },
+      ]),
+      fetchSessionMessages: vi.fn(),
+      createSession: vi.fn(),
+      renameSession: vi.fn(),
+      deleteSession: vi.fn(),
+    }
+    const app = initChatApp({
+      root,
+      kbApi: { listKnowledgeBases: vi.fn().mockResolvedValue([{ kb_id: 'agv_demo', name: 'AGV Demo', status: 'active' }]) },
+      chatApi: { sendChatMessage: vi.fn() },
+      sessionApi,
+      storage: createStorage(),
+    })
+    await app.ready
+
+    const firstTitle = root.querySelector('.session-list__item-title')
+    expect(firstTitle.textContent).toBe('What alarm ID is triggered when…')
+    expect(firstTitle.title).toContain('obstruction')
+
+    root.querySelector('.session-menu-btn').click()
+    expect(root.querySelector('.session-menu-dropdown').hidden).toBe(false)
+    root.querySelector('.session-menu-dropdown .session-menu-item:nth-child(2)').click()
+    expect(document.body.querySelector('.session-bulk-modal')).not.toBeNull()
+    expect(document.body.querySelector('.session-bulk-modal').textContent).toContain('批量管理')
+  })
+
+  it('shows the sidebar list edge only after scrolling down', async () => {
+    const root = renderChatShell({ withSessionList: true })
+    const sessionApi = {
+      getSession: vi.fn(),
+      listSessions: vi.fn().mockResolvedValue([
+        { session_id: 's1', kb_id: 'agv_demo', title: 'Clash配置转V2Ray' },
+        { session_id: 's2', kb_id: 'agv_demo', title: 'Tile Corner Techniques' },
+      ]),
+      fetchSessionMessages: vi.fn(),
+      createSession: vi.fn(),
+      renameSession: vi.fn(),
+      deleteSession: vi.fn(),
+    }
+    const app = initChatApp({
+      root,
+      kbApi: { listKnowledgeBases: vi.fn().mockResolvedValue([{ kb_id: 'agv_demo', name: 'AGV Demo', status: 'active' }]) },
+      chatApi: { sendChatMessage: vi.fn() },
+      sessionApi,
+      storage: createStorage(),
+    })
+    await app.ready
+
+    const host = root.querySelector('[data-role="session-list"]')
+    expect(host.classList.contains('is-scrolled')).toBe(false)
+
+    host.scrollTop = 24
+    host.dispatchEvent(new Event('scroll'))
+    expect(host.classList.contains('is-scrolled')).toBe(true)
+
+    host.scrollTop = 0
+    host.dispatchEvent(new Event('scroll'))
+    expect(host.classList.contains('is-scrolled')).toBe(false)
+  })
+
+  it('searches chat topics and switches to the selected session', async () => {
+    window.location.hash = ''
+    const root = renderChatShell({ withSessionList: true })
+    const sessionApi = {
+      getSession: vi.fn().mockResolvedValue({ session_id: 's_clash', kb_id: 'agv_demo' }),
+      listSessions: vi.fn().mockResolvedValue([
+        {
+          session_id: 's_tile',
+          kb_id: 'agv_demo',
+          title: 'Tile Corner Techniques',
+          updated_at: '2026-05-10T10:00:00Z',
+        },
+        {
+          session_id: 's_clash',
+          kb_id: 'agv_demo',
+          title: 'Clash配置转V2Ray',
+          updated_at: '2026-05-18T10:00:00Z',
+        },
+      ]),
+      fetchSessionMessages: vi.fn().mockResolvedValue([]),
+      createSession: vi.fn(),
+      renameSession: vi.fn(),
+      deleteSession: vi.fn(),
+    }
+    const app = initChatApp({
+      root,
+      kbApi: { listKnowledgeBases: vi.fn().mockResolvedValue([{ kb_id: 'agv_demo', name: 'AGV Demo', status: 'active' }]) },
+      chatApi: { sendChatMessage: vi.fn() },
+      sessionApi,
+      storage: createStorage(),
+    })
+    await app.ready
+
+    root.querySelector('[data-role="search-chat"]').click()
+    await vi.waitFor(() => document.body.querySelector('.chat-search-modal'))
+
+    const modal = document.body.querySelector('.chat-search-modal')
+    const input = modal.querySelector('.chat-search-input')
+    input.value = 'Clash'
+    input.dispatchEvent(new Event('input'))
+
+    const results = modal.querySelector('.chat-search-body')
+    expect(results.textContent).toContain('Clash配置转V2Ray')
+    expect(results.textContent).not.toContain('Tile Corner Techniques')
+
+    results.querySelector('.chat-search-result').click()
+    await vi.waitFor(() => expect(sessionApi.getSession).toHaveBeenCalledWith('s_clash'))
+    expect(window.location.hash).toBe('#session=s_clash')
   })
 
   it('does not produce citation spans in quick mode when no 【来源:】 pattern', async () => {

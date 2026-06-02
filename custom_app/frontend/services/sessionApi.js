@@ -59,6 +59,15 @@ export async function deleteSession(sessionId) {
   return j.data
 }
 
+export async function deleteSessions(sessionIds = []) {
+  const ids = [...new Set(sessionIds.filter(Boolean))]
+  const out = []
+  for (const id of ids) {
+    out.push(await deleteSession(id))
+  }
+  return out
+}
+
 export async function renameSession(sessionId, title) {
   const id = encodeURIComponent(sessionId)
   const r = await fetch(`/api/sessions/${id}`, {

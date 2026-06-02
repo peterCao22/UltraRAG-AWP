@@ -9,6 +9,46 @@ from custom_app.db import new_id, now_iso
 from custom_app.repositories import SessionRepository
 
 
+def _make_session_title(user_text: str) -> str:
+    """Create a compact sidebar title from the first user question."""
+    text = " ".join((user_text or "").strip().split())
+    if not text:
+        return "新对话"
+
+    lower = text.lower()
+    replacements = [
+        ("what alarm id is triggered when there is an obstruction in the agv's right arm", "Right arm obstruction alarm ID"),
+        ("what alarm id is triggered when there is an obstruction in the agv right arm", "Right arm obstruction alarm ID"),
+        ("what alarm id is triggered", "Alarm ID"),
+        ("how to", ""),
+        ("what is", ""),
+        ("please tell me", ""),
+        ("请问", ""),
+        ("帮我", ""),
+        ("如何", ""),
+        ("怎么", ""),
+        ("怎样", ""),
+    ]
+    for old, new in replacements:
+        lower = lower.replace(old, new)
+    cleaned = lower.strip(" ：:，,。.?？!！")
+    cleaned = " ".join(cleaned.split())
+    if not cleaned:
+        cleaned = text
+
+    has_cjk = any("\u4e00" <= ch <= "\u9fff" for ch in cleaned)
+    if has_cjk:
+        cleaned = cleaned.replace("需要注意什么", "注意事项").replace("是什么", "")
+        return cleaned[:28].strip(" ：:，,。.?？!！") or "新对话"
+
+    words = cleaned.split()
+    if len(words) > 7:
+        cleaned = " ".join(words[:7])
+    if cleaned.islower():
+        cleaned = cleaned[:1].upper() + cleaned[1:]
+    return cleaned[:48].strip(" ：:，,。.?？!！") or "New chat"
+
+
 def _safe_dump_reasoning(value: Any) -> str:
     """非 dict 一律落库为 '{}'，防止上游传错类型污染历史。"""
     if not isinstance(value, dict):
@@ -141,7 +181,7 @@ def append_chat_turn(
     )
     new_title = prev_title
     if (not prev_title or prev_title == "新对话") and user_text.strip():
-        new_title = user_text.strip()[:120]
+        new_title = _make_session_title(user_text)
     repo.update_title_and_mode(
         session_id, title=new_title, agent_mode=am, updated_at=ts2,
     )

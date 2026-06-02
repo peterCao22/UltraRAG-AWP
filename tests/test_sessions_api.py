@@ -2,6 +2,8 @@
 
 import pytest
 
+from custom_app.services.session_store import _make_session_title
+
 
 @pytest.fixture(autouse=True)
 def isolated_env(tmp_path, monkeypatch):
@@ -53,6 +55,19 @@ def test_patch_title(client):
     r2 = client.patch(f"/api/sessions/{sid}", json={"title": "自定义标题"})
     assert r2.status_code == 200
     assert r2.get_json()["data"]["title"] == "自定义标题"
+
+
+def test_make_session_title_compacts_long_english_question():
+    title = _make_session_title(
+        "What alarm ID is triggered when there is an obstruction in the AGV right arm?"
+    )
+    assert title == "Right arm obstruction alarm ID"
+    assert len(title) < 48
+
+
+def test_make_session_title_compacts_chinese_question():
+    title = _make_session_title("将电池滑出后，下一步需要注意什么？")
+    assert title == "将电池滑出后，下一步注意事项"
 
 
 def test_list_sessions_requires_kb_id(client):
