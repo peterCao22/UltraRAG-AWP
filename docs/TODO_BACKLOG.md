@@ -27,6 +27,10 @@
   ↓
 api/chat.py 拉 session history（最近 6 轮）
   ↓
+Phase 11.1.5 意图分类（规则优先 + Haiku 兜底）
+  ├─ chitchat / help / data_query → 模板回复短路（零检索零生成）
+  └─ knowledge → 继续 RAG
+  ↓
 RagRunner._prepare_chat_context(history=...)
   ├─ Phase 12.1: resolve_references（指代消解，Claude Haiku 4.5）
   └─ _rewrite_query（query rewrite，主对话模型）
@@ -91,7 +95,7 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 | ~~4~~ | ~~Phase 11.1.2 审计日志~~ ✅ 2026-06-01 commit `f9685ec`（**最小版**：仅 QA 事件 append-only；admin UI / 认证打点 / 数据操作打点延期） | — | §四.4 |
 | ~~5~~ | ~~Phase 12.3 Clarification（主动反问）~~ ✅ 2026-06-01 commit `38e857b`（零 LLM 实现：rerank 低分 + 跨域 doc 双触发器） | — | §四.5 |
 | 6 | Phase 12.4 Multi-turn Agent 状态优化 | 1-2 周 | §四.6 |
-| 7 | Phase 11.1.5 Query 意图理解 | 3-4 天 | §四.7 |
+| ~~7~~ | ~~Phase 11.1.5 Query 意图理解~~ ✅ 2026-06-01 commit `d55a638`（规则 + Haiku 混合；闲聊/帮助短路 = 0 token） | — | §四.7 |
 | 8 | Phase 11.1.3 FAQ 库 | 1-1.5 周 | §四.8 |
 
 ### 🟢 中低优先级（视团队节奏）
@@ -119,6 +123,7 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `d55a638` | feat(phase11.1.5): Query 意图分类 — 规则 + Haiku 混合；闲聊/帮助短路 = 0 token；36 单测 | 2026-06-02 |
 | `38e857b` | feat(phase12.3): Clarification 反问 — rerank 低分 + 跨域 doc 双触发器；零 LLM；17 单测 | 2026-06-01 |
 | `f9685ec` | feat(phase11.1.2-min): 审计日志最小实现 — 仅记 QA 事件，append-only；10 单测全过 | 2026-06-01 |
 | `1467047` | feat(phase12.2): Session Memory（长会话摘要）+ 主对话 history-in-prompt；多轮 80 条 Hit@5 0.9250→0.9250 不回归 | 2026-06-01 |
@@ -267,15 +272,27 @@ RAG 系统）。改完其他 API 的限额设置后未再复发，本系统不�
 
 ---
 
-### §四.7 🟡 Phase 11.1.5 Query 意图理解
+### §四.7 ✅ Phase 11.1.5 Query 意图分类（2026-06-02 commit `d55a638`）
 
-**目标**：闲聊 / 知识问答 / 数据查询 三类分流；不该走 RAG 的不走。
+**实际落地**：规则优先 + Haiku 兜底，4 类意图
+- ✅ `chitchat / help / data_query` 短路模板回复（零检索零 LLM）
+- ✅ `knowledge` 默认走 RAG
+- ✅ 规则层用正则覆盖常见 pattern（zero-token）
+- ✅ LLM 不确定时兜底，失败一律降级 knowledge
+- ✅ intent 信息写入 audit_logs.meta，未来可统计意图分布
+- ⏭ 12.3 反问的"置信度信号"未集成（12.3 已用检索分数 + 跨域信号，够用）
 
-**方案**：LLM 分类器（轻量模型 Haiku） → 路由到不同 pipeline
+**env 调阈值**：
+- `ULTRARAG_INTENT_ENABLED=0` 全局关
+- `ULTRARAG_INTENT_LLM_FALLBACK=0` 规则未命中也走 RAG（节省 LLM 调用）
+- `ULTRARAG_INTENT_MIN_CONFIDENCE=0.7` 提高 LLM 采纳门槛
 
-**为 Phase 12.3 Clarification 提供置信度信号**
+**Smoke 结果**（agv_demo）：
+- "你好" → chitchat (rule, 0.85, 0ms) → 模板回复，**0 检索 0 生成**
+- "你能做什么？" → help (rule, 0.9, 0ms) → 能力清单
+- "Alarm 16 怎么处理" → knowledge → 走 RAG（正常生成 + 触发 clarification）
 
-**详见**：[docs/Phase11/PHASE_11_1_PLAN.md](Phase11/PHASE_11_1_PLAN.md) §11.1.5
+**降本预期**：业务高峰期闲聊/帮助问询若占 5-10%，省同比例的 embedding + 检索 + 生成 + Haiku（指代消解 / 摘要）调用。
 
 ---
 
