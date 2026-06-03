@@ -111,11 +111,19 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 | 15 | Phase 11.2.5 移动端适配 | 1-2 周 | §四.15 |
 | 16 | Phase 11.2.6 i18n 国际化 | 1 周 | §四.16 |
 
+### 🆕 后续 Phase 候选（未排期）
+
+| # | 任务 | 工时 | 备注 |
+|---|---|---|---|
+| **P9** | **Phase 9 图文联动**（VLM 给图打 caption + 实体 → 图片参与检索 → KG 跨章节联动） | **预计 2-3 周** | docs/Phase9/README.md 方向锚点已就绪；用户 2026-06-03 确定下一个做这个 |
+| P-Perm | 用户权限层（**轻量级，非 Phase 10 多租户**）：users 表 + 登录 + user↔role 绑定，复用 Phase 3 `roles/role_kb_permissions` | 5-7 天 | 用户 2026-06-03 确认 Phase 9 后做。**明确不做** Phase 10 多租户改造（业务紧迫性低；users + role binding 已够） |
+| ~~Phase 10 多租户~~ | ~~多组织 + 数据隔离 + 跨租户共享 + 联邦检索~~ | ~~6-8 周~~ | ❌ 2026-06-03 决定**不做**。当前是车间内网单租户场景；用户的真实需求是"控制哪些用户能用哪个 KB"，等同于轻量级 RBAC，走 P-Perm 即可 |
+
 ### 杂项
 
 | # | 任务 | 备注 |
 |---|---|---|
-| Z1 | 25+ 历史散留 uncommit 改动盘点 | `git status` 看 `db.py / agent_runner.py / session_store.py / .claude/settings.json` 等 18 M + 9 ??，确认有用的清理掉 |
+| ~~Z1~~ | ~~18 M + 9 ?? 历史散留 uncommit 改动盘点~~ ✅ 2026-06-02 commit `9646408` / `f4d92fe` / `6c6f8ee` / `3d8a8b1` 全部处理 | working tree 干净 |
 
 ---
 
