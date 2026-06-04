@@ -22,12 +22,23 @@ class ChunkImage:
     """chunk 内嵌图片的统一描述。
 
     img_id 作为稳定标识，为 Phase 5+ 视觉检索（CLIP）留钩子。
+
+    Phase 9.1 新增字段：
+        caption_zh / caption_en : VLM（Gemini Vision）生成的中英双语描述
+        entities                : 抽取出的关键实体列表（中文实体 + 英文术语保留原文）
+
+    向后兼容：旧 ``caption`` 字段保留；老 jsonl 升级时若仅有 caption，
+    from_jsonl_dict 不会自动迁移到 caption_zh（避免误判语言）。新管线全部
+    走 caption_zh/caption_en；caption 字段仅作为旧版兜底显示。
     """
 
     path: str
     caption: str = ""
     page_idx: Optional[int] = None
     img_id: Optional[str] = None
+    caption_zh: str = ""
+    caption_en: str = ""
+    entities: tuple[str, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -35,6 +46,9 @@ class ChunkImage:
             "caption": self.caption,
             "page_idx": self.page_idx,
             "img_id": self.img_id,
+            "caption_zh": self.caption_zh,
+            "caption_en": self.caption_en,
+            "entities": list(self.entities),
         }
 
 
@@ -135,12 +149,19 @@ class Chunk:
             if isinstance(item, str):
                 images.append(ChunkImage(path=item))
             elif isinstance(item, dict):
+                entities_raw = item.get("entities") or []
+                entities_tuple = tuple(
+                    str(e).strip() for e in entities_raw if str(e).strip()
+                ) if isinstance(entities_raw, (list, tuple)) else ()
                 images.append(
                     ChunkImage(
                         path=item.get("path", ""),
                         caption=item.get("caption", ""),
                         page_idx=item.get("page_idx"),
                         img_id=item.get("img_id"),
+                        caption_zh=str(item.get("caption_zh") or ""),
+                        caption_en=str(item.get("caption_en") or ""),
+                        entities=entities_tuple,
                     )
                 )
 
