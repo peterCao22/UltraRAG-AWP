@@ -115,7 +115,10 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 
 | # | 任务 | 工时 | 备注 |
 |---|---|---|---|
-| **P9** | **Phase 9 图文联动**（VLM 给图打 caption + 实体 → 图片参与检索 → KG 跨章节联动） | **预计 2-3 周** | docs/Phase9/README.md 方向锚点已就绪；用户 2026-06-03 确定下一个做这个 |
+| **P9.1** | ~~图片 VLM caption + 实体抽取（基础设施）~~ ✅ 2026-06-04 commit `454e46d`（代码完成，待全量跑 backfill） | — | gemini-2.5-flash 默认；PoC 5/5 张达 80% 成功率；retry + salvage 兜底；22 单测 |
+| **P9.1-run** | 在 awprag 跑全量 backfill：agv_demo 23 张 + ifs_docs 44 张 | 10 分钟 ~$0.13 | `python -m custom_app.scripts.backfill_image_captions --kb agv_demo` 然后 `--kb ifs_docs`。失败的可重跑（幂等）。20 张人评 ≥80% 才进 9.2 |
+| P9.2 | 图片参与检索（caption 拼到 chunk embedding 或独立 multimodal collection） | 1 周 | 待 P9.1-run 评测合格后启动 |
+| P9.3 | 跨章节图文联动（KG 实体桥接） | 2-3 周 | 待 P9.2 合格 |
 | P-Perm | 用户权限层（**轻量级，非 Phase 10 多租户**）：users 表 + 登录 + user↔role 绑定，复用 Phase 3 `roles/role_kb_permissions` | 5-7 天 | 用户 2026-06-03 确认 Phase 9 后做。**明确不做** Phase 10 多租户改造（业务紧迫性低；users + role binding 已够） |
 | ~~Phase 10 多租户~~ | ~~多组织 + 数据隔离 + 跨租户共享 + 联邦检索~~ | ~~6-8 周~~ | ❌ 2026-06-03 决定**不做**。当前是车间内网单租户场景；用户的真实需求是"控制哪些用户能用哪个 KB"，等同于轻量级 RBAC，走 P-Perm 即可 |
 
@@ -131,6 +134,7 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `454e46d` | feat(phase9.1): 图片 VLM caption + 实体（gemini-2.5-flash + salvage 兜底）；22 单测；待全量跑 backfill | 2026-06-04 |
 | `6348e5c` | feat(phase12.4): Agent Scratchpad — Haiku 摘要工作记忆 + SSE 推理链可视化；23 单测 | 2026-06-02 |
 | `d55a638` | feat(phase11.1.5): Query 意图分类 — 规则 + Haiku 混合；闲聊/帮助短路 = 0 token；36 单测 | 2026-06-02 |
 | `38e857b` | feat(phase12.3): Clarification 反问 — rerank 低分 + 跨域 doc 双触发器；零 LLM；17 单测 | 2026-06-01 |
