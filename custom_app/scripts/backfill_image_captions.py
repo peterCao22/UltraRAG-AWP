@@ -174,17 +174,8 @@ def main(argv: list[str] | None = None) -> int:
     # 延迟 import：避免 dry-run 也要装 jinja2
     from custom_app.services.parsers.image_describer import describe_image
 
-    print(f"\n开始回填 {len(jobs)} 张图片...")
-    n_ok = 0
-    n_fail = 0
-    total_ms = 0
-    for k, (ci, ii, path) in enumerate(jobs, start=1):
-        chunk_ctx = _build_chunk_context(chunks[ci])
-        result = describe_image(
-            path, chunk_context=chunk_ctx, kb_root=kb_root,
-        )
-        total_ms += result.ms
-        # 升级 images[ii]：字符串 → dict
+    def _apply_result(ci: int, ii: int, path: str, result) -> bool:
+        """把 describe_image 结果合并到 chunks[ci].images[ii]，返回是否 failed。"""
         original_item = chunks[ci].get("images", [])[ii]
         if isinstance(original_item, str):
             new_item: dict[str, Any] = {"path": original_item}
@@ -195,33 +186,80 @@ def main(argv: list[str] | None = None) -> int:
 
         new_item["caption_zh"] = result.caption_zh
         new_item["caption_en"] = result.caption_en
-        new_item["entities"] = result.entities
+        new_item["entities"] = list(result.entities)
         if result.failed:
             new_item["_describe_failed"] = True
             new_item["_describe_reason"] = result.reason or ""
-            # 保留 raw_text 用于排查（成功时不存，避免 jsonl 膨胀）
             if result.raw_text:
                 new_item["_describe_raw"] = result.raw_text[:500]
-            n_fail += 1
         else:
             # 清除可能的旧失败标记
             new_item.pop("_describe_failed", None)
             new_item.pop("_describe_reason", None)
-            n_ok += 1
+            new_item.pop("_describe_raw", None)
 
         chunks[ci]["images"][ii] = new_item
+        return result.failed
 
-        # 进度
+    # ── Pass 1：正常顺序跑 ───────────────────────────────────────
+    print(f"\n[Pass 1] 顺序跑 {len(jobs)} 张图片...")
+    n_ok = 0
+    failed_jobs: list[tuple[int, int, str]] = []  # 失败的图，pass 2 重试用
+    total_ms = 0
+    for k, (ci, ii, path) in enumerate(jobs, start=1):
+        chunk_ctx = _build_chunk_context(chunks[ci])
+        result = describe_image(path, chunk_context=chunk_ctx, kb_root=kb_root)
+        total_ms += result.ms
+        if _apply_result(ci, ii, path, result):
+            failed_jobs.append((ci, ii, path))
+        else:
+            n_ok += 1
+        # 每张写完立即增量写文件（防止脚本崩溃丢全部成果）
+        _write_chunks(chunks, chunks_path)
         if k % 5 == 0 or k == len(jobs):
             print(
-                f"  [{k}/{len(jobs)}] ok={n_ok} fail={n_fail} "
+                f"  [{k}/{len(jobs)}] ok={n_ok} fail={len(failed_jobs)} "
                 f"avg_ms={int(total_ms / k)}"
             )
 
-    # 写回
-    _write_chunks(chunks, chunks_path)
+    # ── Pass 2：等待 + 慢节流重试失败的 ─────────────────────────
+    pass2_recovered = 0
+    if failed_jobs:
+        cool_down_sec = 30
+        per_image_sleep_sec = 3
+        print(
+            f"\n[Pass 2] {len(failed_jobs)} 张失败，冷却 {cool_down_sec}s "
+            f"让 Gemini 节流缓存退出，然后慢节流重试..."
+        )
+        time.sleep(cool_down_sec)
+        for k, (ci, ii, path) in enumerate(failed_jobs, start=1):
+            chunk_ctx = _build_chunk_context(chunks[ci])
+            result = describe_image(path, chunk_context=chunk_ctx, kb_root=kb_root)
+            recovered = not result.failed
+            _apply_result(ci, ii, path, result)
+            if recovered:
+                pass2_recovered += 1
+                n_ok += 1
+            print(
+                f"  [{k}/{len(failed_jobs)}] {'OK' if recovered else 'STILL FAIL'} "
+                f"{path}"
+            )
+            # 每张写完立即增量写
+            _write_chunks(chunks, chunks_path)
+            # 张之间留 sleep，让 Gemini 服务端节流窗口完全过期
+            if k < len(failed_jobs):
+                time.sleep(per_image_sleep_sec)
+
+    final_fail = len(failed_jobs) - pass2_recovered
     print(f"\n已写回 {chunks_path}")
-    print(f"成功: {n_ok}，失败: {n_fail}，总耗时: {total_ms / 1000:.1f}s")
+    print(
+        f"成功: {n_ok}（含 Pass 2 救回 {pass2_recovered}），失败: {final_fail}"
+    )
+    if final_fail:
+        print(
+            f"\n[WARN] {final_fail} 张仍失败的图片已标 _describe_failed=true，"
+        )
+        print("       可以再跑一次本脚本（幂等），失败的会再重试")
     if n_fail:
         print(f"\n[WARN] {n_fail} 张失败的图片仍写入了 _describe_failed=true，")
         print("       你可以稍后重跑本脚本（幂等），失败的会重试")
