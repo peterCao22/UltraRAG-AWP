@@ -393,3 +393,29 @@ def test_default_model_is_gemini_2_5_flash():
     """default model 应为 2.5-flash（PoC 验证：3.1-pro 不稳定）。"""
     from custom_app.services.parsers.image_describer import DEFAULT_MODEL
     assert DEFAULT_MODEL == "gemini-2.5-flash"
+
+
+def test_model_param_overrides_env(tiny_jpeg, monkeypatch):
+    """describe_image(model=...) 应优先于 env。"""
+    monkeypatch.setenv("GOOGLE_API_KEY", "fake-key")
+    monkeypatch.setenv("ULTRARAG_IMAGE_DESCRIBE_MODEL", "gemini-2.5-flash")
+
+    captured = {}
+
+    def fake_call(*, image_bytes, mime_type, prompt, model, api_key,
+                  timeout_sec, max_retries):
+        captured["model"] = model
+        return (
+            json.dumps({"caption_zh": "z", "caption_en": "e", "entities": []}),
+            model,
+        )
+
+    monkeypatch.setattr(
+        "custom_app.services.parsers.image_describer._call_gemini_vision",
+        fake_call,
+    )
+
+    result = describe_image(tiny_jpeg, model="gemini-2.5-pro")
+    assert result.failed is False
+    assert captured["model"] == "gemini-2.5-pro"
+    assert result.model == "gemini-2.5-pro"

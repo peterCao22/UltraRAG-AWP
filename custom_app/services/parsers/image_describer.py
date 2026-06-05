@@ -342,6 +342,7 @@ def describe_image(
     *,
     chunk_context: str = "",
     kb_root: str | Path | None = None,
+    model: str | None = None,
 ) -> ImageDescription:
     """生成图片的中英 caption + 实体。
 
@@ -349,6 +350,8 @@ def describe_image(
         image_path:    图片文件路径（绝对路径或相对 kb_root 的相对路径）
         chunk_context: 同 chunk 的文本上下文（提升 caption 准确性）
         kb_root:       KB 根目录；image_path 是相对路径时用它解析
+        model:         覆盖默认模型（不传则按 env 优先级 → DEFAULT_MODEL）。
+                       backfill Pass 3 fallback 时传 gemini-2.5-pro。
 
     返回:
         ImageDescription；failed=True 时 caption_zh/caption_en/entities 为
@@ -404,9 +407,13 @@ def describe_image(
         result.ms = int((time.perf_counter() - t0) * 1000)
         return result
 
-    model = (
-        os.environ.get("ULTRARAG_IMAGE_DESCRIBE_MODEL") or DEFAULT_MODEL
+    # model 参数优先级：函数参数 > env > DEFAULT_MODEL
+    effective_model = (
+        (model or "").strip()
+        or os.environ.get("ULTRARAG_IMAGE_DESCRIBE_MODEL")
+        or DEFAULT_MODEL
     ).strip()
+    model = effective_model  # 后面的代码以 model 作为 final 模型名
     timeout_sec = max(1, _env_int(
         "ULTRARAG_IMAGE_DESCRIBE_TIMEOUT_SEC", DEFAULT_TIMEOUT_SEC,
     ))

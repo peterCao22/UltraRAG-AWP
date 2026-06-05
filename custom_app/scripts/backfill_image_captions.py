@@ -222,8 +222,9 @@ def main(argv: list[str] | None = None) -> int:
                 f"avg_ms={int(total_ms / k)}"
             )
 
-    # ── Pass 2：等待 + 慢节流重试失败的 ─────────────────────────
+    # ── Pass 2：等待 + 慢节流重试失败的（同模型）─────────────────
     pass2_recovered = 0
+    pass2_still_failed: list[tuple[int, int, str]] = []
     if failed_jobs:
         cool_down_sec = 30
         per_image_sleep_sec = 3
@@ -240,29 +241,58 @@ def main(argv: list[str] | None = None) -> int:
             if recovered:
                 pass2_recovered += 1
                 n_ok += 1
+            else:
+                pass2_still_failed.append((ci, ii, path))
             print(
                 f"  [{k}/{len(failed_jobs)}] {'OK' if recovered else 'STILL FAIL'} "
                 f"{path}"
             )
-            # 每张写完立即增量写
             _write_chunks(chunks, chunks_path)
-            # 张之间留 sleep，让 Gemini 服务端节流窗口完全过期
             if k < len(failed_jobs):
                 time.sleep(per_image_sleep_sec)
 
-    final_fail = len(failed_jobs) - pass2_recovered
+    # ── Pass 3：仍失败的用 fallback model（更稳定的 gemini-2.5-pro）──
+    pass3_recovered = 0
+    if pass2_still_failed:
+        import os as _os
+        fallback_model = (
+            _os.environ.get("ULTRARAG_IMAGE_DESCRIBE_FALLBACK_MODEL")
+            or "gemini-2.5-pro"
+        ).strip()
+        print(
+            f"\n[Pass 3] {len(pass2_still_failed)} 张仍失败，"
+            f"切换到 fallback model={fallback_model} 重试..."
+        )
+        for k, (ci, ii, path) in enumerate(pass2_still_failed, start=1):
+            chunk_ctx = _build_chunk_context(chunks[ci])
+            result = describe_image(
+                path, chunk_context=chunk_ctx, kb_root=kb_root,
+                model=fallback_model,
+            )
+            recovered = not result.failed
+            _apply_result(ci, ii, path, result)
+            if recovered:
+                pass3_recovered += 1
+                n_ok += 1
+            print(
+                f"  [{k}/{len(pass2_still_failed)}] {'OK' if recovered else 'STILL FAIL'} "
+                f"{path}"
+            )
+            _write_chunks(chunks, chunks_path)
+            if k < len(pass2_still_failed):
+                time.sleep(2)
+
+    final_fail = len(failed_jobs) - pass2_recovered - pass3_recovered
     print(f"\n已写回 {chunks_path}")
     print(
-        f"成功: {n_ok}（含 Pass 2 救回 {pass2_recovered}），失败: {final_fail}"
+        f"成功: {n_ok}（含 Pass 2 救回 {pass2_recovered}，"
+        f"Pass 3 fallback 救回 {pass3_recovered}），失败: {final_fail}"
     )
     if final_fail:
         print(
-            f"\n[WARN] {final_fail} 张仍失败的图片已标 _describe_failed=true，"
+            f"\n[WARN] {final_fail} 张仍失败的图片已标 _describe_failed=true"
         )
         print("       可以再跑一次本脚本（幂等），失败的会再重试")
-    if n_fail:
-        print(f"\n[WARN] {n_fail} 张失败的图片仍写入了 _describe_failed=true，")
-        print("       你可以稍后重跑本脚本（幂等），失败的会重试")
     return 0
 
 
