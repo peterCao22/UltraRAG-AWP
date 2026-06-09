@@ -133,6 +133,53 @@ def strip_images_footer(contents: str) -> str:
     return (contents or "").strip()
 
 
+def _compose_image_block(row: dict) -> str:
+    """Phase 9.2：把 chunk 内含 caption 的图片拼成一段 image_block。
+
+    跳过：旧 schema 字符串 images / 已失败图（_describe_failed=True）/
+    caption_zh + caption_en 都空的图。
+
+    每张图拼成 "[图片] zh / en | 实体: a, b, c" 单行；多图换行连接。
+    设计意图：embedding 时让图片语义进入向量，但**不污染**已存在的文本
+    检索能力。query 命中图片时，标识"[图片]"前缀帮助召回路径区分。
+    """
+    images_raw = row.get("images") or []
+    if not isinstance(images_raw, list):
+        return ""
+    lines: list[str] = []
+    for img in images_raw:
+        if not isinstance(img, dict):
+            continue  # 旧 schema 字符串 / 非法项跳过
+        if img.get("_describe_failed"):
+            continue  # P9.1 失败的图（caption_zh 中间被截）
+        zh = str(img.get("caption_zh") or "").strip()
+        en = str(img.get("caption_en") or "").strip()
+        if not zh and not en:
+            continue
+        # 拼一段：zh / en 选有的；entities 用顿号连接（去重 + 截断防膨胀）
+        caption_parts: list[str] = []
+        if zh:
+            caption_parts.append(zh)
+        if en:
+            caption_parts.append(en)
+        entities_raw = img.get("entities") or []
+        if isinstance(entities_raw, list):
+            ents = [str(e).strip() for e in entities_raw if str(e).strip()]
+            # 去重保序 + 最多 8 个
+            seen = set()
+            unique_ents: list[str] = []
+            for e in ents:
+                if e not in seen:
+                    seen.add(e)
+                    unique_ents.append(e)
+                    if len(unique_ents) >= 8:
+                        break
+            if unique_ents:
+                caption_parts.append("实体: " + "、".join(unique_ents))
+        lines.append("[图片] " + " / ".join(caption_parts))
+    return "\n".join(lines)
+
+
 def compose_doc_embedding_text(row: dict) -> str:
     """构造一条 chunk 的嵌入输入文本。
 
@@ -145,17 +192,25 @@ def compose_doc_embedding_text(row: dict) -> str:
         在 heading_path 与 title 之前再加一行文档级上下文摘要，帮助 embedding 在
         chunk 脱离原文档时仍能定位。缺失 context 时退化到 Phase 4.3 行为，零回归。
 
+    Phase 9.2：图片 caption 参与检索（方案 A）
+        当 chunk 含 images 且其中至少 1 张含有 caption_zh / caption_en（由
+        Phase 9.1 image_describer 写入），把图片 caption + 实体作为 image_block
+        附加到 embedding 文本末尾。失败的图（_describe_failed=True）和旧字符串
+        schema 不进 image_block，零回归。
+
     格式（按优先级从外到内）：
         [context]
         A > B > C   ← heading_path
         <title>
         <contents>
+        [图片] zh / en / 实体: ...   ← Phase 9.2，可能多行
     """
     structure = row.get("structure") or {}
     heading_path = structure.get("heading_path") or []
     title = row.get("title", "") or ""
     body = strip_images_footer(row.get("contents", ""))
     context = (row.get("context") or "").strip()
+    image_block = _compose_image_block(row)
 
     parts: list[str] = []
     if context:
@@ -169,6 +224,8 @@ def compose_doc_embedding_text(row: dict) -> str:
         parts.append(title)
     if body:
         parts.append(body)
+    if image_block:
+        parts.append(image_block)
     return "\n".join(parts).strip()
 
 
