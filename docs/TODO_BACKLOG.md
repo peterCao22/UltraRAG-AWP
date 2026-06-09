@@ -116,8 +116,8 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 | # | 任务 | 工时 | 备注 |
 |---|---|---|---|
 | **P9.1** | ~~图片 VLM caption + 实体抽取（基础设施）~~ ✅ 2026-06-04 commit `454e46d`（代码完成，待全量跑 backfill） | — | gemini-2.5-flash 默认；PoC 5/5 张达 80% 成功率；retry + salvage 兜底；22 单测 |
-| **P9.1-run** | 在 awprag 跑全量 backfill：agv_demo 23 张 + ifs_docs 44 张 | 10 分钟 ~$0.13 | `python -m custom_app.scripts.backfill_image_captions --kb agv_demo` 然后 `--kb ifs_docs`。失败的可重跑（幂等）。20 张人评 ≥80% 才进 9.2 |
-| P9.2 | 图片参与检索（caption 拼到 chunk embedding 或独立 multimodal collection） | 1 周 | 待 P9.1-run 评测合格后启动 |
+| ~~P9.1-run~~ | ~~跑全量 backfill~~ ✅ 2026-06-09 完成 | — | agv_demo 12 ok + 3 salvaged + 8 fail = 65%；ifs_docs 26 ok + 9 salvaged + 9 fail = **80%**；合计 50/67 = 75%。失败规律：Gemini 对含密集文字的界面截图（LCD/IFS UI）在 caption_zh 中间提前 STOP，gemini-2.5-flash/2.5-pro/3.1-pro 均存在；可接受（失败图所在 doc 文本完整，检索不受影响） |
+| **P9.2** | 图片参与检索（caption 拼到 chunk embedding 或独立 multimodal collection） | 1 周 | **进行中**（2026-06-09 启动）。基于 P9.1 拿到的 50 张可用 caption，让图片 caption 参与向量检索 |
 | P9.3 | 跨章节图文联动（KG 实体桥接） | 2-3 周 | 待 P9.2 合格 |
 | P-Perm | 用户权限层（**轻量级，非 Phase 10 多租户**）：users 表 + 登录 + user↔role 绑定，复用 Phase 3 `roles/role_kb_permissions` | 5-7 天 | 用户 2026-06-03 确认 Phase 9 后做。**明确不做** Phase 10 多租户改造（业务紧迫性低；users + role binding 已够） |
 | ~~Phase 10 多租户~~ | ~~多组织 + 数据隔离 + 跨租户共享 + 联邦检索~~ | ~~6-8 周~~ | ❌ 2026-06-03 决定**不做**。当前是车间内网单租户场景；用户的真实需求是"控制哪些用户能用哪个 KB"，等同于轻量级 RBAC，走 P-Perm 即可 |
