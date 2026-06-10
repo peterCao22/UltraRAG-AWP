@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     final_size = store.size()
     print(f"  done: collection size={final_size}")
 
-    print(f"\n✓ Phase 9.2 重 embed 完成。kb={args.kb}")
+    print(f"\n[OK] Phase 9.2 重 embed 完成。kb={args.kb}")
     print("  下一步：跑 eval_custom_app 对比 Phase 8.1 基线")
     return 0
 

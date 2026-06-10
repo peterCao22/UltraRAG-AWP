@@ -79,6 +79,20 @@ class Neo4jKgStore:
                 "CREATE INDEX rel_kb_id IF NOT EXISTS "
                 "FOR ()-[r:RELATES_TO]-() ON (r.kb_id)"
             )
+            # Phase 9.3：Image 节点约束（kb_id, img_id 联合唯一）+ kb_id 索引
+            session.run(
+                """
+                CREATE CONSTRAINT image_kb_img_unique IF NOT EXISTS
+                FOR (i:Image) REQUIRE (i.kb_id, i.img_id) IS UNIQUE
+                """
+            )
+            session.run(
+                "CREATE INDEX image_kb_id IF NOT EXISTS FOR (i:Image) ON (i.kb_id)"
+            )
+            session.run(
+                "CREATE INDEX mentions_kb_id IF NOT EXISTS "
+                "FOR ()-[r:MENTIONS]-() ON (r.kb_id)"
+            )
         self._ensured_schema = True
         logger.info("neo4j schema constraints/indexes ensured")
 
@@ -337,6 +351,214 @@ class Neo4jKgStore:
                 "entity_count": int(rec["ec"]) if rec else 0,
                 "relation_count": int(rec["rc"]) if rec else 0,
             }
+
+    # ------------------------------------------------------------------
+    # Phase 9.3：Image 节点 + MENTIONS 关系
+    # ------------------------------------------------------------------
+
+    def upsert_image_node(
+        self,
+        *,
+        kb_id: str,
+        img_id: str,
+        path: str,
+        doc: str,
+        chunk_id: str,
+        caption_zh: str,
+        caption_en: str,
+        created_at: str,
+    ) -> str:
+        """幂等创建或更新 :Image 节点。返回 Neo4j elementId。
+
+        约束 (kb_id, img_id) 唯一；同 img_id 重复调用会更新 caption 等字段。
+        """
+        self.ensure_constraints()
+        with self._session() as session:
+            rec = session.run(
+                """
+                MERGE (i:Image {kb_id: $kb_id, img_id: $img_id})
+                ON CREATE SET
+                  i.path = $path,
+                  i.doc = $doc,
+                  i.chunk_id = $chunk_id,
+                  i.caption_zh = $caption_zh,
+                  i.caption_en = $caption_en,
+                  i.created_at = $created_at
+                ON MATCH SET
+                  i.path = $path,
+                  i.doc = $doc,
+                  i.chunk_id = $chunk_id,
+                  i.caption_zh = $caption_zh,
+                  i.caption_en = $caption_en
+                RETURN elementId(i) AS id
+                """,
+                kb_id=kb_id, img_id=img_id, path=path, doc=doc,
+                chunk_id=chunk_id, caption_zh=caption_zh,
+                caption_en=caption_en, created_at=created_at,
+            ).single()
+            return str(rec["id"])
+
+    def link_image_to_entity(
+        self,
+        *,
+        kb_id: str,
+        img_id: str,
+        entity_name: str,
+        created_at: str,
+    ) -> bool:
+        """建 (:Image)-[:MENTIONS]->(:Entity) 关系；Entity 不存在时跳过返 False。
+
+        kb_id 严格隔离：MENTIONS 关系 property 含 kb_id；Image 和 Entity 必须
+        是同 kb_id 才连接。
+        """
+        self.ensure_constraints()
+        with self._session() as session:
+            rec = session.run(
+                """
+                MATCH (i:Image {kb_id: $kb_id, img_id: $img_id})
+                MATCH (e:Entity {kb_id: $kb_id, name: $entity_name})
+                MERGE (i)-[r:MENTIONS {kb_id: $kb_id}]->(e)
+                ON CREATE SET r.created_at = $created_at
+                RETURN elementId(r) AS rel_id
+                """,
+                kb_id=kb_id, img_id=img_id, entity_name=entity_name,
+                created_at=created_at,
+            ).single()
+            return rec is not None
+
+    def list_entity_chunk_id_counts(
+        self, kb_id: str,
+    ) -> dict[str, int]:
+        """返回该 KB 下每个实体名 → chunk_ids 数组长度。Phase 9.3 过滤通用词用。
+
+        实体 chunk_ids 是 JSON 字符串，这里逐条解析；KG 通常 < 300 实体，
+        全表扫成本可接受。
+        """
+        if not kb_id:
+            return {}
+        import json as _json
+        self.ensure_constraints()
+        with self._session() as session:
+            recs = session.run(
+                "MATCH (e:Entity {kb_id: $kb_id}) "
+                "RETURN e.name AS name, e.chunk_ids AS chunk_ids",
+                kb_id=kb_id,
+            ).data()
+        out: dict[str, int] = {}
+        for r in recs:
+            name = str(r.get("name") or "")
+            if not name:
+                continue
+            raw = r.get("chunk_ids") or "[]"
+            try:
+                arr = _json.loads(raw)
+                cnt = len(arr) if isinstance(arr, list) else 0
+            except (ValueError, TypeError):
+                cnt = 0
+            out[name] = cnt
+        return out
+
+    def count_images(self, kb_id: Optional[str] = None) -> dict[str, int]:
+        """统计图节点 + MENTIONS 关系数。"""
+        self.ensure_constraints()
+        with self._session() as session:
+            if kb_id:
+                rec = session.run(
+                    """
+                    MATCH (i:Image {kb_id: $kb_id})
+                    OPTIONAL MATCH (i)-[m:MENTIONS]->()
+                    WHERE m.kb_id = $kb_id
+                    RETURN count(DISTINCT i) AS ic, count(DISTINCT m) AS mc
+                    """,
+                    kb_id=kb_id,
+                ).single()
+            else:
+                rec = session.run(
+                    """
+                    MATCH (i:Image)
+                    OPTIONAL MATCH (i)-[m:MENTIONS]->()
+                    RETURN count(DISTINCT i) AS ic, count(DISTINCT m) AS mc
+                    """
+                ).single()
+            return {
+                "image_count": int(rec["ic"]) if rec else 0,
+                "mentions_count": int(rec["mc"]) if rec else 0,
+            }
+
+    def delete_images_for_kb(self, kb_id: str) -> int:
+        """删除某 KB 下所有 :Image 节点（DETACH 自动级联删 MENTIONS）。"""
+        self.ensure_constraints()
+        with self._session() as session:
+            rec = session.run(
+                """
+                MATCH (i:Image {kb_id: $kb_id})
+                WITH count(i) AS n
+                MATCH (i:Image {kb_id: $kb_id})
+                DETACH DELETE i
+                RETURN n
+                """,
+                kb_id=kb_id,
+            ).single()
+            return int(rec["n"]) if rec else 0
+
+    def find_images_for_entities(
+        self,
+        kb_id: str,
+        entity_names: list[str],
+        *,
+        exclude_chunk_ids: Optional[list[str]] = None,
+        limit: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Phase 9.3.B 检索路径：给定一组实体名，找它们 MENTIONS 关联的图片。
+
+        参数:
+            kb_id:             KB 隔离
+            entity_names:      种子实体列表（来自命中 chunk 的实体）
+            exclude_chunk_ids: 排除已经在命中 chunk 列表里的图片（避免重复）；
+                               传入命中 chunk_id 列表即可
+            limit:             最多返回几张图（默认 3，env 可调）
+
+        返回:
+            按"被多少实体提及"降序排列 + 限 limit 张图：
+            [{img_id, path, doc, chunk_id, caption_zh, caption_en, hit_count}, ...]
+        """
+        if not entity_names or not kb_id:
+            return []
+        self.ensure_constraints()
+        exclude = set(str(c) for c in (exclude_chunk_ids or []))
+        with self._session() as session:
+            recs = session.run(
+                """
+                MATCH (e:Entity {kb_id: $kb_id})
+                WHERE e.name IN $entity_names
+                MATCH (i:Image {kb_id: $kb_id})-[:MENTIONS {kb_id: $kb_id}]->(e)
+                WITH i, count(DISTINCT e) AS hits
+                RETURN i.img_id AS img_id, i.path AS path, i.doc AS doc,
+                       i.chunk_id AS chunk_id, i.caption_zh AS caption_zh,
+                       i.caption_en AS caption_en, hits
+                ORDER BY hits DESC, i.img_id ASC
+                LIMIT $limit_cap
+                """,
+                kb_id=kb_id, entity_names=entity_names,
+                # 多读几条，让上层按 exclude 过滤后还能凑齐 limit
+                limit_cap=max(int(limit) * 3, int(limit)),
+            ).data()
+        out: list[dict[str, Any]] = []
+        for r in recs:
+            if str(r.get("chunk_id") or "") in exclude:
+                continue
+            out.append({
+                "img_id": str(r.get("img_id") or ""),
+                "path": str(r.get("path") or ""),
+                "doc": str(r.get("doc") or ""),
+                "chunk_id": str(r.get("chunk_id") or ""),
+                "caption_zh": str(r.get("caption_zh") or ""),
+                "caption_en": str(r.get("caption_en") or ""),
+                "hit_count": int(r.get("hits") or 0),
+            })
+            if len(out) >= int(limit):
+                break
+        return out
 
     def find_relations_for_entities(
         self, kb_id: str, entity_names: list[str]
