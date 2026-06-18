@@ -118,8 +118,10 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 | **P9.1** | ~~图片 VLM caption + 实体抽取（基础设施）~~ ✅ 2026-06-04 commit `454e46d`（代码完成，待全量跑 backfill） | — | gemini-2.5-flash 默认；PoC 5/5 张达 80% 成功率；retry + salvage 兜底；22 单测 |
 | ~~P9.1-run~~ | ~~跑全量 backfill~~ ✅ 2026-06-09 完成 | — | agv_demo 12 ok + 3 salvaged + 8 fail = 65%；ifs_docs 26 ok + 9 salvaged + 9 fail = **80%**；合计 50/67 = 75%。失败规律：Gemini 对含密集文字的界面截图（LCD/IFS UI）在 caption_zh 中间提前 STOP，gemini-2.5-flash/2.5-pro/3.1-pro 均存在；可接受（失败图所在 doc 文本完整，检索不受影响） |
 | ~~P9.2~~ | ~~方案 A: 图片 caption 拼到 chunk embedding~~ ⚙️ 2026-06-10 代码完成、**评测未达门槛但作为 9.3 基础设施保留**（commit `495996d` + `b4df311`） | — | agv_demo Hit@5 0.9000→0.9077 (+0.77pp, 波动范围内)；ifs_docs Hit@5 持平 1.0。退出门槛 ≥+5pp/F1+0.03 未达。根因：评测 query 多问"Alarm ID 处理"类，chunk.contents 已含完整答案，caption 是冗余；真正图文联动需要 9.3 KG 桥接。代码保留供 9.3 使用，不算上线 |
-| **P9.3** | 跨章节图文联动（KG 实体桥接） | 2-3 周 | **进行中**（2026-06-10 启动）。`(:Chunk)-[:CONTAINS]->(:Image)` + `(:Image)-[:MENTIONS]->(:Entity)`；检索时按命中 chunk 的实体邻居扩散找跨章节图 |
-| P-Perm | 用户权限层（**轻量级，非 Phase 10 多租户**）：users 表 + 登录 + user↔role 绑定，复用 Phase 3 `roles/role_kb_permissions` | 5-7 天 | 用户 2026-06-03 确认 Phase 9 后做。**明确不做** Phase 10 多租户改造（业务紧迫性低；users + role binding 已够） |
+| ~~P9.3~~ | ~~跨章节图文联动（KG 实体桥接）~~ ✅ 2026-06-18 完成 | — | A: 17+35 Image nodes / 41+117 MENTIONS（commit `6cd53ae` + `f880e6c`）；B: `_find_linked_images` 集成 _prepare_chat_context（commit `b7d871c`）。Smoke: 3 query 均能返图但**通用实体多导致跨 query 重叠度高**——属基础设施，命中质量靠 KG 抽取精度；env 可调阈值 |
+| **P-Perm** | **用户权限层**（轻量级，非 Phase 10 多租户）：users 表 + 登录 + user↔role 绑定，复用 Phase 3 `roles/role_kb_permissions` | 5-7 天 | **进行中**（2026-06-18 启动，Phase 9 已收）。**明确不做** Phase 10 多租户改造 |
+| P-Frontend-9 | 前端兼容新 SSE 事件：intent / clarification / scratchpad_update | 半天 | Phase 11.1.5 / 12.3 / 12.4 加的事件未在前端渲染。试用前必须做 |
+| P-Trial | 内部小范围试用 + 阈值调优 | 3-5 天 | 1-2 个用户用 1-2 周，从 audit_logs 看反问触发率 / 闲聊误判率 / 摘要质量 / linked_images 命中率，调 env 阈值 |
 | ~~Phase 10 多租户~~ | ~~多组织 + 数据隔离 + 跨租户共享 + 联邦检索~~ | ~~6-8 周~~ | ❌ 2026-06-03 决定**不做**。当前是车间内网单租户场景；用户的真实需求是"控制哪些用户能用哪个 KB"，等同于轻量级 RBAC，走 P-Perm 即可 |
 
 ### 杂项
@@ -134,6 +136,11 @@ Phase 11.1.2 审计：done 后 finally 写 audit_logs（query + answer + chunk_i
 
 | commit | 内容 | 日期 |
 |---|---|---|
+| `b7d871c` | feat(phase9.3.B): 跨章节图片联动检索（KG 实体桥接）；14 单测；smoke 通过 | 2026-06-18 |
+| `f880e6c` | feat(phase9.3.A): build_image_kg_links 加包含匹配；MENTIONS 11→43；18 单测 | 2026-06-12 |
+| `6cd53ae` | feat(phase9.3.A): Image 节点 + MENTIONS 关系（KG schema + 构建脚本）；13 单测 | 2026-06-12 |
+| `b4df311` | chore(phase9.2): 加 reembed 脚本 — 不重 parse 只重 embed/index/Qdrant | 2026-06-09 |
+| `495996d` | feat(phase9.2): 图片 caption 拼进 chunk embedding（方案 A）；15 单测；评测未达门槛但保留为基础设施 | 2026-06-09 |
 | `454e46d` | feat(phase9.1): 图片 VLM caption + 实体（gemini-2.5-flash + salvage 兜底）；22 单测；待全量跑 backfill | 2026-06-04 |
 | `6348e5c` | feat(phase12.4): Agent Scratchpad — Haiku 摘要工作记忆 + SSE 推理链可视化；23 单测 | 2026-06-02 |
 | `d55a638` | feat(phase11.1.5): Query 意图分类 — 规则 + Haiku 混合；闲聊/帮助短路 = 0 token；36 单测 | 2026-06-02 |
