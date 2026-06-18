@@ -110,6 +110,31 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_role_kb_perm
               ON role_kb_permissions (role_id, kb_id);
 
+            -- P-Perm: 用户认证 + 角色绑定（轻量级 RBAC，复用 roles 表）
+            CREATE TABLE IF NOT EXISTS users (
+              user_id        TEXT NOT NULL PRIMARY KEY,
+              username       TEXT NOT NULL UNIQUE,
+              password_hash  TEXT NOT NULL,
+              display_name   TEXT NOT NULL DEFAULT '',
+              status         TEXT NOT NULL DEFAULT 'active',
+              created_at     TEXT NOT NULL,
+              updated_at     TEXT NOT NULL,
+              last_login_at  TEXT NOT NULL DEFAULT ''
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+            CREATE TABLE IF NOT EXISTS user_roles (
+              id          INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id     TEXT NOT NULL,
+              role_id     TEXT NOT NULL,
+              created_at  TEXT NOT NULL,
+              UNIQUE (user_id, role_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+            CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
+
             CREATE TABLE IF NOT EXISTS kb_sessions (
               session_id TEXT NOT NULL PRIMARY KEY,
               kb_id TEXT NOT NULL,
@@ -119,7 +144,8 @@ def init_db() -> None:
               updated_at TEXT NOT NULL,
               summary TEXT NOT NULL DEFAULT '',
               summary_at_msg_id INTEGER NOT NULL DEFAULT 0,
-              summary_updated_at TEXT NOT NULL DEFAULT ''
+              summary_updated_at TEXT NOT NULL DEFAULT '',
+              user_id TEXT NOT NULL DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_kb_sessions_kb_updated
@@ -240,12 +266,14 @@ def init_db() -> None:
               query       TEXT NOT NULL DEFAULT '',
               answer      TEXT NOT NULL DEFAULT '',
               chunk_ids   TEXT NOT NULL DEFAULT '[]',
-              meta        TEXT NOT NULL DEFAULT '{}'
+              meta        TEXT NOT NULL DEFAULT '{}',
+              user_id     TEXT NOT NULL DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_audit_kb_ts ON audit_logs (kb_id, ts);
             CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs (session_id);
             CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_logs (event_type);
+            CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id);
             """
         )
 
@@ -308,6 +336,21 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE kb_sessions "
                 "ADD COLUMN summary_updated_at TEXT NOT NULL DEFAULT ''"
+            )
+
+        # P-Perm 迁移：kb_sessions / audit_logs 加 user_id；老行零感升级（默认 ''）
+        if "user_id" not in sess_cols:
+            conn.execute(
+                "ALTER TABLE kb_sessions ADD COLUMN user_id TEXT NOT NULL DEFAULT ''"
+            )
+        cur = conn.execute("PRAGMA table_info(audit_logs)")
+        audit_cols = {row["name"] for row in cur.fetchall()}
+        if "user_id" not in audit_cols:
+            conn.execute(
+                "ALTER TABLE audit_logs ADD COLUMN user_id TEXT NOT NULL DEFAULT ''"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id)"
             )
 
         # Phase 7.2.A 种子数据：插入两个内置 agent（已存在则跳过）。

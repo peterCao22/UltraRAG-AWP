@@ -190,6 +190,31 @@ CREATE TABLE IF NOT EXISTS role_kb_permissions (
 CREATE INDEX IF NOT EXISTS idx_role_kb_perm
   ON role_kb_permissions (role_id, kb_id);
 
+-- P-Perm: users + user_roles 表（轻量级 RBAC）
+CREATE TABLE IF NOT EXISTS users (
+  user_id        TEXT NOT NULL PRIMARY KEY,
+  username       TEXT NOT NULL UNIQUE,
+  password_hash  TEXT NOT NULL,
+  display_name   TEXT NOT NULL DEFAULT '',
+  status         TEXT NOT NULL DEFAULT 'active',
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  last_login_at  TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+
+CREATE TABLE IF NOT EXISTS user_roles (
+  id          SERIAL PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  role_id     TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  UNIQUE (user_id, role_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
+
 CREATE TABLE IF NOT EXISTS kb_sessions (
   session_id          TEXT NOT NULL PRIMARY KEY,
   kb_id               TEXT NOT NULL,
@@ -199,13 +224,17 @@ CREATE TABLE IF NOT EXISTS kb_sessions (
   updated_at          TEXT NOT NULL,
   summary             TEXT NOT NULL DEFAULT '',
   summary_at_msg_id   INTEGER NOT NULL DEFAULT 0,
-  summary_updated_at  TEXT NOT NULL DEFAULT ''
+  summary_updated_at  TEXT NOT NULL DEFAULT '',
+  user_id             TEXT NOT NULL DEFAULT ''
 );
 
 -- Phase 12.2 老库升级：已存在的 kb_sessions 表补三列（IF NOT EXISTS Postgres 9.6+）
 ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';
 ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS summary_at_msg_id INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS summary_updated_at TEXT NOT NULL DEFAULT '';
+
+-- P-Perm 老库升级：kb_sessions 加 user_id（默认空，老 session 归属 admin 由迁移脚本处理）
+ALTER TABLE kb_sessions ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_kb_sessions_kb_updated
   ON kb_sessions (kb_id, updated_at);
@@ -325,12 +354,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   query       TEXT NOT NULL DEFAULT '',
   answer      TEXT NOT NULL DEFAULT '',
   chunk_ids   TEXT NOT NULL DEFAULT '[]',
-  meta        TEXT NOT NULL DEFAULT '{}'
+  meta        TEXT NOT NULL DEFAULT '{}',
+  user_id     TEXT NOT NULL DEFAULT ''
 );
+
+-- P-Perm 老库升级：audit_logs 加 user_id
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_audit_kb_ts ON audit_logs (kb_id, ts);
 CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs (session_id);
 CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_logs (event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id);
 """
 
 
