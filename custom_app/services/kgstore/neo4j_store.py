@@ -458,6 +458,43 @@ class Neo4jKgStore:
             out[name] = cnt
         return out
 
+    def list_entity_names_for_chunks(
+        self, kb_id: str, chunk_ids: list[str],
+    ) -> list[str]:
+        """Phase 9.3.B：给定一组 chunk_id，返回所有出现在其中的实体名（去重）。
+
+        实现：扫所有实体的 chunk_ids JSON 数组，O(N_entities) Python 端过滤。
+        KG 通常 < 500 实体；远比每个 chunk 单独 Cypher 查快。
+        """
+        if not kb_id or not chunk_ids:
+            return []
+        import json as _json
+        target = set(str(c) for c in chunk_ids)
+        self.ensure_constraints()
+        with self._session() as session:
+            recs = session.run(
+                "MATCH (e:Entity {kb_id: $kb_id}) "
+                "RETURN e.name AS name, e.chunk_ids AS chunk_ids",
+                kb_id=kb_id,
+            ).data()
+        out: list[str] = []
+        seen: set[str] = set()
+        for r in recs:
+            name = str(r.get("name") or "")
+            if not name or name in seen:
+                continue
+            raw = r.get("chunk_ids") or "[]"
+            try:
+                arr = _json.loads(raw)
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(arr, list):
+                continue
+            if any(str(c) in target for c in arr):
+                out.append(name)
+                seen.add(name)
+        return out
+
     def count_images(self, kb_id: Optional[str] = None) -> dict[str, int]:
         """统计图节点 + MENTIONS 关系数。"""
         self.ensure_constraints()

@@ -24,6 +24,20 @@ The following excerpts are from SOP/knowledge-base documents. Each has a unique 
 {{ psg.contents }}
 
 {% endfor %}
+{% if linked_images %}
+---
+The following images come from **other sections** of the knowledge base and have
+captions that mention entities related to your question. They are supplementary —
+**do not include them in your section-by-section answer below**, but you may
+mention "(参考其他章节图片)" / "(see related images from other sections)" if useful.
+
+{% for img in linked_images %}
+[Related image {{ loop.index }}] (from doc: {{ img.doc }}, chunk: {{ img.chunk_id }})
+  caption_zh: {{ img.caption_zh }}
+  caption_en: {{ img.caption_en }}
+{% endfor %}
+
+{% endif %}
 ---
 User question (may be in English or Chinese):
 

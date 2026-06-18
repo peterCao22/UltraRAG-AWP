@@ -489,6 +489,100 @@ class RagRunner:
             per_doc_count[doc] = per_doc_count.get(doc, 0) + 1
         return {d for d, n in per_doc_count.items() if n >= STEP_HEAVY_DOC_THRESHOLD}
 
+    def _find_linked_images(
+        self, hit_ids: List[int], *, kb_id: str,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """Phase 9.3.B：从命中 chunk 的 KG 实体出发，跨章节找关联图片。
+
+        env：
+            ULTRARAG_PHASE9_3_ENABLED        默认 1（设 0 全跳）
+            ULTRARAG_PHASE9_3_MAX_IMAGES     默认 3
+            ULTRARAG_PHASE9_3_MAX_ENTITIES   默认 20（送给 find_images 的实体数上限）
+
+        返回:
+            (images_list, meta_dict)
+            images_list: [{path, doc, chunk_id, caption_zh, caption_en, hit_count}, ...]
+            meta_dict:   {enabled, entity_count, image_count, skip_reason}
+        """
+        meta: Dict[str, Any] = {
+            "enabled": False, "entity_count": 0, "image_count": 0, "skip_reason": None,
+        }
+
+        # env 开关
+        if (os.environ.get("ULTRARAG_PHASE9_3_ENABLED") or "1").strip().lower() in ("0", "false", "no", "off"):
+            meta["skip_reason"] = "disabled"
+            return [], meta
+        meta["enabled"] = True
+
+        if not hit_ids:
+            meta["skip_reason"] = "no_hits"
+            return [], meta
+        if not kb_id:
+            meta["skip_reason"] = "no_kb_id"
+            return [], meta
+
+        try:
+            max_images = int(os.environ.get("ULTRARAG_PHASE9_3_MAX_IMAGES") or 3)
+        except (TypeError, ValueError):
+            max_images = 3
+        try:
+            max_entities = int(os.environ.get("ULTRARAG_PHASE9_3_MAX_ENTITIES") or 20)
+        except (TypeError, ValueError):
+            max_entities = 20
+
+        # 命中 chunk_id 集合
+        hit_chunk_ids: List[str] = []
+        for idx in hit_ids:
+            if 0 <= idx < len(self._rows):
+                cid = str(self._rows[idx].get("id") or "").strip()
+                if cid:
+                    hit_chunk_ids.append(cid)
+        if not hit_chunk_ids:
+            meta["skip_reason"] = "no_chunk_ids"
+            return [], meta
+
+        # 仅当 KG 后端是 neo4j 才有 :Image 节点（9.3.A 只在 Neo4j 里建）
+        backend = (os.environ.get("ULTRARAG_KG_BACKEND") or "sqlite").strip().lower()
+        if backend != "neo4j":
+            meta["skip_reason"] = f"kg_backend:{backend}"
+            return [], meta
+
+        try:
+            from custom_app.services.kgstore import build_kg_store
+            store = build_kg_store()
+        except Exception as e:  # noqa: BLE001
+            meta["skip_reason"] = f"kg_store_error:{type(e).__name__}"
+            return [], meta
+
+        # 1. 命中 chunk 含哪些 KG 实体
+        try:
+            entity_names = store.list_entity_names_for_chunks(kb_id, hit_chunk_ids)
+        except Exception as e:  # noqa: BLE001
+            meta["skip_reason"] = f"list_entities_error:{type(e).__name__}"
+            return [], meta
+        if not entity_names:
+            meta["skip_reason"] = "no_entities"
+            return [], meta
+        if len(entity_names) > max_entities:
+            entity_names = entity_names[:max_entities]
+        meta["entity_count"] = len(entity_names)
+
+        # 2. 从实体扩散找图片，排除命中 chunk 已自带的图
+        try:
+            images = store.find_images_for_entities(
+                kb_id, entity_names,
+                exclude_chunk_ids=hit_chunk_ids,
+                limit=max_images,
+            )
+        except Exception as e:  # noqa: BLE001
+            meta["skip_reason"] = f"find_images_error:{type(e).__name__}"
+            return [], meta
+
+        meta["image_count"] = len(images)
+        if not images:
+            meta["skip_reason"] = "no_cross_chapter_images"
+        return images, meta
+
     def _expand_short_chunks_with_neighbors(
         self,
         hit_ids: List[int],
@@ -996,6 +1090,7 @@ class RagRunner:
         *,
         prior_summary: str = "",
         recent_turns: List[Dict[str, Any]] | None = None,
+        linked_images: List[Dict[str, Any]] | None = None,
     ) -> str:
         """
         按模板渲染最终 prompt 文本。
@@ -1006,6 +1101,8 @@ class RagRunner:
             prior_summary: Phase 12.2 摘要文本；非空时拼入模板 prior_summary 段。
             recent_turns: Phase 12.2 最近 K 轮原始对话（最旧→最新），每项含
                 role_label + content；空 / None 时不渲染对话历史段。
+            linked_images: Phase 9.3.B 跨章节图片；每项含 path / doc /
+                caption_zh / caption_en / hit_count。空 / None 时不渲染图片段。
         返回:
             str: 渲染后的提示词文本。
         """
@@ -1037,6 +1134,7 @@ class RagRunner:
             no_information_text=policy.no_information_text,
             prior_summary=(prior_summary or "").strip(),
             recent_turns=recent_turns or [],
+            linked_images=linked_images or [],
         )
 
     def _gemini_rest_base(self) -> str:
@@ -2096,10 +2194,27 @@ class RagRunner:
                 })
             memory_meta["recent_k"] = len(recent_turns_for_prompt)
 
+        # Phase 9.3.B：跨章节图片联动
+        # 从命中 chunk 的 KG 实体出发，找 MENTIONS 这些实体且不在命中 chunk
+        # 范围内的图片（即"跨章节"图片）。失败一律降级（KG 不可达 / 无实体），
+        # 不阻塞主对话。
+        linked_images: List[Dict[str, Any]] = []
+        linked_images_meta: Dict[str, Any] = {
+            "enabled": False, "entity_count": 0, "image_count": 0, "skip_reason": None,
+        }
+        try:
+            linked_images, linked_images_meta = self._find_linked_images(
+                hit_ids, kb_id=self.kb_id,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("linked_images lookup failed kb=%s: %s", self.kb_id, e)
+            linked_images_meta["skip_reason"] = f"error:{type(e).__name__}"
+
         prompt_text = self._build_prompt(
             q, hit_ids,
             prior_summary=prior_summary,
             recent_turns=recent_turns_for_prompt,
+            linked_images=linked_images,
         )
         effective_mode = (
             "agent"
@@ -2126,6 +2241,8 @@ class RagRunner:
             "effective_agent_mode": effective_mode,
             "reference_resolution": ref_result.to_meta(),
             "session_memory": memory_meta,
+            "linked_images": linked_images,
+            "linked_images_meta": linked_images_meta,
             "degraded": degraded,
             "degrade_reason": degrade_reason,
         }
@@ -2197,6 +2314,15 @@ class RagRunner:
             meta_out["degraded"] = bool(prep["degraded"])
         if prep.get("degrade_reason"):
             meta_out["degrade_reason"] = prep["degrade_reason"]
+        # Phase 9.3.B: 暴露 linked_images 元数据给前端 / audit（不含 caption 全文）
+        lim = prep.get("linked_images_meta")
+        if isinstance(lim, dict):
+            meta_out["linked_images"] = {
+                "enabled": bool(lim.get("enabled")),
+                "entity_count": int(lim.get("entity_count") or 0),
+                "image_count": int(lim.get("image_count") or 0),
+                "skip_reason": lim.get("skip_reason"),
+            }
         return {
             "answer": display_answer,
             "answer_blocks": answer_blocks,
