@@ -23,6 +23,7 @@ from custom_app.api import (
     roles_bp,
     sessions_bp,
 )
+from custom_app.api.auth import auth_bp
 from custom_app.db import init_db
 from custom_app.logging_setup import setup_logging
 
@@ -114,6 +115,22 @@ def create_app() -> Flask:
         static_folder=str(FRONTEND_DIR),
         static_url_path="/static",
     )
+    # P-Perm: Flask Session 需要 SECRET_KEY。优先 env，未设则用 ADMIN_TOKEN 派生（仍可签名）；
+    # 都没有则用一次性随机串（每次重启会让登录态失效，开发可用）。
+    import os as _os
+    import secrets as _secrets
+    _secret = (
+        _os.environ.get("ULTRARAG_FLASK_SECRET_KEY")
+        or _os.environ.get(ADMIN_TOKEN_ENV)
+        or _secrets.token_hex(32)
+    )
+    app.config["SECRET_KEY"] = _secret
+    # 7 天 session 寿命；超时自动登出
+    import datetime as _dt
+    app.config["PERMANENT_SESSION_LIFETIME"] = _dt.timedelta(days=7)
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
     if not _get_configured_admin_token():
         logging.getLogger(__name__).warning(
             "%s 未配置，管理后台与管理 API 处于内网免登录模式。",
@@ -121,6 +138,22 @@ def create_app() -> Flask:
         )
 
     init_db()
+    # P-Perm: 首次启动种入默认 admin 账号（admin / admin123）
+    try:
+        from custom_app.services.auth import create_user as _create_user
+        from custom_app.repositories import UserRepository as _UserRepo
+        if not _UserRepo().exists_username("admin"):
+            _create_user(
+                username="admin", password="admin123",
+                display_name="默认管理员",
+            )
+            logging.getLogger(__name__).warning(
+                "P-Perm 已种入默认账号 admin / admin123；首次登录请尽快修改密码。",
+            )
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "P-Perm seed default admin failed; continuing",
+        )
 
     # Phase 6.1: 把上一次 Flask 崩溃后残留在 parsing/embedding/indexing/deleting
     # 状态超过 10 分钟的文档标 failed，避免前端轮询永远转圈圈。
@@ -138,6 +171,7 @@ def create_app() -> Flask:
     app.register_blueprint(sessions_bp)
     app.register_blueprint(admin_models_bp)
     app.register_blueprint(admin_agents_bp)
+    app.register_blueprint(auth_bp)
 
     @app.before_request
     def require_admin_token():
