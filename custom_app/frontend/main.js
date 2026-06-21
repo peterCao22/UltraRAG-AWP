@@ -1,3 +1,4 @@
+import { applyI18n, bindLangSwitch, t } from './js/i18n.js'
 import {
   AGENT_STORAGE_KEY,
   applyStoredAgentMode,
@@ -287,6 +288,10 @@ export function initChatApp({
     sessions: [],
   }
 
+  // i18n 必须在其他渲染之前；一次性把所有 data-i18n 节点的文本/属性替换好
+  applyI18n(root)
+  bindLangSwitch(root)
+
   mountAgentSelect(elements.agentSelect)
   bindChatImageLightbox(elements.messageList)
   initModelChip()
@@ -523,8 +528,9 @@ export function initChatApp({
       await syncSessionFromUrl()
     } catch (error) {
       const msg = error?.message || '未知错误'
-      Toast.show(`知识库加载失败：${msg}`, 'error')
-      addMessage('ai error', `知识库加载失败：${msg}`)
+      const prefix = t('chat.kb_load_failed', '知识库加载失败：')
+      Toast.show(`${prefix}${msg}`, 'error')
+      addMessage('ai error', `${prefix}${msg}`)
     }
   }
 
@@ -1025,7 +1031,7 @@ export function initChatApp({
     if (!sessions.length) {
       const p = document.createElement('p')
       p.className = 'muted'
-      p.textContent = '暂无历史会话，点击「新建对话」开始。'
+      p.textContent = t('chat.session_empty', '暂无历史会话，点击「新建对话」开始。')
       host.append(p)
       updateSessionListScrollEdge()
       return

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AGV 知识库助手 · 登录</title>
+    <title data-i18n="login.page_title">AGV 知识库助手 · 登录</title>
     <link rel="icon" href="/frontend/favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/frontend/style.css">
     <link rel="stylesheet" href="/frontend/css/login.css">
@@ -11,26 +11,35 @@
   <body>
     <main class="login-shell" data-page="login">
       <section class="login-card">
-        <h1>AGV 知识库助手</h1>
-        <p>请使用管理员分配的账号登录</p>
+        <button
+          type="button"
+          class="lang-switch"
+          data-role="lang-switch"
+          aria-label="切换语言"
+        >
+          🌐 <span data-role="lang-name">English</span>
+        </button>
+
+        <h1 data-i18n="login.title">AGV 知识库助手</h1>
+        <p data-i18n="login.subtitle">请使用管理员分配的账号登录</p>
 
         <form class="login-form" id="login-form" autocomplete="on">
           <label>
-            用户名
+            <span data-i18n="login.username">用户名</span>
             <input type="text" name="username" id="username" required autocomplete="username" autofocus>
           </label>
           <label>
-            密码
+            <span data-i18n="login.password">密码</span>
             <input type="password" name="password" id="password" required autocomplete="current-password">
           </label>
-          <button type="button" id="login-btn">登录</button>
+          <button type="button" id="login-btn" data-i18n="login.submit">登录</button>
           <div id="login-error" role="alert"></div>
         </form>
 
-        <p class="login-hint">首次登录默认账号见管理员；登录后请尽快修改密码。</p>
+        <p class="login-hint" data-i18n="login.hint">首次登录默认账号见管理员；登录后请尽快修改密码。</p>
       </section>
     </main>
 
-    <script src="/frontend/js/login.js"></script>
+    <script type="module" src="/frontend/js/login.js"></script>
   </body>
 </html>

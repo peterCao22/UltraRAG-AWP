@@ -305,6 +305,12 @@ a {
   color: #7f1d1d;
 }
 
+.sidebar-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .session-list-host {
   min-height: 0;
   flex: 1;
