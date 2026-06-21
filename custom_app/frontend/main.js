@@ -319,10 +319,11 @@ export function initChatApp({
 
   function renderWelcome() {
     elements.messageList.innerHTML = ''
-    const { article } = createMessageElement('ai', '您好！请选择知识库后开始提问。')
+    const greeting = t('chat.greeting_with_kb_hint', '您好！请选择知识库后开始提问。')
+    const { article } = createMessageElement('ai', greeting)
     const sourcePlaceholder = document.createElement('div')
     sourcePlaceholder.className = 'source-placeholder'
-    sourcePlaceholder.textContent = '引用来源将在回答完成后展示。'
+    sourcePlaceholder.textContent = t('chat.source_placeholder', '引用来源将在回答完成后展示。')
     article.append(sourcePlaceholder)
     elements.messageList.append(article)
   }

@@ -8,9 +8,19 @@
  * 旧值 'quick' / 'agent' 会被映射到 builtin-quick / builtin-agent。
  */
 
+import { t } from '../js/i18n.js'
+
 export const AGENT_STORAGE_KEY = 'ultrarag_agent_mode'
 
 const ANALYST_VALUE = 'analyst'
+
+function agentPrefix() {
+  return t('chat.agent.prefix', '智能体：')
+}
+
+function analystLabel() {
+  return t('chat.agent.analyst', '智能体：数据分析师（即将推出）')
+}
 
 /**
  * 若尚未存在，则追加禁用的「数据分析师」占位项（对齐 WeKnora 第三项占位）。
@@ -22,9 +32,9 @@ export function mountAgentSelect(selectEl) {
   if (exists) return
   const opt = document.createElement('option')
   opt.value = ANALYST_VALUE
-  opt.textContent = '智能体：数据分析师（即将推出）'
+  opt.textContent = analystLabel()
   opt.disabled = true
-  opt.title = '即将推出'
+  opt.title = t('chat.agent.coming_soon', '即将推出')
   selectEl.append(opt)
 }
 
@@ -38,10 +48,11 @@ export function populateAgentSelect(selectEl, agents) {
   // 清掉非占位项；占位项 disabled 由其它逻辑保证
   const placeholders = [...selectEl.options].filter((o) => o.disabled)
   selectEl.innerHTML = ''
+  const prefix = agentPrefix()
   for (const a of agents || []) {
     const opt = document.createElement('option')
     opt.value = a.agent_id
-    opt.textContent = `智能体：${a.name}`
+    opt.textContent = `${prefix}${a.name}`
     opt.dataset.agentMode = a.agent_mode || 'quick'
     selectEl.append(opt)
   }
