@@ -923,22 +923,26 @@ def list_kb():
         )
     )
     if not is_admin_bypass:
-        from custom_app.services.auth import current_user_id
+        from custom_app.services.auth import current_user
         from custom_app.repositories import UserRepository
-        uid = current_user_id() or ""
-        # 无登录 + 无 admin = 直接空（before_request 通常已挡住，但兜底）
-        allowed = (
-            set(UserRepository().list_kb_ids_accessible(uid)) if uid else set()
-        )
-        if isinstance(rows, list):
-            rows = [it for it in rows if it.get("kb_id") in allowed]
-        elif isinstance(rows, dict) and "items" in rows:
-            rows = dict(rows)
-            rows["items"] = [
-                it for it in rows["items"] if it.get("kb_id") in allowed
-            ]
-            if "total" in rows:
-                rows["total"] = len(rows["items"])
+        u = current_user() or {}
+        uid = str(u.get("user_id") or "")
+        # P-Perm 超管语义：用户名为 admin 视为超级管理员，看到所有 KB
+        is_admin_user = (u.get("username") or "") == "admin"
+        if not is_admin_user:
+            # 无登录 + 无 admin = 直接空（before_request 通常已挡住，但兜底）
+            allowed = (
+                set(UserRepository().list_kb_ids_accessible(uid)) if uid else set()
+            )
+            if isinstance(rows, list):
+                rows = [it for it in rows if it.get("kb_id") in allowed]
+            elif isinstance(rows, dict) and "items" in rows:
+                rows = dict(rows)
+                rows["items"] = [
+                    it for it in rows["items"] if it.get("kb_id") in allowed
+                ]
+                if "total" in rows:
+                    rows["total"] = len(rows["items"])
     return _ok(rows)
 
 

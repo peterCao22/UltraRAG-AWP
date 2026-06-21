@@ -190,6 +190,12 @@ def create_app() -> Flask:
 
         返回：
             Response | None: 未授权时返回登录页重定向；通过或未启用保护时返回 None。
+
+        P-Perm 共存策略：
+            - admin token 通过 → 放行（运维通道）
+            - 已登录用户 → 放行；细粒度权限由 /api/kb 视图层 + UserRepository
+              的 list_kb_ids_accessible / user_has_kb_permission 兜底
+            - 都没有 → API 返 401；页面跳 /login
         """
         configured_token = _get_configured_admin_token()
         if not configured_token or not _is_admin_request(request.path):
@@ -198,6 +204,14 @@ def create_app() -> Flask:
         request_token = _get_request_admin_token()
         if hmac.compare_digest(request_token, configured_token):
             return None
+
+        # P-Perm：已登录用户也算合法访问者；admin 权限由视图层装饰器细控。
+        try:
+            from custom_app.services.auth import current_user as _cu
+            if _cu() is not None:
+                return None
+        except Exception:  # noqa: BLE001
+            pass
 
         if _is_api_request(request.path):
             return jsonify({"success": False, "error": "unauthorized"}), 401
@@ -273,14 +287,28 @@ def create_app() -> Flask:
     @app.route('/')
     @app.route('/chat')
     def index():
-        """返回对话主页入口。
+        """返回对话主页入口；未登录用户先重定向到 /login。
 
-        参数：
-            无。
+        P-Perm Commit 5+ 后，对话页 JS 会立即调 /api/kb /api/chat/models
+        等受保护 API。若用户未登录，浏览器先看到对话页骨架再瀑布式 401，
+        体验差。这里在服务端层提前把未登录用户挡到 /login。
 
-        返回：
-            Response: `custom_app/frontend/index.html` 的静态文件响应。
+        admin token / ULTRARAG_AUTH_REQUIRED=0 不强制（与中间件一致）。
         """
+        auth_off = os.environ.get(
+            "ULTRARAG_AUTH_REQUIRED", "1",
+        ).strip().lower() in ("0", "false", "no", "off")
+        if not auth_off:
+            configured_admin = _get_configured_admin_token()
+            presented_admin = _get_request_admin_token()
+            has_admin_token = bool(configured_admin) and bool(presented_admin) and hmac.compare_digest(
+                presented_admin, configured_admin,
+            )
+            if not has_admin_token:
+                from custom_app.services.auth import current_user as _cu
+                if _cu() is None:
+                    return redirect("/login")
+
         resp = make_response(send_from_directory(app.static_folder, 'index.html'))
         # 避免浏览器长期使用缓存的 Sprint 旧版 HTML（侧栏文案等不更新）。
         resp.headers['Cache-Control'] = 'no-store, max-age=0'

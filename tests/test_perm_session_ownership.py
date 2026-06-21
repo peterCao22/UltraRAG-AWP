@@ -23,7 +23,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "db").mkdir()
     monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
-    monkeypatch.delenv("ULTRARAG_ADMIN_TOKEN", raising=False)
+    # 防 .env 注入污染：直接设空串覆盖任何继承值
+    monkeypatch.setenv("ULTRARAG_ADMIN_TOKEN", "")
     monkeypatch.setenv("ULTRARAG_FLASK_SECRET_KEY", "test-secret-perm-c4")
     from custom_app.repositories.base import set_default_provider
     set_default_provider(None)

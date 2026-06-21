@@ -273,7 +273,7 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_audit_kb_ts ON audit_logs (kb_id, ts);
             CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs (session_id);
             CREATE INDEX IF NOT EXISTS idx_audit_event ON audit_logs (event_type);
-            CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id);
+            -- idx_audit_user 必须放到 ALTER 之后建（老库 audit_logs 还没 user_id 列）
             """
         )
 
@@ -349,9 +349,10 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE audit_logs ADD COLUMN user_id TEXT NOT NULL DEFAULT ''"
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id)"
-            )
+        # 索引建在 ALTER 之后，幂等；老库每次启动都安全。
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id)"
+        )
 
         # Phase 7.2.A 种子数据：插入两个内置 agent（已存在则跳过）。
         # 与 Postgres 端 apply_phase7_2_a_migration.py 的种子逻辑保持一致。
