@@ -86,6 +86,25 @@ def _login(client, username: str, password: str = "pw123456") -> None:
     assert r.status_code == 200, r.get_data(as_text=True)
 
 
+def _grant_kb(user_id: str, kb_id: str, level: str = "read") -> str:
+    """P-Perm C7：给用户加一条 role + role_kb_permissions，便于会话/对话权限测试。
+
+    返回创建的 role_id。重复调用会创建新 role；够测试使用。
+    """
+    from custom_app.db import new_id, now_iso
+    from custom_app.repositories import RoleRepository, UserRepository
+    rid = new_id("role")
+    ts = now_iso()
+    RoleRepository().create(
+        role_id=rid, name=f"role-{rid}", description="", created_at=ts,
+    )
+    RoleRepository().upsert_permission(
+        role_id=rid, kb_id=kb_id, access_level=level, updated_at=ts,
+    )
+    UserRepository().assign_role(user_id=user_id, role_id=rid, created_at=ts)
+    return rid
+
+
 # ── before_request middleware ─────────────────────────────────────────────────
 
 def test_unauthenticated_protected_route_401(client) -> None:
@@ -133,6 +152,8 @@ def test_auth_required_env_off(client, monkeypatch) -> None:
 def test_session_create_records_user_id(client) -> None:
     """登录用户创建 session 时 user_id 落库。"""
     uid = _seed_user("alice")
+    _seed_kb("kb_a")
+    _grant_kb(uid, "kb_a", "read")
     _login(client, "alice")
     r = client.post("/api/sessions", json={"kb_id": "kb_a", "title": "t1"})
     assert r.status_code == 200
@@ -142,8 +163,11 @@ def test_session_create_records_user_id(client) -> None:
 
 def test_session_list_only_own_sessions(client) -> None:
     """alice 看不见 bob 的会话。"""
-    _seed_user("alice")
-    _seed_user("bob")
+    auid = _seed_user("alice")
+    buid = _seed_user("bob")
+    _seed_kb("kb_x")
+    _grant_kb(auid, "kb_x", "read")
+    _grant_kb(buid, "kb_x", "read")
 
     _login(client, "alice")
     client.post("/api/sessions", json={"kb_id": "kb_x", "title": "alice-s1"})
@@ -161,8 +185,10 @@ def test_session_list_only_own_sessions(client) -> None:
 
 def test_session_get_other_user_returns_403(client) -> None:
     """跨用户读单条 session → 403。"""
-    _seed_user("alice")
+    auid = _seed_user("alice")
     _seed_user("bob")
+    _seed_kb("kb_y")
+    _grant_kb(auid, "kb_y", "read")
 
     _login(client, "alice")
     r1 = client.post(
@@ -178,8 +204,10 @@ def test_session_get_other_user_returns_403(client) -> None:
 
 def test_session_delete_other_user_returns_403(client) -> None:
     """跨用户删 session → 403，且 session 仍存在。"""
-    _seed_user("alice")
+    auid = _seed_user("alice")
     _seed_user("bob")
+    _seed_kb("kb_z")
+    _grant_kb(auid, "kb_z", "read")
 
     _login(client, "alice")
     sid = client.post(
@@ -199,8 +227,11 @@ def test_session_delete_other_user_returns_403(client) -> None:
 
 def test_admin_token_sees_all_sessions(admin_token_client) -> None:
     """admin token bypass session 归属过滤。"""
-    _seed_user("alice")
-    _seed_user("bob")
+    auid = _seed_user("alice")
+    buid = _seed_user("bob")
+    _seed_kb("kb_admin")
+    _grant_kb(auid, "kb_admin", "read")
+    _grant_kb(buid, "kb_admin", "read")
     # 用 session 登录 alice 创建一条
     admin_token_client.post(
         "/api/auth/login",

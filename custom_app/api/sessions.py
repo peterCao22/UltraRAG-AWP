@@ -59,6 +59,15 @@ def create_session():
     kb_id = str(data.get("kb_id", "")).strip()
     if not kb_id:
         return jsonify({"success": False, "error": "kb_id 不能为空"}), 400
+    # P-Perm C7：必须对该 kb 有 read 权限，否则不能开会话
+    from custom_app.api.chat import _check_kb_access
+    allowed, reason = _check_kb_access(kb_id, level="read")
+    if not allowed:
+        return jsonify({
+            "success": False,
+            "error": reason or "forbidden",
+            "code": "KB_FORBIDDEN",
+        }), 403
     title = str(data.get("title", "")).strip()
     agent_mode = str(data.get("agent_mode", "quick")).strip().lower()
     uid = "" if _is_admin_bypass() else (current_user_id() or "")

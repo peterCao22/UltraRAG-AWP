@@ -59,6 +59,51 @@ def _runner_key(
     return (kb_id, model_id or "", agent_id or "")
 
 
+def _check_kb_access(kb_id: str, level: str = "read") -> tuple[bool, str]:
+    """P-Perm C7：校验当前请求是否有 kb_id 的访问权限。
+
+    返回 (allowed, reason)；reason 仅在 not allowed 时有意义，便于上层选 4xx/JSON 还是 SSE error 帧。
+
+    通过条件（任一）：
+        - ULTRARAG_AUTH_REQUIRED=0（开发模式全开）
+        - 带合法 X-Admin-Token（运维通道）
+        - 已登录用户且 username == 'admin'（超管语义）
+        - 已登录用户且 user_has_kb_permission(uid, kb_id, level)
+    """
+    import hmac
+
+    auth_off = os.environ.get(
+        "ULTRARAG_AUTH_REQUIRED", "1",
+    ).strip().lower() in ("0", "false", "no", "off")
+    if auth_off:
+        return True, ""
+
+    expected = os.getenv("ULTRARAG_ADMIN_TOKEN", "").strip()
+    presented = (request.headers.get("X-Admin-Token", "") or "").strip()
+    if expected and presented and hmac.compare_digest(presented, expected):
+        return True, ""
+
+    try:
+        from custom_app.repositories import UserRepository
+        from custom_app.services.auth import current_user
+    except Exception:  # noqa: BLE001
+        return False, "auth subsystem unavailable"
+
+    u = current_user() or {}
+    if not u:
+        return False, "login required"
+    if (u.get("username") or "") == "admin":
+        return True, ""
+    uid = str(u.get("user_id") or "")
+    if not uid:
+        return False, "login required"
+    if UserRepository().user_has_kb_permission(
+        user_id=uid, kb_id=kb_id, min_level=level,
+    ):
+        return True, ""
+    return False, f"no '{level}' permission on kb {kb_id}"
+
+
 def _load_chat_model_row(model_id: str | None) -> dict | None:
     """Phase 7.1: 从 ChatModelRepository 查模型 row；找不到返回 None（runner 走老 .env 路径）。"""
     if not model_id:
@@ -270,6 +315,11 @@ def chat():
     if not question:
         return jsonify({"error": "question 不能为空"}), 400
 
+    # P-Perm C7：必须对该 kb 有 read 权限
+    allowed, reason = _check_kb_access(kb_id, level="read")
+    if not allowed:
+        return jsonify({"error": reason or "forbidden", "code": "KB_FORBIDDEN"}), 403
+
     agent_mode = str(data.get("agent_mode", "quick")).strip().lower()
     if agent_mode not in ("quick", "agent"):
         agent_mode = "quick"
@@ -416,6 +466,17 @@ def chat_stream():
 
     if not question:
         return jsonify({"error": "question 不能为空"}), 400
+
+    # P-Perm C7：必须对该 kb 有 read 权限才能问
+    allowed, reason = _check_kb_access(kb_id, level="read")
+    if not allowed:
+        logger.warning(
+            "chat_stream forbidden: kb=%s reason=%s", kb_id, reason,
+        )
+        return jsonify({
+            "error": reason or "forbidden",
+            "code": "KB_FORBIDDEN",
+        }), 403
 
     def generate():
         accumulated: list[str] = []
@@ -692,6 +753,11 @@ def chat_markdown():
 
     if not question:
         return jsonify({"error": "question 不能为空"}), 400
+
+    # P-Perm C7：必须对该 kb 有 read 权限
+    allowed, reason = _check_kb_access(kb_id, level="read")
+    if not allowed:
+        return jsonify({"error": reason or "forbidden", "code": "KB_FORBIDDEN"}), 403
 
     agent_mode = str(data.get("agent_mode", "quick")).strip().lower()
     if agent_mode not in ("quick", "agent"):
