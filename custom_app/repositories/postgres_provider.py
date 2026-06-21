@@ -302,6 +302,7 @@ CREATE TABLE IF NOT EXISTS agent_configs (
   agent_id              TEXT NOT NULL UNIQUE,
   tenant_id             INTEGER NOT NULL DEFAULT 1,
   name                  TEXT NOT NULL,
+  name_en               TEXT NOT NULL DEFAULT '',
   description           TEXT DEFAULT '',
   avatar                TEXT DEFAULT '',
   agent_mode            TEXT NOT NULL,
@@ -360,6 +361,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 -- P-Perm 老库升级：audit_logs 加 user_id
 ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT '';
+
+-- agent i18n：agent_configs 加双语 name_en
+ALTER TABLE agent_configs ADD COLUMN IF NOT EXISTS name_en TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_audit_kb_ts ON audit_logs (kb_id, ts);
 CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs (session_id);

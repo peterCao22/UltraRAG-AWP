@@ -73,6 +73,7 @@ def _validate_create_payload(
 
     return {
         "name": name,
+        "name_en": str(body.get("name_en", "")).strip(),
         "agent_mode": agent_mode,
         "description": str(body.get("description", "")),
         "avatar": str(body.get("avatar", "")),
@@ -113,6 +114,7 @@ def create_agent():
     repo.create(
         agent_id=agent_id,
         name=cleaned["name"],
+        name_en=cleaned["name_en"],
         agent_mode=cleaned["agent_mode"],
         description=cleaned["description"],
         avatar=cleaned["avatar"],
@@ -153,7 +155,7 @@ def update_agent(agent_id: str):
         )
 
     update_kwargs: dict[str, Any] = {}
-    for field in ("name", "description", "avatar"):
+    for field in ("name", "name_en", "description", "avatar"):
         if field in body:
             update_kwargs[field] = str(body[field])
     for field in ("system_prompt", "agent_system_prompt"):

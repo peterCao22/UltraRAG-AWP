@@ -58,6 +58,7 @@ class ChatAgentRepository:
         name: str,
         agent_mode: str,
         created_at: str,
+        name_en: str = "",
         description: str = "",
         avatar: str = "",
         system_prompt: str = "",
@@ -71,16 +72,17 @@ class ChatAgentRepository:
     ) -> None:
         sql = (
             """INSERT INTO agent_configs
-               (agent_id, tenant_id, name, description, avatar, agent_mode,
+               (agent_id, tenant_id, name, name_en, description, avatar, agent_mode,
                 is_builtin, system_prompt, agent_system_prompt, model_id,
                 temperature, max_tokens, enabled, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
         )
         with self._provider.connect() as conn:
             conn.execute(
                 adapt_sql(sql, self._provider),
                 (
-                    agent_id, tenant_id, name, description, avatar, agent_mode,
+                    agent_id, tenant_id, name, name_en or "",
+                    description, avatar, agent_mode,
                     bool(is_builtin), system_prompt, agent_system_prompt, model_id,
                     float(temperature), int(max_tokens), bool(enabled),
                     created_at, created_at,
@@ -129,6 +131,7 @@ class ChatAgentRepository:
         *,
         updated_at: str,
         name: Optional[str] = None,
+        name_en: Optional[str] = None,
         description: Optional[str] = None,
         avatar: Optional[str] = None,
         system_prompt: Optional[str] = None,
@@ -146,6 +149,8 @@ class ChatAgentRepository:
         params: list[Any] = [updated_at]
         if name is not None:
             sets.append("name=?"); params.append(name)
+        if name_en is not None:
+            sets.append("name_en=?"); params.append(name_en)
         if description is not None:
             sets.append("description=?"); params.append(description)
         if avatar is not None:

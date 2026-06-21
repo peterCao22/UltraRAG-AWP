@@ -1155,6 +1155,15 @@ export function initAdminApp({
 
         const h2 = document.createElement('h2')
         h2.textContent = a.name
+        if (a.name_en) {
+          const en = document.createElement('span')
+          en.className = 'muted'
+          en.style.marginLeft = '8px'
+          en.style.fontSize = '13px'
+          en.style.fontWeight = '400'
+          en.textContent = `/ ${a.name_en}`
+          h2.append(en)
+        }
         if (a.is_builtin) {
           const badge = document.createElement('span')
           badge.className = 'status-badge status-badge--ok'
@@ -1279,7 +1288,17 @@ export function initAdminApp({
     inputName.className = 'field'
     inputName.required = true
     inputName.maxLength = 120
-    form.append(makeField('名称', inputName, true))
+    form.append(makeField('名称（中文）', inputName, true))
+
+    // 英文名称（i18n；为空时英文界面回退到中文 name）
+    const inputNameEn = document.createElement('input')
+    inputNameEn.name = 'name_en'
+    inputNameEn.className = 'field'
+    inputNameEn.maxLength = 120
+    form.append(makeField(
+      '名称（English）', inputNameEn, false,
+      '可选；用户切到英文界面时显示此名称。空白时回退到中文名称。',
+    ))
 
     // agent_mode（创建后不可改）
     const selectMode = document.createElement('select')
@@ -1399,6 +1418,7 @@ export function initAdminApp({
 
     if (isEdit) {
       inputName.value = existing.name || ''
+      inputNameEn.value = existing.name_en || ''
       selectMode.value = existing.agent_mode || 'quick'
       textareaDesc.value = existing.description || ''
       selectModel.value = existing.model_id || ''
@@ -1413,6 +1433,7 @@ export function initAdminApp({
       e.preventDefault()
       const payload = {
         name: inputName.value.trim(),
+        name_en: inputNameEn.value.trim(),
         agent_mode: selectMode.value,
         description: textareaDesc.value.trim(),
         model_id: selectModel.value,

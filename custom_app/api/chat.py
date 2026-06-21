@@ -405,6 +405,8 @@ def get_chat_agents():
             {
                 "agent_id": r["agent_id"],
                 "name": r["name"],
+                # i18n：双语字段。空串时前端按 lang fallback 到 name。
+                "name_en": r.get("name_en") or "",
                 "agent_mode": r["agent_mode"],
                 "avatar": r.get("avatar", ""),
                 "description": r.get("description", ""),

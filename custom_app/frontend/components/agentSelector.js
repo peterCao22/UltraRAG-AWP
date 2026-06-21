@@ -8,7 +8,7 @@
  * 旧值 'quick' / 'agent' 会被映射到 builtin-quick / builtin-agent。
  */
 
-import { t } from '../js/i18n.js'
+import { getLang, t } from '../js/i18n.js'
 
 export const AGENT_STORAGE_KEY = 'ultrarag_agent_mode'
 
@@ -20,6 +20,20 @@ function agentPrefix() {
 
 function analystLabel() {
   return t('chat.agent.analyst', '智能体：数据分析师（即将推出）')
+}
+
+/**
+ * i18n：英文界面优先用 agent.name_en；空时回退到 name。
+ * 中文界面始终用 name。
+ *
+ * @param {{name: string, name_en?: string}} agent
+ * @returns {string}
+ */
+function displayName(agent) {
+  if (getLang() === 'en' && agent && agent.name_en) {
+    return String(agent.name_en)
+  }
+  return String((agent && agent.name) || '')
 }
 
 /**
@@ -52,7 +66,7 @@ export function populateAgentSelect(selectEl, agents) {
   for (const a of agents || []) {
     const opt = document.createElement('option')
     opt.value = a.agent_id
-    opt.textContent = `${prefix}${a.name}`
+    opt.textContent = `${prefix}${displayName(a)}`
     opt.dataset.agentMode = a.agent_mode || 'quick'
     selectEl.append(opt)
   }

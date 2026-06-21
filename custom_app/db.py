@@ -214,6 +214,7 @@ def init_db() -> None:
               agent_id              TEXT NOT NULL UNIQUE,
               tenant_id             INTEGER NOT NULL DEFAULT 1,
               name                  TEXT NOT NULL,
+              name_en               TEXT NOT NULL DEFAULT '',
               description           TEXT DEFAULT '',
               avatar                TEXT DEFAULT '',
               agent_mode            TEXT NOT NULL,
@@ -354,6 +355,15 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs (user_id)"
         )
 
+        # agent name_en 双语：老库零感升级，默认空串（前端 fallback 到 name）
+        cur = conn.execute("PRAGMA table_info(agent_configs)")
+        agent_cols = {row["name"] for row in cur.fetchall()}
+        if "name_en" not in agent_cols:
+            conn.execute(
+                "ALTER TABLE agent_configs "
+                "ADD COLUMN name_en TEXT NOT NULL DEFAULT ''"
+            )
+
         # Phase 7.2.A 种子数据：插入两个内置 agent（已存在则跳过）。
         # 与 Postgres 端 apply_phase7_2_a_migration.py 的种子逻辑保持一致。
         _seed_builtin_agents(conn)
@@ -392,12 +402,13 @@ def _seed_builtin_agents(conn: sqlite3.Connection) -> None:
             continue
         conn.execute(
             "INSERT INTO agent_configs "
-            "(agent_id, tenant_id, name, description, avatar, agent_mode, "
+            "(agent_id, tenant_id, name, name_en, description, avatar, agent_mode, "
             " is_builtin, system_prompt, agent_system_prompt, model_id, "
             " temperature, max_tokens, enabled, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                row["agent_id"], row["tenant_id"], row["name"], row["description"],
+                row["agent_id"], row["tenant_id"], row["name"],
+                row.get("name_en", ""), row["description"],
                 row["avatar"], row["agent_mode"], row["is_builtin"],
                 row["system_prompt"], row["agent_system_prompt"], row["model_id"],
                 row["temperature"], row["max_tokens"], row["enabled"],
@@ -413,6 +424,7 @@ def _builtin_agent_seed_rows(now: str) -> list[dict[str, Any]]:
             "agent_id": "builtin-quick",
             "tenant_id": 1,
             "name": "快速问答",
+            "name_en": "Quick Q&A",
             "description": "基于检索的单轮快速问答，沿用 AGV SOP 风格的 system_prompt。",
             "avatar": "",
             "agent_mode": "quick",
@@ -430,6 +442,7 @@ def _builtin_agent_seed_rows(now: str) -> list[dict[str, Any]]:
             "agent_id": "builtin-agent",
             "tenant_id": 1,
             "name": "智能推理",
+            "name_en": "Smart Reasoning",
             "description": "ReAct 多轮推理 + 工具调用，使用项目内置 Agent system_prompt。",
             "avatar": "",
             "agent_mode": "agent",

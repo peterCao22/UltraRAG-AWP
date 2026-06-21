@@ -17,6 +17,9 @@ def isolated_env(tmp_path: Path, monkeypatch) -> Iterator[Path]:
 
     set_default_provider(None)
     monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
+    # 隔离 .env 注入：admin token 中间件 + P-Perm 登录中间件都关掉
+    monkeypatch.setenv("ULTRARAG_ADMIN_TOKEN", "")
+    monkeypatch.setenv("ULTRARAG_AUTH_REQUIRED", "0")
     yield tmp_path
     set_default_provider(None)
 
@@ -62,6 +65,13 @@ class TestList:
         for row in resp.get_json()["data"]:
             assert "id" not in row
 
+    def test_builtin_agents_have_name_en(self, client):
+        """i18n：内置 agent 种子带英文名。"""
+        resp = client.get("/api/admin/agents")
+        rows = {r["agent_id"]: r for r in resp.get_json()["data"]}
+        assert rows["builtin-quick"]["name_en"] == "Quick Q&A"
+        assert rows["builtin-agent"]["name_en"] == "Smart Reasoning"
+
 
 class TestCreate:
     def test_creates_user_agent(self, client):
@@ -91,6 +101,23 @@ class TestCreate:
         )
         assert resp.status_code == 400
 
+    def test_creates_with_name_en(self, client):
+        """i18n：POST 时带 name_en，落库并回显。"""
+        resp = client.post(
+            "/api/admin/agents",
+            json=_create_payload(name_en="Business Helper"),
+        )
+        assert resp.status_code == 200, resp.get_json()
+        row = resp.get_json()["data"]
+        assert row["name_en"] == "Business Helper"
+
+    def test_creates_without_name_en_defaults_empty(self, client):
+        """i18n：不传 name_en 时落空串。"""
+        resp = client.post("/api/admin/agents", json=_create_payload())
+        assert resp.status_code == 200
+        row = resp.get_json()["data"]
+        assert row.get("name_en", "") == ""
+
 
 class TestUpdate:
     def test_update_user_agent(self, client):
@@ -99,11 +126,15 @@ class TestUpdate:
 
         resp = client.put(
             f"/api/admin/agents/{agent_id}",
-            json={"name": "更新后", "system_prompt": "new prompt"},
+            json={
+                "name": "更新后", "name_en": "Updated",
+                "system_prompt": "new prompt",
+            },
         )
         assert resp.status_code == 200
         row = resp.get_json()["data"]
         assert row["name"] == "更新后"
+        assert row["name_en"] == "Updated"
         assert row["system_prompt"] == "new prompt"
         # agent_mode 不变
         assert row["agent_mode"] == "quick"
@@ -172,7 +203,7 @@ class TestChatAgentsEndpoint:
         # 字段只暴露最小集
         for r in rows:
             assert set(r.keys()) <= {
-                "agent_id", "name", "agent_mode", "avatar",
+                "agent_id", "name", "name_en", "agent_mode", "avatar",
                 "description", "is_builtin", "model_id",
             }
             assert "system_prompt" not in r
