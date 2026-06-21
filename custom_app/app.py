@@ -145,6 +145,24 @@ def create_app() -> Flask:
         )
 
     init_db()
+
+    # Postgres 后端：启动时自动跑 DDL（含 ALTER TABLE ... ADD COLUMN IF NOT EXISTS），
+    # 这样新增列上线时不必再手动跑迁移脚本。仅在显式使用 Postgres 时执行。
+    if os.environ.get("ULTRARAG_DB_BACKEND", "").strip().lower() == "postgres":
+        try:
+            from custom_app.repositories.base import get_default_provider
+            from custom_app.repositories.postgres_provider import init_postgres_schema
+            provider = get_default_provider()
+            if getattr(provider, "backend_name", "") == "postgres":
+                init_postgres_schema(provider)
+                logging.getLogger(__name__).info(
+                    "Postgres schema applied at startup (idempotent).",
+                )
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "init_postgres_schema failed at startup; continuing",
+            )
+
     # P-Perm: 首次启动种入默认 admin 账号（admin / admin123）
     try:
         from custom_app.services.auth import create_user as _create_user
