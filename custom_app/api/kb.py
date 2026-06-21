@@ -36,6 +36,45 @@ _JOB_EXECUTOR = JobExecutor(max_workers=1)
 _LEGACY_ALLOWED_EXTENSIONS = {".docx", ".pdf"}
 
 
+# ── P-Perm C7：blueprint-level kb_id 守卫 ───────────────────────────────────
+# 所有 /api/kb/<kb_id>/... 路由统一在这里校验权限。
+# 写操作（PUT / DELETE / POST 上传 / 触发 ingest）要求 'write'，
+# 读操作要求 'read'。集合见 _WRITE_ENDPOINTS。
+_WRITE_ENDPOINTS = {
+    # endpoint 名 = blueprint.view_func.__name__
+    "update_kb", "delete_kb",
+    "upload_documents", "create_ingest_job",
+    "cancel_job", "retry_job", "run_pending_job",
+    "delete_document_legacy", "delete_document",
+    "retry_document", "reindex_document", "batch_reindex_documents",
+    "put_agent_config",
+}
+
+
+@kb_bp.before_request
+def _enforce_kb_permission():
+    """对所有 /api/kb/<kb_id>/* 校验当前请求是否对该 kb 有访问权限。
+
+    /api/kb 列表（无 kb_id）跳过；视图层自己按用户过滤。
+    /api/kb POST 新建（无 kb_id 路径参数）跳过；超管在视图层校验。
+    """
+    view_args = request.view_args or {}
+    kb_id = view_args.get("kb_id")
+    if not kb_id:
+        return None
+    # 复用 chat._check_kb_access：admin token / username=admin / 真实权限
+    try:
+        from custom_app.api.chat import _check_kb_access
+    except Exception:  # noqa: BLE001
+        return None
+    endpoint = (request.endpoint or "").split(".")[-1]
+    level = "write" if endpoint in _WRITE_ENDPOINTS else "read"
+    allowed, reason = _check_kb_access(kb_id, level=level)
+    if allowed:
+        return None
+    return _err(reason or "forbidden", "KB_FORBIDDEN", 403)
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _req_id() -> str:
