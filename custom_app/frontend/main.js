@@ -267,6 +267,11 @@ export function initChatApp({
     modelChip: root.querySelector('[data-role="model-chip"]'),
     modelChipName: root.querySelector('[data-role="model-chip-name"]'),
     deepReasoningToggle: root.querySelector('[data-role="deep-reasoning-toggle"]'),
+    // P-Perm Commit 5+：侧栏底部用户信息 + 退出
+    userBox: root.querySelector('[data-role="sidebar-user"]'),
+    userName: root.querySelector('[data-role="user-name"]'),
+    adminLink: root.querySelector('[data-role="admin-link"]'),
+    logoutBtn: root.querySelector('[data-role="logout-btn"]'),
   }
 
   const state = {
@@ -285,6 +290,7 @@ export function initChatApp({
   mountAgentSelect(elements.agentSelect)
   bindChatImageLightbox(elements.messageList)
   initModelChip()
+  initUserFooter()
 
   function scrollMessageListToBottom() {
     const list = elements.messageList
@@ -328,6 +334,45 @@ export function initChatApp({
         || state.chatModels.find((m) => m.is_default)
         || state.chatModels[0]
     elements.modelChipName.textContent = sel ? sel.name : '默认模型'
+  }
+
+  async function initUserFooter() {
+    // P-Perm：拉 /api/auth/me，渲染当前用户名 + 退出按钮。
+    // 未登录场景理论上 before_request 已跳 /login，到不了这里；做兜底。
+    if (!elements.userBox || !elements.userName) return
+    try {
+      const resp = await fetch('/api/auth/me', {
+        credentials: 'same-origin', headers: { Accept: 'application/json' },
+      })
+      if (!resp.ok) {
+        // 401 → 调到登录页，避免半截界面
+        if (resp.status === 401) window.location.href = '/login'
+        return
+      }
+      const body = await resp.json().catch(() => ({}))
+      const u = body && body.data
+      if (!u) return
+      const label = u.display_name || u.username || ''
+      elements.userName.textContent = label
+      elements.userBox.hidden = false
+      const isAdmin = (u.username || '') === 'admin'
+      if (elements.adminLink) elements.adminLink.hidden = !isAdmin
+      if (elements.logoutBtn) {
+        elements.logoutBtn.hidden = false
+        elements.logoutBtn.addEventListener('click', async () => {
+          try {
+            await fetch('/api/auth/logout', {
+              method: 'POST', credentials: 'same-origin',
+            })
+          } catch {
+            /* ignore — 服务器清不到也直接强跳登录页 */
+          }
+          window.location.href = '/login'
+        })
+      }
+    } catch {
+      /* 网络异常时静默，不阻塞对话页 */
+    }
   }
 
   async function initModelChip() {

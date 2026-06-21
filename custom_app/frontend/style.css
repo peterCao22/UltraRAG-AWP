@@ -259,11 +259,50 @@ a {
 }
 
 .sidebar-link {
+  padding: 6px 0;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sidebar-link:hover {
+  color: var(--color-text-primary);
+}
+
+.sidebar-footer {
   margin-top: auto;
   padding-top: var(--space-lg);
   border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
   color: var(--color-text-secondary);
-  text-decoration: none;
+  padding-bottom: 6px;
+}
+
+.sidebar-user__name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.sidebar-logout {
+  color: #b91c1c;
+}
+
+.sidebar-logout:hover {
+  color: #7f1d1d;
 }
 
 .session-list-host {

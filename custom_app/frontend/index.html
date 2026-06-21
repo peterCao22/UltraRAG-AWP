@@ -48,7 +48,14 @@
           <div class="session-list-host" data-role="session-list" aria-label="历史会话"></div>
         </section>
 
-        <a class="sidebar-link" href="/admin">管理后台</a>
+        <div class="sidebar-footer" data-role="sidebar-footer">
+          <div class="sidebar-user" data-role="sidebar-user" hidden>
+            <span class="sidebar-user__icon" aria-hidden="true">👤</span>
+            <span class="sidebar-user__name" data-role="user-name">—</span>
+          </div>
+          <a class="sidebar-link" href="/admin" data-role="admin-link" hidden>管理后台</a>
+          <button class="sidebar-link sidebar-logout" type="button" data-role="logout-btn" hidden>退出登录</button>
+        </div>
       </aside>
 
       <main class="chat-workspace">
