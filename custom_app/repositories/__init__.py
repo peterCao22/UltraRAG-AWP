@@ -34,6 +34,7 @@ from custom_app.repositories.kb_repository import KbRepository
 from custom_app.repositories.kg_repository import KgRepository
 from custom_app.repositories.role_repository import RoleRepository
 from custom_app.repositories.session_repository import SessionRepository
+from custom_app.repositories.user_repository import UserRepository
 
 __all__ = [
     # base
@@ -51,4 +52,5 @@ __all__ = [
     "KgRepository",
     "RoleRepository",
     "SessionRepository",
+    "UserRepository",
 ]
