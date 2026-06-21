@@ -18,6 +18,7 @@ from flask import Flask, jsonify, make_response, redirect, request, send_from_di
 from custom_app.api import (
     admin_agents_bp,
     admin_models_bp,
+    admin_users_bp,
     chat_bp,
     kb_bp,
     roles_bp,
@@ -73,7 +74,13 @@ def _is_admin_request(path: str) -> bool:
 
     返回：
         bool: 是管理后台页面或管理 API 返回 True，否则返回 False。
+
+    P-Perm Commit 5：/api/admin/users/* 改由 admin_users.py 内的 @require_admin
+    装饰器鉴权（admin token 或登录用户为 admin），不再走 token 强制中间件，
+    否则配了 token 后 admin UI 无法用 cookie 登录访问。
     """
+    if path.startswith("/api/admin/users"):
+        return False
     return (
         path == "/admin"
         or path.startswith("/admin/")
@@ -171,6 +178,7 @@ def create_app() -> Flask:
     app.register_blueprint(sessions_bp)
     app.register_blueprint(admin_models_bp)
     app.register_blueprint(admin_agents_bp)
+    app.register_blueprint(admin_users_bp)
     app.register_blueprint(auth_bp)
 
     @app.before_request

@@ -37,6 +37,17 @@ import {
   updateAgentConfig,
   uploadKbDocuments,
 } from './services/kbApi.js'
+import {
+  assignRole as assignUserRole,
+  createUser as createUserApi,
+  deleteUser as deleteUserApi,
+  listAllRoles as listAllRolesApi,
+  listUserRoles,
+  listUsers,
+  resetPassword as resetPasswordApi,
+  revokeRole as revokeUserRole,
+  setStatus as setUserStatusApi,
+} from './services/usersApi.js'
 
 const defaultKbApi = {
   batchDocumentStatus,
@@ -120,6 +131,7 @@ function parseRoute() {
   if (raw === '/status') return { view: 'status' }
   if (raw === '/models') return { view: 'models' }
   if (raw === '/agents') return { view: 'agents' }
+  if (raw === '/users') return { view: 'users' }
   const m = raw.match(/^\/kb\/([^/]+)\/?$/)
   if (m) return { view: 'detail', kbId: decodeURIComponent(m[1]) }
   return { view: 'list' }
@@ -1415,6 +1427,218 @@ export function initAdminApp({
     })
   }
 
+  // ── P-Perm Commit 5：用户管理视图 ──────────────────────────────────────
+  async function renderUsers() {
+    clearPoll()
+    clearDocPoll()
+    activeKbId = null
+    setNavActive(root, 'users')
+    if (titleEl) titleEl.textContent = '用户管理'
+    outlet.innerHTML = sanitizeHtml(`
+      <section class="admin-users">
+        <div class="admin-users__head">
+          <h1>用户管理</h1>
+          <button type="button" class="btn-primary" data-action="users-new">+ 新建用户</button>
+        </div>
+        <p class="muted">管理登录账号与角色绑定；admin 用户不可删除/禁用。</p>
+        <div data-role="users-list"><p class="muted">加载中…</p></div>
+      </section>
+    `)
+
+    const listBox = outlet.querySelector('[data-role="users-list"]')
+
+    async function reload() {
+      try {
+        const items = await listUsers()
+        if (!items.length) {
+          listBox.innerHTML = sanitizeHtml('<p class="muted">暂无用户。</p>')
+          return
+        }
+        const rowsHtml = items.map((u) => {
+          const isAdmin = u.username === 'admin'
+          const statusBadge = u.status === 'active'
+            ? '<span class="badge badge--ok">启用</span>'
+            : '<span class="badge badge--warn">禁用</span>'
+          const lastLogin = u.last_login_at || '—'
+          const actions = [
+            `<button class="btn-link" data-uid="${escapeHtml(u.user_id)}" data-act="roles">角色</button>`,
+            `<button class="btn-link" data-uid="${escapeHtml(u.user_id)}" data-act="pw">重置密码</button>`,
+            !isAdmin
+              ? `<button class="btn-link" data-uid="${escapeHtml(u.user_id)}" data-act="toggle" data-status="${escapeHtml(u.status)}">${u.status === 'active' ? '禁用' : '启用'}</button>`
+              : '',
+            !isAdmin
+              ? `<button class="btn-link btn-danger" data-uid="${escapeHtml(u.user_id)}" data-act="del" data-username="${escapeHtml(u.username)}">删除</button>`
+              : '',
+          ].filter(Boolean).join(' ')
+          return `<tr>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.display_name || '')}</td>
+            <td>${statusBadge}</td>
+            <td>${escapeHtml(lastLogin)}</td>
+            <td class="admin-users__actions">${actions}</td>
+          </tr>`
+        }).join('')
+        listBox.innerHTML = sanitizeHtml(`
+          <table class="admin-table">
+            <thead><tr>
+              <th>用户名</th><th>显示名</th><th>状态</th><th>上次登录</th><th>操作</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        `)
+      } catch (e) {
+        Toast.show(`加载失败：${e.message || String(e)}`, 'error')
+        listBox.innerHTML = sanitizeHtml(`<p class="muted">加载失败：${escapeHtml(e.message || String(e))}</p>`)
+      }
+    }
+
+    function openCreateModal() {
+      const overlay = document.createElement('div')
+      overlay.className = 'modal-overlay'
+      overlay.innerHTML = sanitizeHtml(`
+        <div class="modal">
+          <h2>新建用户</h2>
+          <label>用户名 <input type="text" data-f="username" autocomplete="off" /></label>
+          <label>密码（≥6 位） <input type="password" data-f="password" autocomplete="new-password" /></label>
+          <label>显示名（可选） <input type="text" data-f="display_name" autocomplete="off" /></label>
+          <div class="modal-actions">
+            <button type="button" data-act="cancel">取消</button>
+            <button type="button" class="btn-primary" data-act="ok">创建</button>
+          </div>
+        </div>
+      `)
+      document.body.appendChild(overlay)
+      const get = (k) => overlay.querySelector(`[data-f="${k}"]`).value.trim()
+      overlay.querySelector('[data-act="cancel"]').onclick = () => overlay.remove()
+      overlay.querySelector('[data-act="ok"]').onclick = async () => {
+        try {
+          await createUserApi({
+            username: get('username'),
+            password: get('password'),
+            displayName: get('display_name'),
+          })
+          overlay.remove()
+          Toast.show('创建成功', 'success')
+          await reload()
+        } catch (e) {
+          Toast.show(e.message || String(e), 'error')
+        }
+      }
+    }
+
+    function openResetPwModal(userId) {
+      const overlay = document.createElement('div')
+      overlay.className = 'modal-overlay'
+      overlay.innerHTML = sanitizeHtml(`
+        <div class="modal">
+          <h2>重置密码</h2>
+          <label>新密码（≥6 位） <input type="password" data-f="pw" autocomplete="new-password" /></label>
+          <div class="modal-actions">
+            <button type="button" data-act="cancel">取消</button>
+            <button type="button" class="btn-primary" data-act="ok">提交</button>
+          </div>
+        </div>
+      `)
+      document.body.appendChild(overlay)
+      overlay.querySelector('[data-act="cancel"]').onclick = () => overlay.remove()
+      overlay.querySelector('[data-act="ok"]').onclick = async () => {
+        const pw = overlay.querySelector('[data-f="pw"]').value.trim()
+        try {
+          await resetPasswordApi(userId, pw)
+          overlay.remove()
+          Toast.show('已重置密码', 'success')
+        } catch (e) {
+          Toast.show(e.message || String(e), 'error')
+        }
+      }
+    }
+
+    async function openRolesModal(userId) {
+      let allRoles = []
+      let bound = []
+      try {
+        ;[allRoles, bound] = await Promise.all([
+          listAllRolesApi(), listUserRoles(userId),
+        ])
+      } catch (e) {
+        Toast.show(`加载角色失败：${e.message || String(e)}`, 'error')
+        return
+      }
+      const boundIds = new Set(bound.map((r) => r.role_id))
+      const optionsHtml = allRoles.map((r) => {
+        const checked = boundIds.has(r.role_id) ? 'checked' : ''
+        return `<label class="role-row">
+          <input type="checkbox" data-rid="${escapeHtml(r.role_id)}" ${checked} />
+          ${escapeHtml(r.name || r.role_id)}
+        </label>`
+      }).join('')
+      const overlay = document.createElement('div')
+      overlay.className = 'modal-overlay'
+      overlay.innerHTML = sanitizeHtml(`
+        <div class="modal">
+          <h2>用户角色</h2>
+          <div class="role-list">${optionsHtml || '<p class="muted">尚未创建角色，先去「知识库管理」配置。</p>'}</div>
+          <div class="modal-actions">
+            <button type="button" data-act="close">关闭</button>
+          </div>
+        </div>
+      `)
+      document.body.appendChild(overlay)
+      overlay.querySelector('[data-act="close"]').onclick = () => overlay.remove()
+      overlay.querySelectorAll('input[type="checkbox"][data-rid]').forEach((cb) => {
+        cb.addEventListener('change', async () => {
+          const rid = cb.getAttribute('data-rid')
+          try {
+            if (cb.checked) await assignUserRole(userId, rid)
+            else await revokeUserRole(userId, rid)
+            Toast.show('已更新', 'success')
+          } catch (e) {
+            cb.checked = !cb.checked
+            Toast.show(e.message || String(e), 'error')
+          }
+        })
+      })
+    }
+
+    listBox.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-uid]')
+      if (!btn) return
+      const uid = btn.getAttribute('data-uid')
+      const act = btn.getAttribute('data-act')
+      if (act === 'pw') openResetPwModal(uid)
+      else if (act === 'roles') openRolesModal(uid)
+      else if (act === 'toggle') {
+        const next = btn.getAttribute('data-status') === 'active' ? 'disabled' : 'active'
+        try {
+          await setUserStatusApi(uid, next)
+          Toast.show('已更新', 'success')
+          await reload()
+        } catch (err) {
+          Toast.show(err.message || String(err), 'error')
+        }
+      } else if (act === 'del') {
+        const username = btn.getAttribute('data-username') || ''
+        const ok = await openConfirmModal({
+          title: '删除用户',
+          message: `确认删除用户「${username}」？该操作不可撤销（审计日志保留）。`,
+          confirmText: '删除',
+          danger: true,
+        })
+        if (!ok) return
+        try {
+          await deleteUserApi(uid)
+          Toast.show('已删除', 'success')
+          await reload()
+        } catch (err) {
+          Toast.show(err.message || String(err), 'error')
+        }
+      }
+    })
+
+    outlet.querySelector('[data-action="users-new"]').onclick = openCreateModal
+    await reload()
+  }
+
   function renderStatus() {
     clearPoll()
     clearDocPoll()
@@ -1435,6 +1659,7 @@ export function initAdminApp({
     else if (route.view === 'status') renderStatus()
     else if (route.view === 'models') await renderModels()
     else if (route.view === 'agents') await renderAgents()
+    else if (route.view === 'users') await renderUsers()
     else if (route.view === 'detail' && route.kbId) await renderDetail(route.kbId)
     else await renderList()
   }
