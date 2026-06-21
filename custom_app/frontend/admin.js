@@ -48,6 +48,14 @@ import {
   revokeRole as revokeUserRole,
   setStatus as setUserStatusApi,
 } from './services/usersApi.js'
+import {
+  assignKbPermission,
+  createRole as createRoleApi,
+  deleteRole as deleteRoleApi,
+  listRolePermissions,
+  listRoles,
+  revokeKbPermission,
+} from './services/rolesApi.js'
 
 const defaultKbApi = {
   batchDocumentStatus,
@@ -132,6 +140,7 @@ function parseRoute() {
   if (raw === '/models') return { view: 'models' }
   if (raw === '/agents') return { view: 'agents' }
   if (raw === '/users') return { view: 'users' }
+  if (raw === '/roles') return { view: 'roles' }
   const m = raw.match(/^\/kb\/([^/]+)\/?$/)
   if (m) return { view: 'detail', kbId: decodeURIComponent(m[1]) }
   return { view: 'list' }
@@ -1639,6 +1648,200 @@ export function initAdminApp({
     await reload()
   }
 
+  // ── P-Perm C7.3：角色管理视图 ──────────────────────────────────────────
+  async function renderRoles() {
+    clearPoll()
+    clearDocPoll()
+    activeKbId = null
+    setNavActive(root, 'roles')
+    if (titleEl) titleEl.textContent = '角色管理'
+    outlet.innerHTML = sanitizeHtml(`
+      <section class="admin-roles">
+        <div class="admin-roles__head">
+          <h1>角色管理</h1>
+          <button type="button" class="btn-primary" data-action="roles-new">+ 新建角色</button>
+        </div>
+        <p class="muted">角色绑定 KB 权限（read / write / admin），再由用户管理把角色绑给用户。</p>
+        <div data-role="roles-list"><p class="muted">加载中…</p></div>
+      </section>
+    `)
+
+    const listBox = outlet.querySelector('[data-role="roles-list"]')
+
+    async function loadKbs() {
+      try {
+        return await api.listKnowledgeBases({ purpose: 'admin' })
+      } catch (e) {
+        Toast.show(`KB 加载失败：${e.message || String(e)}`, 'error')
+        return []
+      }
+    }
+
+    async function reload() {
+      try {
+        const rows = await listRoles()
+        if (!rows.length) {
+          listBox.innerHTML = sanitizeHtml(
+            '<p class="muted">尚未创建角色。点击右上「新建角色」开始。</p>',
+          )
+          return
+        }
+        const rowsHtml = rows.map((r) => {
+          return `<tr>
+            <td>${escapeHtml(r.name || '')}</td>
+            <td>${escapeHtml(r.description || '')}</td>
+            <td>${escapeHtml(r.created_at || '')}</td>
+            <td class="admin-roles__actions">
+              <button class="btn-link" data-rid="${escapeHtml(r.role_id)}" data-act="perms">KB 权限</button>
+              <button class="btn-link btn-danger" data-rid="${escapeHtml(r.role_id)}" data-act="del" data-name="${escapeHtml(r.name || '')}">删除</button>
+            </td>
+          </tr>`
+        }).join('')
+        listBox.innerHTML = sanitizeHtml(`
+          <table class="admin-table">
+            <thead><tr>
+              <th>角色名</th><th>说明</th><th>创建时间</th><th>操作</th>
+            </tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        `)
+      } catch (e) {
+        Toast.show(`加载失败：${e.message || String(e)}`, 'error')
+        listBox.innerHTML = sanitizeHtml(
+          `<p class="muted">加载失败：${escapeHtml(e.message || String(e))}</p>`,
+        )
+      }
+    }
+
+    function openCreateModal() {
+      const overlay = document.createElement('div')
+      overlay.className = 'modal-overlay'
+      overlay.innerHTML = sanitizeHtml(`
+        <div class="modal">
+          <h2>新建角色</h2>
+          <label>角色名 <input type="text" data-f="name" autocomplete="off" /></label>
+          <label>说明（可选） <input type="text" data-f="description" autocomplete="off" /></label>
+          <div class="modal-actions">
+            <button type="button" data-act="cancel">取消</button>
+            <button type="button" class="btn-primary" data-act="ok">创建</button>
+          </div>
+        </div>
+      `)
+      document.body.appendChild(overlay)
+      overlay.querySelector('[data-act="cancel"]').onclick = () => overlay.remove()
+      overlay.querySelector('[data-act="ok"]').onclick = async () => {
+        const name = overlay.querySelector('[data-f="name"]').value.trim()
+        const description = overlay.querySelector('[data-f="description"]').value.trim()
+        if (!name) {
+          Toast.show('角色名不能为空', 'error')
+          return
+        }
+        try {
+          await createRoleApi({ name, description })
+          overlay.remove()
+          Toast.show('已创建', 'success')
+          await reload()
+        } catch (e) {
+          Toast.show(e.message || String(e), 'error')
+        }
+      }
+    }
+
+    async function openPermsModal(roleId, roleName) {
+      let kbs = []
+      let perms = []
+      try {
+        ;[kbs, perms] = await Promise.all([
+          loadKbs(), listRolePermissions(roleId),
+        ])
+      } catch (e) {
+        Toast.show(`权限加载失败：${e.message || String(e)}`, 'error')
+        return
+      }
+      const permMap = new Map()
+      for (const p of perms) permMap.set(p.kb_id, p.access_level || 'read')
+
+      const rowsHtml = kbs.map((kb) => {
+        const current = permMap.get(kb.kb_id)
+        const sel = (lvl) => current === lvl ? 'selected' : ''
+        return `<tr>
+          <td>${escapeHtml(kb.name || kb.kb_id)}</td>
+          <td>
+            <select data-kbid="${escapeHtml(kb.kb_id)}" class="perm-select">
+              <option value="" ${current ? '' : 'selected'}>（无）</option>
+              <option value="read" ${sel('read')}>read</option>
+              <option value="write" ${sel('write')}>write</option>
+              <option value="admin" ${sel('admin')}>admin</option>
+            </select>
+          </td>
+        </tr>`
+      }).join('')
+
+      const overlay = document.createElement('div')
+      overlay.className = 'modal-overlay'
+      overlay.innerHTML = sanitizeHtml(`
+        <div class="modal modal--wide">
+          <h2>角色「${escapeHtml(roleName)}」KB 权限</h2>
+          <table class="admin-table">
+            <thead><tr><th>知识库</th><th>权限</th></tr></thead>
+            <tbody>${rowsHtml || '<tr><td colspan="2" class="muted">暂无 KB。先去「知识库管理」创建。</td></tr>'}</tbody>
+          </table>
+          <div class="modal-actions">
+            <button type="button" data-act="close">关闭</button>
+          </div>
+        </div>
+      `)
+      document.body.appendChild(overlay)
+      overlay.querySelector('[data-act="close"]').onclick = () => overlay.remove()
+      overlay.querySelectorAll('select.perm-select[data-kbid]').forEach((sel) => {
+        sel.addEventListener('change', async () => {
+          const kbId = sel.getAttribute('data-kbid')
+          const value = sel.value
+          try {
+            if (!value) {
+              await revokeKbPermission(roleId, kbId)
+            } else {
+              await assignKbPermission(roleId, kbId, value)
+            }
+            Toast.show('已更新', 'success')
+          } catch (e) {
+            Toast.show(e.message || String(e), 'error')
+          }
+        })
+      })
+    }
+
+    listBox.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-rid]')
+      if (!btn) return
+      const rid = btn.getAttribute('data-rid')
+      const act = btn.getAttribute('data-act')
+      if (act === 'perms') {
+        const name = btn.closest('tr')?.querySelector('td')?.textContent || rid
+        openPermsModal(rid, name)
+      } else if (act === 'del') {
+        const name = btn.getAttribute('data-name') || rid
+        const ok = await openConfirmModal({
+          title: '删除角色',
+          message: `确认删除角色「${name}」？已绑定的用户/KB 关系会一并解除。`,
+          confirmText: '删除',
+          danger: true,
+        })
+        if (!ok) return
+        try {
+          await deleteRoleApi(rid)
+          Toast.show('已删除', 'success')
+          await reload()
+        } catch (err) {
+          Toast.show(err.message || String(err), 'error')
+        }
+      }
+    })
+
+    outlet.querySelector('[data-action="roles-new"]').onclick = openCreateModal
+    await reload()
+  }
+
   function renderStatus() {
     clearPoll()
     clearDocPoll()
@@ -1660,6 +1863,7 @@ export function initAdminApp({
     else if (route.view === 'models') await renderModels()
     else if (route.view === 'agents') await renderAgents()
     else if (route.view === 'users') await renderUsers()
+    else if (route.view === 'roles') await renderRoles()
     else if (route.view === 'detail' && route.kbId) await renderDetail(route.kbId)
     else await renderList()
   }
