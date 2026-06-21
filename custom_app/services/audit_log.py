@@ -32,6 +32,7 @@ def log_qa(
     chunk_ids: list[str] | None = None,
     tenant_id: str = "default",
     extra_meta: dict[str, Any] | None = None,
+    user_id: str | None = None,
 ) -> bool:
     """记一条 event_type='qa' 审计行。
 
@@ -60,11 +61,12 @@ def log_qa(
             answer=answer or "",
             chunk_ids_json=chunk_ids_json,
             meta_json=meta_json,
+            user_id=user_id or "",
         )
         return True
     except Exception as e:  # noqa: BLE001 — 审计失败不阻塞主对话
         logger.warning(
-            "audit_log.log_qa failed kb=%s session=%s: %s",
-            kb_id, session_id, e,
+            "audit_log.log_qa failed kb=%s session=%s user=%s: %s",
+            kb_id, session_id, user_id, e,
         )
         return False

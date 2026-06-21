@@ -636,6 +636,13 @@ def chat_stream():
             if _should_audit and question:
                 try:
                     from custom_app.services.audit_log import log_qa
+                    # P-Perm: 注入 user_id（未登录或 admin token 时为空）
+                    _uid = ""
+                    try:
+                        from custom_app.services.auth import current_user_id
+                        _uid = current_user_id() or ""
+                    except Exception:
+                        pass
                     log_qa(
                         kb_id=kb_id,
                         session_id=session_id_opt,
@@ -643,6 +650,7 @@ def chat_stream():
                         answer=final_answer or "".join(accumulated).strip(),
                         chunk_ids=qa_chunk_ids,
                         extra_meta=qa_meta,
+                        user_id=_uid,
                     )
                 except Exception:
                     logger.exception("audit_log.log_qa failed")

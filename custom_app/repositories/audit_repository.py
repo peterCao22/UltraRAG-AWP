@@ -39,23 +39,26 @@ class AuditRepository:
         answer: str = "",
         chunk_ids_json: str = "[]",
         meta_json: str = "{}",
+        user_id: str = "",
     ) -> None:
         """追加一条审计记录。
 
         所有字符串字段都已序列化好（chunk_ids/meta 调用方传 JSON 字符串），
         Repository 不做任何业务转换，避免引入隐式格式。
+        P-Perm 加 user_id 字段：登录用户的 user_id；admin token 或匿名时为空。
         """
         sql = (
             "INSERT INTO audit_logs "
-            "(ts, tenant_id, session_id, kb_id, event_type, query, answer, chunk_ids, meta) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "(ts, tenant_id, session_id, kb_id, event_type, query, answer, "
+            "chunk_ids, meta, user_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         with self._provider.connect() as conn:
             conn.execute(
                 adapt_sql(sql, self._provider),
                 (
                     ts, tenant_id, session_id, kb_id, event_type,
-                    query, answer, chunk_ids_json, meta_json,
+                    query, answer, chunk_ids_json, meta_json, user_id,
                 ),
             )
 

@@ -40,19 +40,22 @@ class SessionRepository:
         title: str,
         agent_mode: str,
         created_at: str,
+        user_id: str = "",
     ) -> None:
         sql = """INSERT INTO kb_sessions
-                 (session_id, kb_id, title, agent_mode, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?)"""
+                 (session_id, kb_id, title, agent_mode, created_at, updated_at, user_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"""
         with self._provider.connect() as conn:
             conn.execute(
                 adapt_sql(sql, self._provider),
-                (session_id, kb_id, title, agent_mode, created_at, created_at),
+                (session_id, kb_id, title, agent_mode,
+                 created_at, created_at, user_id),
             )
 
     def get_session(self, session_id: str) -> Optional[dict[str, Any]]:
         sql = (
-            "SELECT session_id, kb_id, title, agent_mode, created_at, updated_at "
+            "SELECT session_id, kb_id, title, agent_mode, "
+            "created_at, updated_at, user_id "
             "FROM kb_sessions WHERE session_id = ?"
         )
         with self._provider.connect() as conn:
@@ -60,16 +63,35 @@ class SessionRepository:
             return fetch_one_as_dict(cur)
 
     def list_sessions_for_kb(
-        self, kb_id: str, *, limit: int = 100
+        self,
+        kb_id: str,
+        *,
+        limit: int = 100,
+        user_id: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        """按 updated_at DESC 返回某 KB 的会话；limit 上限 500。"""
+        """按 updated_at DESC 返回某 KB 的会话；limit 上限 500。
+
+        P-Perm：user_id 非 None 时按 user_id 过滤（只看自己的会话）；
+        None 表示不过滤（admin 视角 / 兼容老调用）。
+        """
         lim = max(1, min(int(limit), 500))
-        sql = (
-            "SELECT session_id, kb_id, title, agent_mode, created_at, updated_at "
-            "FROM kb_sessions WHERE kb_id = ? ORDER BY updated_at DESC LIMIT ?"
-        )
+        if user_id is None:
+            sql = (
+                "SELECT session_id, kb_id, title, agent_mode, "
+                "created_at, updated_at, user_id "
+                "FROM kb_sessions WHERE kb_id = ? ORDER BY updated_at DESC LIMIT ?"
+            )
+            params: tuple = (kb_id, lim)
+        else:
+            sql = (
+                "SELECT session_id, kb_id, title, agent_mode, "
+                "created_at, updated_at, user_id "
+                "FROM kb_sessions WHERE kb_id = ? AND user_id = ? "
+                "ORDER BY updated_at DESC LIMIT ?"
+            )
+            params = (kb_id, user_id, lim)
         with self._provider.connect() as conn:
-            cur = conn.execute(adapt_sql(sql, self._provider), (kb_id, lim))
+            cur = conn.execute(adapt_sql(sql, self._provider), params)
             return fetch_all_as_dicts(cur)
 
     def update_title(self, session_id: str, *, title: str, updated_at: str) -> None:

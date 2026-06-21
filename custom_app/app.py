@@ -197,6 +197,47 @@ def create_app() -> Flask:
         # 页面请求统一跳转 Phase 4 预留登录页，避免泄露管理页 HTML 内容。
         return redirect("/login")
 
+    # P-Perm: 全局用户登录检查 — chat/kb/sessions API 需登录用户，其他放行。
+    # 公开白名单：/api/auth/* 自身、/health、静态文件、首页等。
+    _AUTH_PUBLIC_PATHS = ("/health",)
+    _AUTH_PUBLIC_PREFIXES = (
+        "/api/auth/", "/static/", "/frontend/", "/login", "/admin",
+    )
+    _AUTH_PROTECTED_PREFIXES = (
+        "/api/chat", "/api/kb", "/api/sessions",
+    )
+
+    @app.before_request
+    def require_user_session():
+        """要求 /api/chat /api/kb /api/sessions 路由有登录用户。
+
+        可通过 env ULTRARAG_AUTH_REQUIRED=0 关闭（开发用，admin token 仍生效）。
+        """
+        if _os.environ.get("ULTRARAG_AUTH_REQUIRED", "1").strip().lower() in (
+            "0", "false", "no", "off",
+        ):
+            return None
+        path = request.path or "/"
+        # 白名单先放行
+        if path in _AUTH_PUBLIC_PATHS:
+            return None
+        if any(path.startswith(p) for p in _AUTH_PUBLIC_PREFIXES):
+            return None
+        # 只校 P-Perm 保护的前缀
+        if not any(path.startswith(p) for p in _AUTH_PROTECTED_PREFIXES):
+            return None
+        # admin token bypass（与现有运维通道一致）
+        configured_admin = _get_configured_admin_token()
+        if configured_admin:
+            presented = _get_request_admin_token()
+            if presented and hmac.compare_digest(presented, configured_admin):
+                return None
+        # 检查 session 用户
+        from custom_app.services.auth import current_user as _current_user
+        if _current_user() is None:
+            return jsonify({"error": "login required", "code": "AUTH_REQUIRED"}), 401
+        return None
+
     @app.after_request
     def add_security_headers(response):
         """为所有响应追加基础安全头。

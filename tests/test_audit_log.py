@@ -143,7 +143,8 @@ def sqlite_provider(tmp_path, monkeypatch):
           query       TEXT NOT NULL DEFAULT '',
           answer      TEXT NOT NULL DEFAULT '',
           chunk_ids   TEXT NOT NULL DEFAULT '[]',
-          meta        TEXT NOT NULL DEFAULT '{}'
+          meta        TEXT NOT NULL DEFAULT '{}',
+          user_id     TEXT NOT NULL DEFAULT ''
         )
         """
     )

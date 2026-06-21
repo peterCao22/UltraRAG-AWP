@@ -45,6 +45,8 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "db").mkdir()
     (tmp_path / "data" / "kb").mkdir(parents=True)
+    # P-Perm（Commit 4）全局登录中间件；旧 Phase 1 测试不携带登录态，关掉拦截。
+    monkeypatch.setenv("ULTRARAG_AUTH_REQUIRED", "0")
     # setup: 先清理可能的历史残留
     _cleanup_test_kb_sessions()
     yield tmp_path

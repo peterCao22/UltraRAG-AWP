@@ -39,6 +39,9 @@ def isolated_env(tmp_path, monkeypatch):
     from custom_app.repositories import set_default_provider
     set_default_provider(None)
     monkeypatch.setenv("ULTRARAG_DB_BACKEND", "sqlite")
+    # P-Perm（Commit 4）引入全局 before_request 登录检查；旧 Phase 2 测试
+    # 不关心登录态，统一关掉拦截（与开发模式一致）。
+    monkeypatch.setenv("ULTRARAG_AUTH_REQUIRED", "0")
     yield tmp_path
     set_default_provider(None)
 

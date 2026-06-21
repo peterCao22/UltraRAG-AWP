@@ -71,9 +71,16 @@ def _safe_load_reasoning(raw: Any) -> dict:
 
 
 def create_session(
-    kb_id: str, *, title: str = "", agent_mode: str = "quick"
+    kb_id: str,
+    *,
+    title: str = "",
+    agent_mode: str = "quick",
+    user_id: str = "",
 ) -> dict[str, Any]:
-    """创建空会话并返回记录字段。"""
+    """创建空会话并返回记录字段。
+
+    P-Perm: user_id 落库以建立归属；admin token / 兼容旧路径传空串。
+    """
     sid = new_id("sess")
     ts = now_iso()
     t = (title or "").strip() or "新对话"
@@ -81,7 +88,8 @@ def create_session(
     if am not in ("quick", "agent"):
         am = "quick"
     SessionRepository().create_session(
-        session_id=sid, kb_id=kb_id, title=t, agent_mode=am, created_at=ts,
+        session_id=sid, kb_id=kb_id, title=t, agent_mode=am,
+        created_at=ts, user_id=user_id or "",
     )
     return {
         "session_id": sid,
@@ -90,12 +98,23 @@ def create_session(
         "agent_mode": am,
         "created_at": ts,
         "updated_at": ts,
+        "user_id": user_id or "",
     }
 
 
-def list_sessions_for_kb(kb_id: str, *, limit: int = 100) -> List[dict[str, Any]]:
-    """按更新时间倒序列出某知识库下的会话。"""
-    return SessionRepository().list_sessions_for_kb(kb_id, limit=limit)
+def list_sessions_for_kb(
+    kb_id: str,
+    *,
+    limit: int = 100,
+    user_id: Optional[str] = None,
+) -> List[dict[str, Any]]:
+    """按更新时间倒序列出某知识库下的会话。
+
+    P-Perm: user_id 非 None 时只返回归属该用户的会话；None 等同于不过滤。
+    """
+    return SessionRepository().list_sessions_for_kb(
+        kb_id, limit=limit, user_id=user_id,
+    )
 
 
 def get_session(session_id: str) -> dict[str, Any] | None:

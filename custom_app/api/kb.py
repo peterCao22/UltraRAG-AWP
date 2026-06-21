@@ -909,6 +909,36 @@ def list_kb():
         limit=limit,
         offset=offset,
     )
+
+    # P-Perm: 普通登录用户只看到自己有权限的 KB；admin token / ULTRARAG_AUTH_REQUIRED=0 透明放行。
+    import hmac
+    auth_disabled = os.environ.get(
+        "ULTRARAG_AUTH_REQUIRED", "1",
+    ).strip().lower() in ("0", "false", "no", "off")
+    expected_admin = os.getenv("ULTRARAG_ADMIN_TOKEN", "").strip()
+    presented_admin = (request.headers.get("X-Admin-Token", "") or "").strip()
+    is_admin_bypass = auth_disabled or (
+        bool(expected_admin) and bool(presented_admin) and hmac.compare_digest(
+            presented_admin, expected_admin,
+        )
+    )
+    if not is_admin_bypass:
+        from custom_app.services.auth import current_user_id
+        from custom_app.repositories import UserRepository
+        uid = current_user_id() or ""
+        # 无登录 + 无 admin = 直接空（before_request 通常已挡住，但兜底）
+        allowed = (
+            set(UserRepository().list_kb_ids_accessible(uid)) if uid else set()
+        )
+        if isinstance(rows, list):
+            rows = [it for it in rows if it.get("kb_id") in allowed]
+        elif isinstance(rows, dict) and "items" in rows:
+            rows = dict(rows)
+            rows["items"] = [
+                it for it in rows["items"] if it.get("kb_id") in allowed
+            ]
+            if "total" in rows:
+                rows["total"] = len(rows["items"])
     return _ok(rows)
 
 
